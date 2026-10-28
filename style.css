@@ -181,3 +181,16 @@ dialog::backdrop{background:rgba(29,42,37,.45);backdrop-filter:blur(2px)}
 .setup{margin:10px 0 16px;padding-left:20px;font-size:13.5px}
 .setup li{margin:5px 0}
 .cloudline{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px}
+
+/* sign-in screen */
+#gate{position:fixed;inset:0;z-index:40;background:var(--paper);background-image:radial-gradient(rgba(29,42,37,.05) 1px,transparent 1px);background-size:18px 18px;display:grid;place-items:center;padding:20px}
+#gate:before{content:"";position:absolute;top:0;left:0;right:0;height:8px;background:repeating-linear-gradient(-45deg,var(--air-red) 0 14px,#fff 14px 24px,var(--air-blue) 24px 38px,#fff 38px 48px)}
+.gatebox{width:min(380px,100%);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px 26px;text-align:center;box-shadow:0 20px 60px rgba(29,42,37,.12)}
+.gatebox .logo{display:inline-block;font-size:20px;margin-bottom:10px}
+.gatebox h1{font-size:40px;margin:6px 0 2px}
+.gatebox form{display:flex;flex-direction:column;gap:12px;margin-top:18px;text-align:left}
+.gatebox input{font-size:17px!important;padding:12px 14px!important}
+.gatebox .btn{justify-content:center;padding:13px;font-size:16px}
+.linkbtn{all:unset;cursor:pointer;margin-top:16px;font-size:13px;color:var(--muted);text-decoration:underline}
+details.admin{margin-top:18px;border-top:1px dashed var(--line);padding-top:12px}
+details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--muted)}

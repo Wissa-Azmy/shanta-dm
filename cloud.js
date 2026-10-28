@@ -2,6 +2,14 @@
    No SDK and no server. Each record lives at ledgers/<ledger>/<collection>/<id>,
    so two people editing different records never overwrite each other.
    Sync = pull remote, re-apply local changes made since the last sync, push only those. */
+const CLOUD = {
+  dbUrl: 'https://shanta-dm-default-rtdb.europe-west1.firebasedatabase.app',
+  apiKey: 'AIzaSyAa9fTvt1RxGFDGf1rWFLBB_gvVlaOkphM',
+  ledger: 'shared',
+  domain: 'shanta-dm.firebaseapp.com' // plain usernames become <username>@this-domain
+};
+const toEmail = u => { u = String(u || '').trim().toLowerCase(); return u.includes('@') ? u : u.replace(/[^a-z0-9._-]/g, '') + '@' + CLOUD.domain; };
+const userName = e => String(e || '').endsWith('@' + CLOUD.domain) ? e.slice(0, -CLOUD.domain.length - 1) : e;
 const COLLS = ['shipments', 'purchases', 'sales', 'expenses', 'transfers'];
 const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
   : v && typeof v === 'object' ? '{' + Object.keys(v).filter(k => v[k] !== undefined && v[k] !== null).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}'
@@ -52,7 +60,7 @@ const Cloud = {
   on() { return !!(this.cfg && this.cfg.refreshToken); },
   saveCfg() { localStorage.setItem('shanta-cloud', JSON.stringify(this.cfg)); },
   saveBase() { localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); },
-  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (!c) return; if (this.on() || c.dataset.mode === 'on') c.outerHTML = this.settingsHTML(); else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } },
+  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) c.outerHTML = this.settingsHTML(); else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $('#g_msg'); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } },
 
   async fetchJSON(url, opts) {
     let r; try { r = await fetch(url, opts); } catch (e) { const x = new Error(netMsg); x.net = true; throw x; }
@@ -103,7 +111,7 @@ const Cloud = {
   disconnect() {
     this.cfg = null; this.base = null; this.stopPolling();
     localStorage.removeItem('shanta-cloud'); localStorage.removeItem('shanta-cloud-base');
-    this.set('off'); toast('Disconnected from the cloud. Your data stays on this device.');
+    this.set('off'); toast('Signed out. Your data stays on this device.'); localStorage.removeItem('shanta-offline'); showGate();
   },
   schedule() { if (!this.on()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), 600); },
   async sync() {
@@ -136,39 +144,42 @@ const Cloud = {
     const t = this.last ? this.last.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
     const map = { syncing: ['', 'Syncing…'], ok: ['ok', 'Shared in the cloud'], offline: ['bad', 'Offline, will retry'], error: ['bad', 'Cloud needs attention'], off: ['', 'Cloud'] };
     const [dot, st] = map[this.state] || map.off;
-    return `<div class="cloudline"><div class="st"><span class="dot ${dot}"></span>${st}</div><p>${esc(this.cfg.email)} · ledger “${esc(this.cfg.ledger)}”${t ? ' · ' + t : ''}${this.msg ? '<br>' + esc(this.msg) : ''}</p>
+    return `<div class="cloudline"><div class="st"><span class="dot ${dot}"></span>${st}</div><p>${esc(userName(this.cfg.email))}${t ? ' · ' + t : ''}${this.msg ? '<br>' + esc(this.msg) : ''}</p>
       <div class="row"><button class="btn sm ghost" data-act="cloud-sync">Sync now</button></div></div>`;
   },
   rules(a, b) {
-    const cond = `auth != null && (auth.token.email == '${a || 'you@example.com'}' || auth.token.email == '${b || 'friend@example.com'}')`;
+    const cond = `auth != null && (auth.token.email == '${toEmail(a || 'you@example.com')}' || auth.token.email == '${toEmail(b || 'friend@example.com')}')`;
     return JSON.stringify({ rules: { ledgers: { $ledger: { '.read': cond, '.write': cond } } } }, null, 2);
   },
+  loginFields(p) {
+    return `<div class="f"><label for="${p}_user">Email</label><input id="${p}_user" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div class="f"><label for="${p}_pw">Password</label><input id="${p}_pw" type="password" autocomplete="current-password"></div>`;
+  },
   settingsHTML() {
-    if (this.on()) return `<div class="card span2" id="cloudcard" data-mode="on"><h3>Shared cloud database</h3>
-      <p class="note">Connected as <b>${esc(this.cfg.email)}</b> to ledger <b>“${esc(this.cfg.ledger)}”</b>. Every change is sent within a second and pulled every 20 seconds, so you and ${esc(db.settings.friendName)} see the same numbers. The file on disk still works as an extra backup.</p>
-      <p class="note">${esc(this.cfg.dbUrl)}${this.msg ? ' · <b>' + esc(this.msg) + '</b>' : ''}</p>
-      <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Disconnect this device</button></div></div>`;
-    return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Share online: free cloud database (Firebase)</h3>
-      <p class="note">Takes about 10 minutes, once. Free plan, no credit card, nothing to maintain. You both log in with your own email and password and work on the same ledger.</p>
+    if (this.on()) return `<div class="card span2" id="cloudcard" data-mode="on"><h3>Shared online ledger</h3>
+      <p class="note">Signed in as <b>${esc(userName(this.cfg.email))}</b>. Every change is sent within a second and pulled every 20 seconds, so you and ${esc(db.settings.friendName)} see the same numbers. The file on disk still works as an extra backup.</p>
+      ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
+      <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
+      ${this.adminHTML()}</div>`;
+    return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
+      <p class="note">Sign in so you and ${esc(db.settings.friendName)} work on the same numbers from any phone or laptop.</p>
+      <form class="fgrid" data-login="cl">${this.loginFields('cl')}<div class="f span"><button class="btn" style="align-self:flex-start">Sign in</button></div></form>
+      <div class="err" id="cl_msg"${this.msg ? '' : ' hidden'}>${esc(this.msg)}</div>
+      ${this.adminHTML()}</div>`;
+  },
+  adminHTML() {
+    return `<details class="admin"><summary>Admin: add a person or update the access rules</summary>
       <ol class="setup">
-        <li>Go to <b>console.firebase.google.com</b> → <b>Create a project</b> (you can switch Google Analytics off).</li>
-        <li><b>Build → Authentication → Get started</b>, enable <b>Email/Password</b>. In the <b>Users</b> tab, add one user for you and one for ${esc(db.settings.friendName)}.</li>
-        <li><b>Build → Realtime Database → Create database</b>, location <b>Belgium (europe-west1)</b>, start in <b>locked mode</b>. Open the <b>Rules</b> tab, paste the rules below (with your two emails), then <b>Publish</b>. Copy the database URL shown on the <b>Data</b> tab.</li>
-        <li><b>Project settings</b> (gear icon) → <b>Your apps</b> → add a <b>Web</b> app (&lt;/&gt;) → copy the <b>apiKey</b> value.</li>
-        <li>Fill in the form here and press Connect. ${esc(db.settings.friendName)} does the same on their phone or laptop with their own email and the same ledger name.</li>
+        <li>In the Firebase console open <b>Authentication → Users → Add user</b>. Enter the person’s email address and choose a password for them.</li>
+        <li>Type both email addresses below, copy the rules, paste them into <b>Realtime Database → Rules</b> and press <b>Publish</b>.</li>
+        <li>Send the person the app link with their email and password. That is all they need.</li>
       </ol>
       <div class="fgrid">
-        <div class="f"><label>Your email</label><input id="cl_email" type="email" autocomplete="username" data-rules="1"></div>
-        <div class="f"><label>Friend’s email (only for the rules)</label><input id="cl_email2" type="email" data-rules="1"></div>
-        <div class="f span"><label>Database rules: paste into Realtime Database → Rules</label><textarea id="cl_rules" readonly rows="11" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
-        <div class="f span"><label>Database URL</label><input id="cl_url" placeholder="e.g. https://shanta-dm-default-rtdb.europe-west1.firebasedatabase.app"></div>
-        <div class="f"><label>Web API key</label><input id="cl_key" value="AIzaSyAa9fTvt1RxGFDGf1rWFLBB_gvVlaOkphM"></div>
-        <div class="f"><label>Ledger name (same for both of you)</label><input id="cl_ledger" value="shared"></div>
-        <div class="f"><label>Your password</label><input id="cl_pw" type="password" autocomplete="current-password"></div>
-        <div class="f" style="justify-content:flex-end"><button class="btn" data-act="cloud-connect">Connect</button></div>
+        <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none"></div>
+        <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none"></div>
+        <div class="f span"><textarea id="cl_rules" readonly rows="11" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
       </div>
-      <div class="err" id="cl_msg"${this.msg ? '' : ' hidden'}>${esc(this.msg)}</div>
-      <p class="note">The password is used once to log in and is not stored; the app keeps a login token on this device. The API key is not a secret; the rules are what keep your data private.</p></div>`;
+      <p class="note">Forgotten password: in Firebase open Users, click ⋮ next to the person and choose Reset password; they get an email to set a new one. Nothing in the ledger is lost.</p></details>`;
   }
 };
 
@@ -178,18 +189,43 @@ document.addEventListener('click', async e => {
   if (a === 'cloud-sync') { await Cloud.sync(); if (Cloud.state === 'ok') toast('Synced'); }
   if (a === 'cloud-off') { if (confirm('Disconnect this device from the shared cloud ledger?')) Cloud.disconnect(); }
   if (a === 'cloud-copy') { const ta = $('#cl_rules'); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied'); }
-  if (a === 'cloud-connect') {
-    const v = id => ($('#' + id) || {}).value || '';
-    const f = { url: v('cl_url'), key: v('cl_key'), email: v('cl_email').trim(), pw: v('cl_pw'), ledger: v('cl_ledger') };
-    if (!f.url || !f.key || !f.email || !f.pw) { Cloud.set('off', 'Fill in database URL, API key, email and password.'); return; }
-    t.textContent = 'Connecting…';
-    try { await Cloud.connect(f); toast('Connected. Your ledger is now shared.'); render(); }
-    catch (x) { console.warn(x); Cloud.cfg = null; localStorage.removeItem('shanta-cloud'); Cloud.set('off', x.message); }
+  if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
+});
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('[data-login]'); if (!form) return;
+  e.preventDefault();
+  const p = form.dataset.login, user = $('#' + p + '_user').value.trim(), pw = $('#' + p + '_pw').value;
+  const btn = form.querySelector('button');
+  if (!user || !pw) { Cloud.set('off', 'Please type your email and password.'); return; }
+  if (!user.includes('@')) { Cloud.set('off', 'Please type your full email address.'); return; }
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  try {
+    await Cloud.connect({ url: CLOUD.dbUrl, key: CLOUD.apiKey, email: toEmail(user), pw, ledger: CLOUD.ledger });
+    localStorage.removeItem('shanta-offline'); hideGate();
+    toast('Welcome, ' + userName(Cloud.cfg.email)); render();
+  } catch (x) {
+    console.warn(x); Cloud.cfg = null; localStorage.removeItem('shanta-cloud');
+    Cloud.set('off', /Wrong email or password/.test(x.message) ? 'Wrong email or password.' : x.message);
+    btn.textContent = 'Sign in'; btn.disabled = false;
   }
 });
 document.addEventListener('input', e => {
   if (!e.target.dataset.rules) return;
-  const ta = $('#cl_rules'); if (ta) ta.value = Cloud.rules($('#cl_email').value.trim(), $('#cl_email2').value.trim());
+  const ta = $('#cl_rules'); if (ta) ta.value = Cloud.rules($('#ad_a').value.trim(), $('#ad_b').value.trim());
 });
+
+/* ---------- full-screen sign-in on first open ---------- */
+function showGate() {
+  if ($('#gate')) return;
+  const g = document.createElement('div'); g.id = 'gate';
+  g.innerHTML = `<div class="gatebox"><div class="logo">€<span>⇄</span>£E</div><h1>Shanta</h1><p class="note">Sign in to open the shared ledger</p>
+    <form data-login="g">${Cloud.loginFields('g')}<button class="btn">Sign in</button></form>
+    <div class="err" id="g_msg" hidden></div>
+    <button type="button" class="linkbtn" data-act="cloud-skip">Use without signing in on this device</button></div>`;
+  document.body.appendChild(g);
+  setTimeout(() => $('#g_user') && $('#g_user').focus(), 50);
+}
+function hideGate() { const g = $('#gate'); if (g) g.remove(); }
+if (!Cloud.on() && !localStorage.getItem('shanta-offline')) showGate();
 window.addEventListener('focus', () => Cloud.on() && Cloud.sync());
 window.addEventListener('online', () => Cloud.on() && Cloud.sync());
