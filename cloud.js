@@ -124,6 +124,7 @@ const Cloud = {
       const raw = await this.req('GET');
       const merged = snapRemote(raw);
       const patch = snapDiff(snapLocal(db), this.base || emptySnap());
+      if (!merged.settings && !patch.settings) patch.settings = JSON.parse(stable(db.settings));
       const dels = Object.values(patch).filter(v => v === null).length;
       if (dels >= 3) await this.snapshot(`Automatic backup before deleting ${dels} entries`, raw);
       snapApply(merged, patch);
@@ -181,7 +182,7 @@ const Cloud = {
       const rs = snapRemote(await this.req('GET', null, true, name));
       this.cfg.ledger = name; this.saveCfg();
       const s = db.settings; Object.assign(db, snapToData(rs)); if (!rs.settings) db.settings = s;
-      persistLocal(); this.base = rs.settings ? rs : Object.assign(rs, { settings: stable(db.settings) }); this.saveBase();
+      persistLocal(); this.base = rs; this.saveBase();
       this.last = new Date();
     } finally { this.busy = false; }
     this.set('ok'); render();

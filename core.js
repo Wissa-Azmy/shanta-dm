@@ -135,7 +135,7 @@ function persistLocal() { try { localStorage.setItem('shanta-db', JSON.stringify
 function commit() {
   db.meta.updatedAt = new Date().toISOString();
   persistLocal(); dirty = true;
-  if (window.Cloud && Cloud.on()) Cloud.schedule();
+  if (typeof Cloud !== 'undefined' && Cloud.on()) Cloud.schedule();
   if (fileHandle && filePerm && db.settings.autosave) { clearTimeout(saveTimer); saveTimer = setTimeout(() => saveFile(false, true), 700); }
   render();
 }
