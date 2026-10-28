@@ -66,11 +66,8 @@ h3{font:600 17px var(--display);margin:0 0 10px}
 
 /* stamps */
 .stamps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px}
-.stamp{background:var(--card);padding:16px 16px 14px;position:relative;
-  -webkit-mask:radial-gradient(circle 5px at 5px 5px,#0000 98%,#000) -5px -5px/14px 14px;
-  mask:radial-gradient(circle 5px at 5px 5px,#0000 98%,#000) -5px -5px/14px 14px;
-  filter:drop-shadow(0 1px 0 var(--line))}
-.stamp .in{border:1.5px solid var(--line);border-radius:4px;padding:12px 12px 10px;height:100%}
+.stamp{position:relative;padding:7px;background:radial-gradient(circle at 3.5px 3.5px,var(--paper) 2.6px,transparent 3px) 0 0/10px 10px,var(--card);box-shadow:0 1px 0 var(--line)}
+.stamp .in{border:1.5px solid var(--line);border-radius:4px;padding:12px 12px 10px;height:100%;background:var(--card)}
 .stamp .k{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .stamp .v{font:600 26px/1.15 var(--display);margin-top:6px}
 .stamp .s{font:12px var(--mono);color:var(--muted)}
