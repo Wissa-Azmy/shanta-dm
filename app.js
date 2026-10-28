@@ -39,7 +39,7 @@ function render() {
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
-  $('#view').innerHTML = V[view](R);
+  $("#view").innerHTML = Cloud.bannerHTML() + V[view](R);
   V[view].after && V[view].after();
   renderFile();
   document.title = 'Shanta Ledger · ' + n[2];
@@ -63,8 +63,6 @@ document.addEventListener('click', e => {
   if (a === 'download') downloadJSON();
   if (a === 'import') $('#fileInput').click();
   if (a === 'csv') V.ledger.csv();
-  if (a === 'demo') { if (confirmReplace()) { db = demoData(); commit(); go('overview'); toast('Sample data loaded'); } }
-  if (a === 'reset') { if (confirm('Clear ALL data from the app' + (Cloud.on() ? ' AND from the shared cloud ledger' : '') + '? Download a backup first if you are unsure.')) { const s = db.settings; db = DEFAULT_DB(); db.settings = s; commit(); go('overview'); } }
 });
 document.addEventListener('input', e => {
   const u = e.target.dataset.ui;

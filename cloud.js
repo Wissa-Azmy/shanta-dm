@@ -9,6 +9,7 @@ const CLOUD = {
   domain: 'shanta-dm.firebaseapp.com' // plain usernames become <username>@this-domain
 };
 const toEmail = u => { u = String(u || '').trim().toLowerCase(); return u.includes('@') ? u : u.replace(/[^a-z0-9._-]/g, '') + '@' + CLOUD.domain; };
+const fDateTime = s => s ? new Date(s).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 const userName = e => String(e || '').endsWith('@' + CLOUD.domain) ? e.slice(0, -CLOUD.domain.length - 1) : e;
 const COLLS = ['shipments', 'purchases', 'sales', 'expenses', 'transfers'];
 const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
@@ -60,7 +61,7 @@ const Cloud = {
   on() { return !!(this.cfg && this.cfg.refreshToken); },
   saveCfg() { localStorage.setItem('shanta-cloud', JSON.stringify(this.cfg)); },
   saveBase() { localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); },
-  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) c.outerHTML = this.settingsHTML(); else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $('#g_msg'); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } },
+  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $('#g_msg'); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } },
 
   async fetchJSON(url, opts) {
     let r; try { r = await fetch(url, opts); } catch (e) { const x = new Error(netMsg); x.net = true; throw x; }
@@ -83,10 +84,11 @@ const Cloud = {
     Object.assign(this.cfg, { idToken: j.id_token, refreshToken: j.refresh_token, exp: Date.now() + (num(j.expires_in) - 60) * 1000 });
     this.saveCfg(); return j.id_token;
   },
-  async req(method, body, retry = true) {
-    const url = `${this.cfg.dbUrl}/ledgers/${encodeURIComponent(this.cfg.ledger)}.json?auth=${encodeURIComponent(await this.token())}`;
+  async req(method, body, retry = true, path) {
+    const seg = String(path || this.cfg.ledger).split('/').map(encodeURIComponent).join('/');
+    const url = `${this.cfg.dbUrl}/ledgers/${seg}.json?auth=${encodeURIComponent(await this.token())}`;
     const { r, j } = await this.fetchJSON(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
-    if (r.status === 401 && retry && !/Permission denied/i.test(j && j.error || '')) { await this.token(true); return this.req(method, body, false); }
+    if (r.status === 401 && retry && !/Permission denied/i.test(j && j.error || '')) { await this.token(true); return this.req(method, body, false, path); }
     if (!r.ok) {
       const m = j && j.error || r.status;
       if (/Permission denied/i.test(m) || r.status === 401) { const e = new Error('Permission denied. Make sure the database rules list your email (' + this.cfg.email + ').'); e.auth = true; throw e; }
@@ -119,8 +121,11 @@ const Cloud = {
     if (this.busy) { this.again = true; return; }
     this.busy = true; this.set('syncing');
     try {
-      const merged = snapRemote(await this.req('GET'));
+      const raw = await this.req('GET');
+      const merged = snapRemote(raw);
       const patch = snapDiff(snapLocal(db), this.base || emptySnap());
+      const dels = Object.values(patch).filter(v => v === null).length;
+      if (dels >= 3) await this.snapshot(`Automatic backup before deleting ${dels} entries`, raw);
       snapApply(merged, patch);
       if (Object.keys(patch).length) await this.req('PATCH', patch);
       if (stable(merged) !== stable(snapLocal(db))) { Object.assign(db, snapToData(merged)); persistLocal(); render(); }
@@ -132,6 +137,75 @@ const Cloud = {
       this.busy = false;
       if (this.again) { this.again = false; this.sync(); }
     }
+  },
+
+  /* ---- backups: a backup is a full copy stored as its own ledger, listed in shared/_backups ---- */
+  async snapshot(reason, raw) {
+    raw = raw || await this.req('GET') || {};
+    const counts = {}; COLLS.forEach(c => counts[c] = Object.keys(raw[c] || {}).length);
+    if (!COLLS.some(c => counts[c])) return null;
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    const name = `backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    const copy = Object.assign({}, raw); delete copy._backups;
+    copy._meta = { backupOf: this.cfg.ledger, createdAt: d.toISOString(), by: this.cfg.email, reason };
+    await this.req('PUT', copy, true, name);
+    const check = await this.req('GET', null, true, name) || {};
+    if (COLLS.some(c => Object.keys(check[c] || {}).length !== counts[c])) throw new Error('The backup could not be verified, so nothing was deleted.');
+    await this.req('PATCH', { [name]: { createdAt: d.toISOString(), by: this.cfg.email, reason, from: this.cfg.ledger, counts } }, true, CLOUD.ledger + '/_backups');
+    this.backups = null;
+    return name;
+  },
+  async backupAndClear(reason) {
+    await this.sync();
+    if (this.state !== 'ok') throw new Error('Couldn’t reach the cloud, so nothing was deleted. ' + this.msg);
+    this.busy = true;
+    try {
+      const name = await this.snapshot(reason);
+      const wipe = {}; COLLS.forEach(c => wipe[c] = null);
+      await this.req('PATCH', wipe);
+      const s = db.settings; db = DEFAULT_DB(); db.settings = s; persistLocal();
+      this.base = snapLocal(db); this.saveBase();
+      return name;
+    } finally { this.busy = false; }
+  },
+  async listBackups() {
+    const o = await this.req('GET', null, true, CLOUD.ledger + '/_backups') || {};
+    this.backups = Object.entries(o).map(([name, v]) => Object.assign({ name }, v)).sort((a, b) => b.name.localeCompare(a.name));
+    return this.backups;
+  },
+  async openLedger(name) {
+    await this.sync();
+    if (this.state !== 'ok') throw new Error('Couldn’t reach the cloud. ' + this.msg);
+    this.busy = true;
+    try {
+      const rs = snapRemote(await this.req('GET', null, true, name));
+      this.cfg.ledger = name; this.saveCfg();
+      const s = db.settings; Object.assign(db, snapToData(rs)); if (!rs.settings) db.settings = s;
+      persistLocal(); this.base = rs.settings ? rs : Object.assign(rs, { settings: stable(db.settings) }); this.saveBase();
+      this.last = new Date();
+    } finally { this.busy = false; }
+    this.set('ok'); render();
+  },
+  isBackup() { return this.on() && this.cfg.ledger !== CLOUD.ledger; },
+  bannerHTML() {
+    if (!this.isBackup()) return '';
+    const b = (this.backups || []).find(x => x.name === this.cfg.ledger);
+    return `<div class="bkbanner"><span>📦 You are looking at a <b>backup</b>${b ? ' from ' + esc(fDateTime(b.createdAt)) : ' (' + esc(this.cfg.ledger) + ')'}. Changes here only affect this backup.</span><button class="btn sm" data-act="cloud-live">Back to the live ledger</button></div>`;
+  },
+  backupsHTML() {
+    const list = this.backups;
+    const cur = this.cfg.ledger;
+    return `<div class="bklist"><h4>Ledger in use: ${cur === CLOUD.ledger ? '<span class="pill ok">Live (shared)</span>' : '<span class="pill warn">Backup</span>'}</h4>
+      ${list === undefined || list === null ? '<p class="note">Loading backups…</p>' : !list.length ? '<p class="note">No backups yet. One is made automatically before data is cleared or many entries are deleted at once.</p>' :
+      `<ul class="mini">${list.map(b => `<li><span><b>${esc(fDateTime(b.createdAt))}</b><span class="sub note">${esc(b.reason || '')} · ${COLLS.reduce((a, c) => a + num(b.counts && b.counts[c]), 0)} entries · by ${esc(userName(b.by || ''))}</span></span>
+        <span class="r">${b.name === cur ? '<span class="pill warn">Open</span>' : `<button class="btn sm ghost" data-act="cloud-open" data-ledger="${esc(b.name)}">Open</button>`}</span></li>`).join('')}</ul>`}
+      ${cur !== CLOUD.ledger ? '<button class="btn sm" data-act="cloud-live">Back to the live ledger</button>' : ''}</div>`;
+  },
+  async fillBackups() {
+    const el = $('#cl_backups'); if (!el || !this.on()) return;
+    el.innerHTML = this.backupsHTML();
+    try { await this.listBackups(); } catch (e) { this.backups = []; }
+    const el2 = $('#cl_backups'); if (el2) el2.innerHTML = this.backupsHTML();
   },
   startPolling() {
     this.stopPolling();
@@ -160,6 +234,7 @@ const Cloud = {
       <p class="note">Signed in as <b>${esc(userName(this.cfg.email))}</b>. Every change is sent within a second and pulled every 20 seconds, so you and ${esc(db.settings.friendName)} see the same numbers. The file on disk still works as an extra backup.</p>
       ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
       <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
+      <div id="cl_backups"></div>
       ${this.adminHTML()}</div>`;
     return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
       <p class="note">Sign in so you and ${esc(db.settings.friendName)} work on the same numbers from any phone or laptop.</p>
@@ -190,7 +265,41 @@ document.addEventListener('click', async e => {
   if (a === 'cloud-off') { if (confirm('Disconnect this device from the shared cloud ledger?')) Cloud.disconnect(); }
   if (a === 'cloud-copy') { const ta = $('#cl_rules'); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied'); }
   if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
+  if (a === 'cloud-open' || a === 'cloud-live') {
+    const name = a === 'cloud-live' ? CLOUD.ledger : t.dataset.ledger;
+    t.disabled = true; t.textContent = 'Opening…';
+    try { await Cloud.openLedger(name); toast(name === CLOUD.ledger ? 'Back on the live ledger' : 'Backup opened'); go(name === CLOUD.ledger ? 'overview' : view); }
+    catch (x) { toast(x.message); render(); }
+  }
 });
+
+/* Clear / replace everything, but never without a backup first */
+async function safeReplace(question, fill) {
+  const has = COLLS.some(c => db[c].length);
+  if (Cloud.on()) {
+    if (has && !confirm(question + '\n\nA full copy of the current ledger is saved first. You can open it any time under Settings → Shared online ledger.')) return;
+    try {
+      toast('Saving a backup…');
+      const name = await Cloud.backupAndClear(question.replace(/\?$/, ''));
+      if (fill) fill();
+      commit(); go('overview');
+      toast(name ? 'Done. A backup was saved first.' : 'Done.');
+    } catch (x) { console.warn(x); alert(x.message); }
+    return;
+  }
+  if (has && !confirm(question + '\n\nA backup file of the current data will be downloaded first.')) return;
+  if (has) downloadJSON();
+  const s = db.settings; db = DEFAULT_DB(); db.settings = s;
+  if (fill) fill();
+  commit(); go('overview');
+}
+V.settings.after = () => Cloud.fillBackups();
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act="reset"],[data-act="demo"]'); if (!t) return;
+  e.stopImmediatePropagation();
+  if (t.dataset.act === 'reset') safeReplace('Clear all shipments, purchases, sales, expenses and transfers?');
+  else safeReplace('Replace all data with sample data?', () => { const d = demoData(); COLLS.forEach(c => db[c] = d[c]); });
+}, true);
 document.addEventListener('submit', async e => {
   const form = e.target.closest('[data-login]'); if (!form) return;
   e.preventDefault();
