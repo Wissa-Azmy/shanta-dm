@@ -16,7 +16,7 @@ let view = localStorage.getItem('shanta-view') || 'overview';
 
 function counts() { return { shipments: db.shipments.length, purchases: db.purchases.length, sales: db.sales.length, expenses: db.expenses.length, transfers: db.transfers.length }; }
 function renderFile() {
-  const box = $('#filebox');
+  const box = $('#filebox'); if (!box) return;
   let dot = 'bad', st = 'Only in this browser', p = 'Not saved to a file yet. Click “Save as…” to pick a file on your disk.', btns = `<button class="btn sm" data-act="saveas">Save as…</button><button class="btn sm ghost" data-act="open">Open</button>`;
   if (fileHandle && !filePerm) { dot = ''; st = 'File needs permission'; p = `Linked to ${esc(fileName)}. Click to allow saving again.`; btns = `<button class="btn sm" data-act="reconnect">Reconnect</button><button class="btn sm ghost" data-act="open">Open other</button>`; }
   else if (fileHandle) {

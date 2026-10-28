@@ -201,7 +201,7 @@ V.settings = () => {
     ${f('rate', 'Today’s rate: EGP for €1', 'number', 'step="0.01"', 'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.')}
     ${f('targetMargin', 'Target markup on cost (%)', 'number', 'step="1"', 'Used for the suggested selling price.')}
     ${f('lowStock', 'Warn when stock is at or below', 'number', 'step="1"')}</div>
-  <div class="card"><h3>Your data file</h3>
+  <div class="card"><h3>Backup & sync</h3><div class="filebox" id="filebox"></div>
     <p class="note">${canFS() ? 'Data is written straight to a <code>.json</code> file on your disk. Pick it once with “Save as…”; after that every change is saved to it automatically. A backup copy also stays in this browser.' : 'This browser can’t write to files directly, so use “Download backup” to save a <code>.json</code> file and “Import” to load it again.'}</p>
     <div class="f chk"><input type="checkbox" id="as" data-set="autosave"${s.autosave ? ' checked' : ''}><label for="as">Save to the file automatically after every change</label></div>
     <div class="topact" style="margin-top:10px"><button class="btn" data-act="saveas">Save as…</button><button class="btn ghost" data-act="open">Open file</button><button class="btn ghost" data-act="download">Download backup</button><button class="btn ghost" data-act="import">Import</button></div></div>
