@@ -1,0 +1,211 @@
+/* ---------- views ---------- */
+const UI = { q: '', person: '', type: '', stockOnly: true };
+let chart = null;
+const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
+const shipName = id => { const s = db.shipments.find(x => x.id === id); return s ? s.name : ''; };
+const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">✎</button><button class="ib del" data-del="${coll}:${id}" title="Delete">✕</button></td>`;
+const match = (...vals) => !UI.q || vals.join(' ').toLowerCase().includes(UI.q.toLowerCase());
+const search = ph => `<input type="search" placeholder="${ph}" value="${esc(UI.q)}" data-ui="q">`;
+const personFilter = () => `<select data-ui="person"><option value="">Everyone</option>${PEOPLE.map(p => `<option value="${p}"${UI.person === p ? ' selected' : ''}>${esc(pname(p))}</option>`).join('')}</select>`;
+
+function settlementHero(R, compact) {
+  const f = R.person.friend, m = R.person.me, s = db.settings;
+  const amt = Math.abs(f.owes), square = amt < 0.5;
+  const from = f.owes > 0 ? 'friend' : 'me', to = from === 'friend' ? 'me' : 'friend';
+  const presetAmt = from === 'friend' ? Math.round(eur2egp(amt)) : Math.round(amt * 100) / 100;
+  const presetCur = from === 'friend' ? 'EGP' : 'EUR';
+  const row = (l, k, fmt = fEUR) => `<tr><td>${l}</td><td>${fmt(m[k])}</td><td>${fmt(f[k])}</td></tr>`;
+  return `<div class="hero">
+    <div>
+      <div class="who">${square ? 'Right now you are' : `<b>${esc(pname(from))}</b> should send <b>${esc(pname(to))}</b>`}</div>
+      <div class="big">${square ? 'All square' : fEUR(amt)}${square ? '' : `<small>≈ ${fEGP(eur2egp(amt))}</small>`}</div>
+      <p class="expl">Counts only money customers have actually paid. Each of you first gets back what you spent on the goods that already left stock (product cost plus that box’s shipping and customs), then the profit is split ${s.meShare}% ${esc(s.meName)} / ${100 - s.meShare}% ${esc(s.friendName)}. Money for unsold stock comes back as it sells.</p>
+      ${square ? '' : `<button class="btn terra" data-new="transfers" ${pre({ from, to, amount: presetAmt, currency: presetCur, notes: 'Settlement' })}>Record this payment</button>`}
+      <div style="margin-top:16px"><div class="note">Profit split</div><div class="split-bar"><div style="width:${s.meShare}%"></div></div>
+      <div class="note" style="display:flex;justify-content:space-between"><span>${esc(s.meName)} ${s.meShare}%</span><span>${esc(s.friendName)} ${100 - s.meShare}%</span></div></div>
+    </div>
+    ${compact ? '' : `<div><table class="ptable"><thead><tr><th></th><th>${esc(s.meName)}</th><th>${esc(s.friendName)}</th></tr></thead><tbody>
+      ${row('Spent in total', 'outlay')}
+      ${row('… still tied up in unsold stock', 'invested')}
+      ${row('Costs earned back so far', 'recovered')}
+      ${row('Profit share', 'share')}
+      <tr class="tot"><td>Should have received</td><td>${fEUR(m.entitled)}</td><td>${fEUR(f.entitled)}</td></tr>
+      ${row('Collected from customers', 'received')}
+      ${row('Transfers received', 'tin')}
+      ${row('Transfers sent', 'tout')}
+      <tr class="tot"><td>Actually holds</td><td>${fEUR(m.actual)}</td><td>${fEUR(f.actual)}</td></tr>
+    </tbody></table><p class="note">All amounts in € using each entry’s own exchange rate. EGP shown at today’s rate of ${s.rate}.</p></div>`}
+  </div>`;
+}
+
+const V = {};
+V.overview = R => {
+  const empty = !db.purchases.length && !db.sales.length && !db.shipments.length;
+  if (empty) return `<div class="welcome"><h2>Welcome. Let’s set up your ledger.</h2>
+    <ol><li><b>Choose where the data lives:</b> click <b>Save as…</b> on the left to create a <code>.json</code> file on your disk. After that every change is written to it automatically. Share that file (e.g. via Google Drive or WhatsApp) so you both see the same numbers.</li>
+    <li>Put your names, the profit split and today’s EGP rate in <b>Settings</b>.</li>
+    <li>Create a <b>Shipment</b>, add your dm <b>Purchases</b> to it, then record <b>Sales</b>, <b>Expenses</b> and <b>Transfers</b> as they happen.</li></ol>
+    <div class="topact"><button class="btn" data-new="shipments">Create first shipment</button><button class="btn ghost" data-go="settings">Settings</button><button class="btn ghost" data-act="demo">Load sample data to explore</button></div></div>`;
+  const lows = Object.values(R.lots).filter(l => l.left > 0 && l.left <= num(db.settings.lowStock));
+  const unpaid = db.sales.filter(s => s.kind === 'sale' && !s.paid).sort(byDate);
+  const moving = db.shipments.filter(s => s.status !== 'Delivered');
+  const prod = {}; Object.values(R.lots).forEach(l => { const k = l.p.product; prod[k] = prod[k] || { n: 0, rev: 0, cost: 0 }; prod[k].n += l.sold; prod[k].rev += l.revEUR; prod[k].cost += l.sold * l.landed; });
+  const top = Object.entries(prod).filter(([, x]) => x.n).sort((a, b) => (b[1].rev - b[1].cost) - (a[1].rev - a[1].cost)).slice(0, 6);
+  return settlementHero(R) + `
+  <div class="stamps">
+    <div class="stamp n"><div class="in"><div class="k">Collected from sales</div><div class="v">${fEGP(R.revEGP)}</div><div class="s">${fEUR(R.rev)}</div></div></div>
+    <div class="stamp ${R.profit >= 0 ? 'n' : 't'}"><div class="in"><div class="k">Profit so far</div><div class="v">${fEUR(R.profit)}</div><div class="s">${fEGP(eur2egp(R.profit))} · on goods sold</div></div></div>
+    <div class="stamp g"><div class="in"><div class="k">Stock not yet sold</div><div class="v">${fEUR(R.stockEUR)}</div><div class="s">${Object.values(R.lots).reduce((a, l) => a + Math.max(0, l.left), 0)} units at cost</div></div></div>
+    <div class="stamp t"><div class="in"><div class="k">Customers still owe</div><div class="v">${fEGP(R.unpaidEGP)}</div><div class="s">${unpaid.length} unpaid sale${unpaid.length === 1 ? '' : 's'}</div></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Money in vs money out, by month</h3><div class="chartbox"><canvas id="chart"></canvas></div></div>
+    <div class="card"><h3>Best earners</h3>${top.length ? `<ul class="mini">${top.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${x.n} sold</span></span><span class="r">${fEUR(x.rev - x.cost)} profit</span></li>`).join('')}</ul>` : '<div class="empty">No sales yet.</div>'}</div>
+  </div>
+  <div class="grid3" style="margin-top:18px">
+    <div class="card"><h3>On the way</h3>${moving.length ? `<ul class="mini">${moving.map(s => `<li><span>${esc(s.name)}<span class="sub note">${esc(s.carrier || '')} ${fDate(s.date)}</span></span><span class="pill warn">${esc(s.status)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in transit.</div>'}</div>
+    <div class="card"><h3>Running low</h3>${lows.length ? `<ul class="mini">${lows.map(l => `<li><span>${esc(l.p.product)}</span><span class="r">${l.left} left</span></li>`).join('')}</ul>` : '<div class="empty">Stock levels look fine.</div>'}</div>
+    <div class="card"><h3>Waiting for payment</h3>${unpaid.length ? `<ul class="mini">${unpaid.slice(0, 8).map(s => { const l = R.lots[s.purchaseId]; return `<li><span>${esc(s.customer || 'Customer')}<span class="sub note">${esc(l ? l.p.product : '')} · ${fDate(s.date)}</span></span><span class="r"><button class="ib" data-act="paid:${s.id}" title="Mark paid">✓</button> ${fAmt(num(s.qty) * num(s.unitPrice), s.currency)}</span></li>`; }).join('')}</ul>` : '<div class="empty">Everyone has paid.</div>'}</div>
+  </div>`;
+};
+V.overview.after = () => {
+  const el = $('#chart'); if (!el || !window.Chart) return;
+  const m = {}; const add = (d, k, v) => { if (!d) return; const key = d.slice(0, 7); m[key] = m[key] || { in: 0, out: 0 }; m[key][k] += v; };
+  db.sales.forEach(s => s.kind === 'sale' && s.paid && add(s.date, 'in', toEUR(num(s.qty) * num(s.unitPrice), s.currency, s.rate)));
+  db.purchases.forEach(p => add(p.date, 'out', num(p.qty) * num(p.unitCost)));
+  db.expenses.forEach(e => add(e.date, 'out', toEUR(e.amount, e.currency, e.rate)));
+  const keys = Object.keys(m).sort().slice(-12);
+  chart = new Chart(el, { type: 'bar', data: { labels: keys.map(k => new Date(k + '-01T00:00').toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })),
+    datasets: [{ label: 'Collected', data: keys.map(k => m[k].in), backgroundColor: '#0e6a5d', borderRadius: 4 }, { label: 'Spent', data: keys.map(k => m[k].out), backgroundColor: '#c4562d', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Avenir Next, Gill Sans, sans-serif' } } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fEUR(c.raw) } } },
+      scales: { y: { ticks: { callback: v => '€' + v }, grid: { color: '#ece3d1' } }, x: { grid: { display: false } } } } });
+};
+
+V.shipments = R => {
+  const list = db.shipments.slice().sort(byDate).filter(s => match(s.name, s.carrier, s.tracking, s.notes));
+  if (!db.shipments.length) return `<div class="welcome"><h2>No shipments yet</h2><p>A shipment is one box or suitcase going to Egypt. Create one, then add your dm purchases to it.</p><button class="btn" data-new="shipments">New shipment</button></div>`;
+  return `<div class="toolbar">${search('Search shipments')}</div><div class="ships">${list.map(s => {
+    const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
+    const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
+    return `<div class="ship"><h3>${esc(s.name)}</h3><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
+      <div class="steps">${OPT.status.map((_, i) => `<span class="${i <= idx ? 'on' : ''}"></span>`).join('')}</div>
+      <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
+      <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>
+      <dt>Costs as % of goods</dt><dd>${x.goods ? Math.round(x.costs / x.goods * 100) + '%' : '—'}</dd>
+      <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
+      <div class="lines"><ul class="mini">${items.map(p => `<li><span>${esc(p.product)} ×${p.qty}</span><span class="r">${fEUR(num(p.qty) * num(p.unitCost))} ${pill(p.paidBy)}</span></li>`).join('') || '<li class="empty">No products yet</li>'}
+      ${costs.map(e => `<li><span>${esc(e.category)}${e.onDelivery ? ' (paid on delivery)' : ''}</span><span class="r">${fAmt(e.amount, e.currency)} ${pill(e.paidBy)}</span></li>`).join('')}</ul></div>
+      ${s.notes ? `<p class="note">${esc(s.notes)}</p>` : ''}
+      <div class="row">${idx < OPT.status.length - 1 ? `<button class="btn sm" data-act="advance:${s.id}">Mark ${OPT.status[idx + 1]}</button>` : ''}
+      <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
+      <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
+      <button class="ib" data-edit="shipments:${s.id}">✎ Edit</button><button class="ib del" data-del="shipments:${s.id}">✕</button></div></div>`;
+  }).join('')}</div>`;
+};
+
+V.purchases = R => {
+  const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && match(p.product, p.brand, p.category, p.place, p.receipt, shipName(p.shipmentId)));
+  const tot = rows.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0), units = rows.reduce((a, p) => a + num(p.qty), 0);
+  return `<div class="toolbar">${search('Search product, brand, receipt…')}${personFilter()}</div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
+  ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td>
+    <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
+    <td>${esc(p.place || '')}<span class="sub">${esc(p.method || '')}</span></td><td>${p.shipmentId ? esc(shipName(p.shipmentId)) : '<span class="pill warn">Not shipped</span>'}</td>${actions('purchases', p.id)}</tr>`).join('') || '<tr><td colspan="10" class="empty">No purchases yet.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="3">${rows.length} lines</td><td class="num">${units}</td><td></td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
+};
+
+V.stock = R => {
+  const tm = num(db.settings.targetMargin) / 100;
+  const loc = l => { const s = db.shipments.find(x => x.id === l.p.shipmentId); if (!s || s.status === 'Packing') return ['In Germany', 'me']; if (s.status === 'Delivered') return ['In Egypt', 'friend']; return [s.status, '']; };
+  const rows = Object.values(R.lots).filter(l => (!UI.stockOnly || l.left > 0) && match(l.p.product, l.p.brand, l.p.category)).sort((a, b) => a.p.product.localeCompare(b.p.product));
+  return `<div class="toolbar">${search('Search stock')}<label class="note"><input type="checkbox" data-ui="stockOnly"${UI.stockOnly ? ' checked' : ''}> Only items still in stock</label></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
+  ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
+    return `<tr><td><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
+    <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid ? `<span class="sub">${l.unpaid} unpaid</span>` : ''}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
+    <td class="num">${fEGP(cEGP)}<span class="sub">${fEUR(l.landed)}</span></td><td class="num">${avg ? fEGP(avg) : '—'}</td>
+    <td class="num">${mk === null ? '—' : `<span class="pill ${mk >= num(db.settings.targetMargin) ? 'ok' : mk >= 0 ? 'warn' : 'bad'}">${Math.round(mk)}%</span>`}</td>
+    <td class="num">${fEGP(Math.ceil(cEGP * (1 + tm) / 5) * 5)}</td>
+    <td class="acts">${l.left > 0 ? `<button class="btn sm" data-new="sales" ${pre({ purchaseId: l.p.id })}>Sell</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">Nothing here.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="5">Stock value at cost</td><td class="num">${rows.reduce((a, l) => a + Math.max(0, l.left), 0)}</td><td class="num">${fEUR(rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0))}</td><td colspan="4"></td></tr></tfoot></table></div>
+  <p class="note">“Cost incl. shipping” spreads each shipment’s shipping and customs over its products by value, converted at today’s rate (${db.settings.rate} EGP/€).</p>`;
+};
+
+V.sales = R => {
+  const rows = db.sales.slice().sort(byDate).filter(s => { const l = R.lots[s.purchaseId]; return (!UI.person || s.receivedBy === UI.person) && (!UI.type || (UI.type === 'unpaid' ? s.kind === 'sale' && !s.paid : s.kind === UI.type)) && match(l && l.p.product, s.customer, s.place, s.method, s.notes); });
+  const tot = rows.filter(s => s.kind === 'sale').reduce((a, s) => a + toEGP(num(s.qty) * num(s.unitPrice), s.currency, s.rate), 0);
+  const kinds = Object.fromEntries(OPT.kind);
+  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option><option value="sale"${UI.type === 'sale' ? ' selected' : ''}>Sales</option><option value="unpaid"${UI.type === 'unpaid' ? ' selected' : ''}>Unpaid</option><option value="gift"${UI.type === 'gift' ? ' selected' : ''}>Gifts</option><option value="damaged"${UI.type === 'damaged' ? ' selected' : ''}>Damaged / lost</option></select></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th><th class="num">Profit</th><th>Customer</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
+  ${rows.map(s => { const l = R.lots[s.purchaseId], tEUR = toEUR(num(s.qty) * num(s.unitPrice), s.currency, s.rate), prof = l ? tEUR - num(s.qty) * l.landed : 0;
+    return `<tr><td>${fDate(s.date)}</td><td><b>${esc(l ? l.p.product : '(deleted product)')}</b><span class="sub">${esc(s.place || '')}${s.method && s.kind === 'sale' ? ' · ' + esc(s.method) : ''}</span></td><td class="num">${s.qty}</td>
+    <td class="num">${s.kind === 'sale' ? fAmt(s.unitPrice, s.currency) : '—'}</td><td class="num">${s.kind === 'sale' ? fAmt(num(s.qty) * num(s.unitPrice), s.currency) : '—'}</td>
+    <td class="num ${prof >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(eur2egp(prof))}</td><td>${esc(s.customer || '')}</td><td>${s.kind === 'sale' ? pill(s.receivedBy) : ''}</td>
+    <td>${s.kind !== 'sale' ? `<span class="pill">${esc(kinds[s.kind])}</span>` : s.paid ? '<span class="pill ok">Paid</span>' : `<button class="btn sm terra" data-act="paid:${s.id}">Mark paid</button>`}</td>${actions('sales', s.id)}</tr>`; }).join('') || '<tr><td colspan="10" class="empty">No sales yet. Go to Stock and press “Sell”, or use the button above.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="4">${rows.length} entries</td><td class="num">${fEGP(tot)}</td><td colspan="5"></td></tr></tfoot></table></div>
+  <p class="note">Profit per line = sale price minus the item’s cost including shipping.</p>`;
+};
+
+V.expenses = R => {
+  const rows = db.expenses.slice().sort(byDate).filter(e => (!UI.person || e.paidBy === UI.person) && match(e.category, e.description, e.place, e.method, shipName(e.shipmentId)));
+  const tot = rows.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
+  return `<div class="toolbar">${search('Search expenses')}${personFilter()}</div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th class="num">In €</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
+  ${rows.map(e => `<tr><td>${fDate(e.date)}</td><td><b>${esc(e.category)}</b><span class="sub">${esc(e.description || '')}</span></td><td class="num">${fAmt(e.amount, e.currency)}${e.currency === 'EGP' ? `<span class="sub">@ ${e.rate}</span>` : ''}</td>
+    <td class="num">${fEUR(toEUR(e.amount, e.currency, e.rate))}</td><td>${pill(e.paidBy)}${e.onDelivery ? '<span class="sub">on delivery</span>' : ''}</td><td>${esc(e.place || '')}<span class="sub">${esc(e.method || '')}</span></td>
+    <td>${e.shipmentId ? esc(shipName(e.shipmentId)) : '<span class="note">general</span>'}</td>${actions('expenses', e.id)}</tr>`).join('') || '<tr><td colspan="8" class="empty">No expenses yet.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="3">${rows.length} entries</td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
+};
+
+V.transfers = R => {
+  const rows = db.transfers.slice().sort(byDate).filter(t => (!UI.person || t.from === UI.person || t.to === UI.person) && match(t.method, t.notes));
+  return settlementHero(R, true) + `<div class="toolbar">${search('Search transfers')}${personFilter()}</div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>From → To</th><th class="num">Amount</th><th class="num">In €</th><th>Method</th><th>Notes</th><th></th></tr></thead><tbody>
+  ${rows.map(t => `<tr><td>${fDate(t.date)}</td><td>${pill(t.from)} → ${pill(t.to)}</td><td class="num">${fAmt(t.amount, t.currency)}${t.currency === 'EGP' ? `<span class="sub">@ ${t.rate}</span>` : ''}</td><td class="num">${fEUR(toEUR(t.amount, t.currency, t.rate))}</td><td>${esc(t.method || '')}</td><td>${esc(t.notes || '')}</td>${actions('transfers', t.id)}</tr>`).join('') || '<tr><td colspan="7" class="empty">No transfers yet.</td></tr>'}
+  </tbody></table></div>`;
+};
+
+function ledgerRows(R) {
+  const out = [];
+  db.purchases.forEach(p => out.push({ date: p.date, type: 'Purchase', desc: `${p.product} ×${p.qty}`, who: p.paidBy, dir: 'out', place: p.place, how: p.method, amt: num(p.qty) * num(p.unitCost), cur: 'EUR', eur: num(p.qty) * num(p.unitCost), coll: 'purchases', id: p.id }));
+  db.expenses.forEach(e => out.push({ date: e.date, type: e.category, desc: e.description || e.category, who: e.paidBy, dir: 'out', place: e.place, how: e.method + (e.onDelivery ? ', on delivery' : ''), amt: e.amount, cur: e.currency, eur: toEUR(e.amount, e.currency, e.rate), coll: 'expenses', id: e.id }));
+  db.sales.filter(s => s.kind === 'sale').forEach(s => { const l = R.lots[s.purchaseId], a = num(s.qty) * num(s.unitPrice);
+    out.push({ date: s.date, type: s.paid ? 'Sale' : 'Sale (unpaid)', desc: `${l ? l.p.product : '?'} ×${s.qty}${s.customer ? ' to ' + s.customer : ''}`, who: s.receivedBy, dir: s.paid ? 'in' : 'pending', place: s.place, how: s.method, amt: a, cur: s.currency, eur: toEUR(a, s.currency, s.rate), coll: 'sales', id: s.id }); });
+  db.transfers.forEach(t => out.push({ date: t.date, type: 'Transfer', desc: `${pname(t.from)} → ${pname(t.to)}${t.notes ? ' · ' + t.notes : ''}`, who: t.from, to: t.to, dir: 'move', place: '', how: t.method, amt: t.amount, cur: t.currency, eur: toEUR(t.amount, t.currency, t.rate), coll: 'transfers', id: t.id }));
+  return out.sort(byDate);
+}
+V.ledger = R => {
+  const rows = ledgerRows(R).filter(r => (!UI.person || r.who === UI.person || r.to === UI.person) && (!UI.type || r.dir === UI.type) && match(r.type, r.desc, r.place, r.how));
+  const flow = { in: ['Money in', 'ok'], out: ['Money out', 'bad'], pending: ['Owed by customer', 'warn'], move: ['Between you', ''] };
+  return `<div class="toolbar">${search('Search everything')}${personFilter()}<select data-ui="type"><option value="">All movements</option>${Object.entries(flow).map(([k, [l]]) => `<option value="${k}"${UI.type === k ? ' selected' : ''}>${l}</option>`).join('')}</select><button class="btn sm ghost" data-act="csv">Export CSV</button></div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>When</th><th>What</th><th>Who</th><th>Where</th><th>How</th><th class="num">How much</th><th class="num">In €</th><th>Flow</th><th></th></tr></thead><tbody>
+  ${rows.map(r => `<tr><td>${fDate(r.date)}</td><td><b>${esc(r.type)}</b><span class="sub">${esc(r.desc)}</span></td><td>${pill(r.who)}${r.to ? ' → ' + pill(r.to) : ''}</td><td>${esc(r.place || '')}</td><td>${esc(r.how || '')}</td>
+    <td class="num">${fAmt(r.amt, r.cur)}</td><td class="num ${r.dir === 'in' ? 'in-amt' : r.dir === 'out' ? 'out-amt' : ''}">${r.dir === 'out' ? '−' : r.dir === 'in' ? '+' : ''}${fEUR(r.eur)}</td>
+    <td><span class="pill ${flow[r.dir][1]}">${flow[r.dir][0]}</span></td><td class="acts"><button class="ib" data-edit="${r.coll}:${r.id}">✎</button></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nothing recorded yet.</td></tr>'}
+  </tbody></table></div>`;
+};
+V.ledger.csv = () => {
+  const R = calc();
+  downloadCSV('shanta-ledger-' + today() + '.csv', [['Date', 'Type', 'Description', 'Who', 'To', 'Where', 'How', 'Amount', 'Currency', 'EUR', 'Flow']]
+    .concat(ledgerRows(R).map(r => [r.date, r.type, r.desc, pname(r.who), r.to ? pname(r.to) : '', r.place, r.how, num(r.amt).toFixed(2), r.cur, r.eur.toFixed(2), r.dir])));
+};
+
+V.settings = () => {
+  const s = db.settings;
+  const f = (k, l, t = 'text', extra = '', hint = '') => `<div class="f"><label>${l}</label><input data-set="${k}" type="${t}" value="${esc(s[k])}" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+  return `<div class="grid2 settings"><div class="card"><h3>The two of you</h3>
+    <div class="fgrid">${f('meName', 'Your name (in Germany)')}${f('friendName', 'Friend’s name (in Egypt)')}</div>
+    ${f('meShare', 'Your share of the profit (%)', 'number', 'min="0" max="100" step="1"', `${esc(s.friendName)} gets ${100 - num(s.meShare)}%`)}
+    <div class="fgrid">${f('cityDE', 'Default place to buy')}${f('cityEG', 'Default city for sales')}</div></div>
+  <div class="card"><h3>Money & stock</h3>
+    ${f('rate', 'Today’s rate: EGP for €1', 'number', 'step="0.01"', 'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.')}
+    ${f('targetMargin', 'Target markup on cost (%)', 'number', 'step="1"', 'Used for the suggested selling price.')}
+    ${f('lowStock', 'Warn when stock is at or below', 'number', 'step="1"')}</div>
+  <div class="card"><h3>Your data file</h3>
+    <p class="note">${canFS() ? 'Data is written straight to a <code>.json</code> file on your disk. Pick it once with “Save as…”; after that every change is saved to it automatically. A backup copy also stays in this browser.' : 'This browser can’t write to files directly, so use “Download backup” to save a <code>.json</code> file and “Import” to load it again.'}</p>
+    <div class="f chk"><input type="checkbox" id="as" data-set="autosave"${s.autosave ? ' checked' : ''}><label for="as">Save to the file automatically after every change</label></div>
+    <div class="topact" style="margin-top:10px"><button class="btn" data-act="saveas">Save as…</button><button class="btn ghost" data-act="open">Open file</button><button class="btn ghost" data-act="download">Download backup</button><button class="btn ghost" data-act="import">Import</button></div></div>
+  ${Cloud.settingsHTML()}
+  <div class="card"><h3>Start over</h3><p class="note">Sample data shows how a full cycle looks. Clearing removes everything from the app (your saved file is only changed if autosave is on).</p>
+    <div class="topact"><button class="btn ghost" data-act="demo">Load sample data</button><button class="btn terra" data-act="reset">Clear all data</button></div></div></div>`;
+};

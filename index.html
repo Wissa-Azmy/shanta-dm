@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shanta Ledger · Germany to Egypt</title>
+<script src="https://artifactcdn.diabrowser.engineering/ajax/libs/Chart.js/chart.umd.js"></script>
+<script>window.Chart || document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"><\/script>')</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="airmail"></div>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="logo">€<span>⇄</span>£E</div>
+      <div><b>Shanta</b><small>Germany ⇄ Egypt ledger</small></div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="filebox" id="filebox"></div>
+  </aside>
+  <main>
+    <header class="top">
+      <div>
+        <div class="eyebrow" id="eyebrow"></div>
+        <h1 id="vtitle"></h1>
+      </div>
+      <div class="topact" id="topact"></div>
+    </header>
+    <section id="view"></section>
+  </main>
+</div>
+<dialog id="modal"><form id="mbody" method="dialog" novalidate></form></dialog>
+<div id="toast"></div>
+<input type="file" id="fileInput" accept=".json,application/json" hidden>
+<script src="core.js"></script>
+<script src="forms.js"></script>
+<script src="views.js"></script>
+<script src="cloud.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
