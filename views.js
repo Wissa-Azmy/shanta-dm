@@ -98,6 +98,7 @@ V.shipments = R => {
       ${s.notes ? `<p class="note">${esc(s.notes)}</p>` : ''}
       <div class="row">${idx < OPT.status.length - 1 ? `<button class="btn sm" data-act="advance:${s.id}">Mark ${OPT.status[idx + 1]}</button>` : ''}
       <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
+      <button class="btn sm ghost" data-receipt="${s.id}">⇪ dm receipt</button>
       <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
       <button class="ib" data-edit="shipments:${s.id}">✎ Edit</button><button class="ib del" data-del="shipments:${s.id}">✕</button></div></div>`;
   }).join('')}</div>`;

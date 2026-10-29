@@ -35,7 +35,7 @@ function render() {
   $('#nav').innerHTML = NAV.map(([k, i, l]) => `<button class="${k === view ? 'on' : ''}" data-go="${k}"><i>${i}</i>${l}${c[k] ? `<span class="cnt">${c[k]}</span>` : ''}</button>`).join('');
   const n = NAV.find(x => x[0] === view) || NAV[0];
   $('#eyebrow').textContent = n[3]; $('#vtitle').textContent = n[2];
-  $('#topact').innerHTML = NEWBTN[view] ? `<button class="btn" data-new="${view === 'stock' ? 'sales' : view}">+ ${NEWBTN[view]}</button>` :
+  $('#topact').innerHTML = NEWBTN[view] ? `${view === 'purchases' || view === 'shipments' ? '<button class="btn ghost" data-receipt="">⇪ Import dm receipt</button>' : ''}<button class="btn" data-new="${view === 'stock' ? 'sales' : view}">+ ${NEWBTN[view]}</button>` :
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();

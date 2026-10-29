@@ -199,3 +199,24 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .bklist{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
 .bklist h4{font:600 14px var(--body);margin:0 0 8px;display:flex;gap:8px;align-items:center}
 .bkbanner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--gold-soft);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin-bottom:18px;font-size:14px}
+
+/* receipt import */
+#rdlg{border:0;border-radius:18px;padding:0;background:var(--card);color:var(--ink);width:min(1080px,96vw);max-height:92vh;box-shadow:0 30px 80px rgba(29,42,37,.35)}
+#rdlg::backdrop{background:rgba(29,42,37,.45);backdrop-filter:blur(2px)}
+#rbody{padding:22px 24px}
+.rhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.rhead h2{font-size:26px;margin-bottom:4px}
+.rdrop{border:2px dashed var(--line);border-radius:14px;padding:28px;text-align:center;margin-top:8px}
+.rdrop details{margin-top:16px;text-align:left}
+.rdrop summary{cursor:pointer;font-weight:600;color:var(--muted)}
+.rdrop textarea{width:100%;font:12px var(--mono);border:1px solid var(--line);border-radius:9px;padding:10px;margin:8px 0}
+.rx-opts{grid-template-columns:repeat(3,minmax(0,1fr));margin:8px 0 12px}
+#rbody .info,#rbody .err{margin:0 0 8px}
+.rx-table{max-height:46vh}
+.rx-table td{padding:5px 8px;vertical-align:middle}
+.rx-table tr.off td{opacity:.45}
+.cell{font:inherit;font-size:13px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;width:100%;min-width:90px}
+.cell:hover,.cell:focus{border-color:var(--line);background:#fff;outline:none}
+.cell.wide{min-width:260px}
+.cell.n{width:64px;min-width:0;text-align:right}
+@media (max-width:820px){.rx-opts{grid-template-columns:minmax(0,1fr)}}
