@@ -1,6 +1,6 @@
 /* ---------- import a dm invoice (PDF or pasted text) into a shipment ---------- */
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/';
-const BRANDS = ['Balea PROFESSIONAL', 'Balea MEN', 'Balea med', 'Balea', 'alverde NATURKOSMETIK', 'alverde', 'Denkmit', 'CATRICE', 'essence', 'ebelin', 'Mivolis', 'Dontodent', 'LANGHAARMÄDCHEN', 'Sundance', 'SEINZ', 'S-quitofree', 'babylove', 'Jessa', 'profissimo', 'trend !t up', 'Maybelline', 'L\'Oréal Paris', 'NIVEA', 'Garnier', 'CeraVe', 'The Ordinary'];
+const BRANDS = ['Balea PROFESSIONAL', 'Balea MEN', 'Balea med', 'Balea', 'alverde NATURKOSMETIK', 'alverde', 'Denkmit', 'CATRICE', 'essence', 'ebelin', 'Mivolis', 'Dontodent', 'LANGHAARMÄDCHEN', 'Sundance', 'SEINZ', 'S-quitofree', 'babylove', 'Jessa', 'profissimo', 'trend !t up', 'Maybelline', 'L\'Oréal Paris', 'NIVEA', 'Garnier', 'CeraVe', 'The Ordinary', 'Mixa', 'Neutrogena', 'Eucerin', 'La Roche-Posay', 'Bebe', 'Isana', 'Dove', 'Schwarzkopf', 'Gliss', 'Syoss', 'Guhl', 'Lavera', 'Weleda', 'Sebamed', 'Kneipp', 'Tetesept', 'Doppelherz', 'Abtei'];
 const RX = { items: [], meta: {}, warn: [], o: {} };
 const deNum = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
 
@@ -11,7 +11,7 @@ function guessCategory(t) {
   if (/mascara|make-up|makeup|lippen|lipstick|eyeliner|nagel|puder|concealer|catrice|essence|rouge|lidschatten/.test(t)) return 'Make-up';
   if (/parfum|parfüm|eau de|duft/.test(t) && !/raum/.test(t)) return 'Fragrance';
   if (/baby|windel|kinder/.test(t)) return 'Baby';
-  if (/gesicht|serum|tagescreme|nachtcreme|bb creme|toner|augen|maske|peel-off|aufheller|q10|hyaluron|niacinamid|retinol|lsf/.test(t)) return 'Skin care';
+  if (/gesicht|serum|tagescreme|nachtcreme|bb creme|toner|augen|maske|peel-off|aufheller|q10|hyaluron|niacinamid|retinol|lsf|ceramid|cica|niac|panthenol|pflegecreme/.test(t)) return 'Skin care';
   if (/deo|antitranspirant|dusch|körper|fuß|fuss|hand|bodylotion|pflegemilch|pflegeöl|massage|peeling|hornhaut|urea/.test(t)) return 'Body care';
   return 'Other';
 }
@@ -22,7 +22,52 @@ function splitBrand(lines) {
   return b ? [s.slice(0, b.length), s.slice(b.length).trim()] : ['', s];
 }
 
+/* store eBon: "Product name  6,95 1" (price is the line total, last digit is the VAT code);
+   an optional line before it like "2 x 3,45" gives quantity and unit price */
+function bonBrand(s) {
+  const b = BRANDS.find(b => s.toLowerCase().startsWith(b.toLowerCase()));
+  if (b) return [s.slice(0, b.length), s.slice(b.length).trim()];
+  const i = s.indexOf(' ');
+  return i > 0 ? [s.slice(0, i), s.slice(i + 1)] : ['', s];
+}
+function parseBon(text) {
+  const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+  const meta = {}, items = [], warn = [];
+  const d = text.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/) || text.match(/Datum:?\s*(\d{2})\.(\d{2})\.(\d{4})/);
+  if (d) { meta.date = `${d[3]}-${d[2]}-${d[1]}`; meta.invoice = `eBon ${meta.date}${d[4] ? ' ' + d[4] + ':' + d[5] : ''}`; }
+  const sum = text.match(/SUMME\s+EUR\s+([\d.]+,\d{2})/); if (sum) meta.sum = deNum(sum[1]);
+  const paid = text.match(/Zu zahlender Betrag\s+EUR\s+([\d.]+,\d{2})/); meta.paid = paid ? deNum(paid[1]) : meta.sum;
+  meta.method = /\bBAR\b|Bargeld|Gegeben/i.test(text) && !/MasterCard|VISA|girocard|Maestro|EC-Karte/i.test(text) ? 'Cash' : /PayPal/i.test(text) ? 'PayPal' : 'Card';
+  meta.online = false;
+  const end = lines.findIndex(l => /^SUMME\b/.test(l));
+  let pending = null, discount = 0;
+  for (const l of lines.slice(0, end < 0 ? lines.length : end)) {
+    const q = l.match(/^(\d+)\s*(?:Stk\.?\s*)?[xX×]\s*(\d+,\d{2})$/);
+    if (q) { pending = { qty: +q[1], unit: deNum(q[2]) }; continue; }
+    const m = l.match(/^(.+?)\s+(-?[\d.]*\d,\d{2})\s+(?:[A-Z]?\d|[A-Z])$/);
+    if (!m) continue;
+    const total = deNum(m[2].replace('-', ''));
+    if (m[2].startsWith('-')) { discount += total; pending = null; continue; }
+    let qty = 1, unit = total;
+    if (pending && Math.abs(pending.qty * pending.unit - total) < 0.015) { qty = pending.qty; unit = pending.unit; }
+    pending = null;
+    const [brand, product] = bonBrand(m[1].replace(/\s+/g, ' '));
+    items.push({ on: true, brand, product: product || brand, qty, unit, total, category: guessCategory(brand + ' ' + product) });
+  }
+  const parsed = items.reduce((a, x) => a + x.total, 0);
+  if (meta.sum && Math.abs(parsed - meta.sum) > 0.02) {
+    if (discount && Math.abs(parsed - discount - meta.sum) < 0.02) meta.sum = parsed;
+    else warn.push(`Lines found add up to ${fEUR(parsed)}, but the receipt says ${fEUR(meta.sum)}. Some lines may be missing.`);
+  }
+  return { items, meta, warn };
+}
+
 function parseReceipt(raw) {
+  const t = String(raw).replace(/\r/g, '');
+  if (/SUMME\s+EUR/.test(t) && !/Rechnungsnummer|Artikelbezeichnung/.test(t)) return parseBon(t.replace(/[ \t ]+/g, ' '));
+  return parseInvoice(raw);
+}
+function parseInvoice(raw) {
   const text = String(raw).replace(/\r/g, '').replace(/[ \t ]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{2,}/g, '\n');
   const meta = {};
   const d = text.match(/Rechnungsdatum:?\s*(\d{2})\.(\d{2})\.(\d{4})/) || text.match(/Auftragsdatum:?\s*(\d{2})\.(\d{2})\.(\d{4})/) || text.match(/(\d{2})\.(\d{2})\.(\d{4})/);
@@ -104,7 +149,7 @@ function drawReceipt() {
     <button type="button" class="ib" data-rx="close" title="Close">✕</button></div>
     ${!RX.items.length ? `<div class="rdrop">
         <label class="btn" for="rx_file">${RX.busy ? 'Reading…' : 'Choose PDF receipt'}</label><input type="file" id="rx_file" accept="application/pdf,.pdf" hidden>
-        <p class="note">dm.de invoices (“Rechnung”) as PDF. The file stays on your device.</p>
+        <p class="note">dm.de online invoices (“Rechnung”) and dm store eBons, as PDF. The file stays on your device.</p>
         <details${RX.err ? ' open' : ''}><summary>Or paste the receipt text</summary>
           <p class="note">Open the PDF, press ⌘A (Ctrl+A) then ⌘C (Ctrl+C), and paste here.</p>
           <textarea id="rx_text" rows="7" placeholder="Paste the receipt text…"></textarea>
@@ -135,7 +180,7 @@ function drawReceipt() {
 }
 function loadText(text) {
   const r = parseReceipt(text);
-  if (!r.items.length) { RX.err = 'No product lines were found. If this is a dm.de invoice, try pasting its text instead; paper till receipts are not supported yet.'; RX.busy = false; drawReceipt(); return; }
+  if (!r.items.length) { RX.err = 'No product lines were found. Try pasting the receipt text instead. Photos or scans of paper receipts can’t be read; use the eBon PDF from the dm app.'; RX.busy = false; drawReceipt(); return; }
   Object.assign(RX, r, { err: '', busy: false });
   Object.assign(RX.o, { date: r.meta.date || RX.o.date, receipt: r.meta.invoice || r.meta.order || '', method: r.meta.method || RX.o.method, place: r.meta.online ? 'dm.de (online)' : db.settings.cityDE });
   drawReceipt();
