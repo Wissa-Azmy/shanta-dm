@@ -54,7 +54,6 @@ document.addEventListener('click', e => {
   if (t.dataset.edit) { const [c, id] = t.dataset.edit.split(':'); return openForm(c, id); }
   if (t.dataset.del) { const [c, id] = t.dataset.del.split(':'); return deleteRec(c, id); }
   const [a, arg] = t.dataset.act.split(':');
-  if (a === 'paid') { const s = db.sales.find(x => x.id === arg); if (s) { s.paid = true; commit(); toast('Marked as paid'); } }
   if (a === 'advance') { const s = db.shipments.find(x => x.id === arg); if (s) { const i = OPT.status.indexOf(s.status); s.status = OPT.status[Math.min(i + 1, OPT.status.length - 1)]; if (s.status === 'Delivered') s.deliveredOn = today(); commit(); toast(s.name + ': ' + s.status); } }
   if (a === 'save') saveFile(false);
   if (a === 'saveas') saveFile(true);
