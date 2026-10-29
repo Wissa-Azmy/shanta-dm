@@ -184,7 +184,8 @@ V.settings = () => {
     ${f('meShare', 'Your share of the profit (%)', 'number', 'min="0" max="100" step="1"', `${esc(s.friendName)} gets ${100 - num(s.meShare)}%`)}
     <div class="fgrid">${f('cityDE', 'Default place to buy')}${f('cityEG', 'Default city for sales')}</div></div>
   <div class="card"><h3>Money & stock</h3>
-    ${f('rate', 'Today’s rate: EGP for €1', 'number', 'step="0.01"', 'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.')}
+    <div class="f"><label>Today’s rate: EGP for €1</label><div class="raterow"><input data-set="rate" type="number" step="0.01" value="${esc(s.rate)}"><button type="button" class="btn sm ghost" data-act="fx">↻ Live rate</button></div><span class="hint" id="fx_hint">${fxHint()}</span></div>
+    <div class="f chk"><input type="checkbox" id="fx_auto" data-set="rateAuto"${s.rateAuto !== false ? ' checked' : ''}><label for="fx_auto">Update the rate from the internet once a day</label></div>
     ${f('targetMargin', 'Target markup on cost (%)', 'number', 'step="1"', 'Used for the suggested selling price.')}
     ${f('lowStock', 'Warn when stock is at or below', 'number', 'step="1"')}</div>
   <div class="card"><h3>Backup & sync</h3><div class="filebox" id="filebox"></div>

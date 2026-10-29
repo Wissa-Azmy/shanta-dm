@@ -62,6 +62,7 @@ document.addEventListener('click', e => {
   if (a === 'download') downloadJSON();
   if (a === 'import') $('#fileInput').click();
   if (a === 'csv') V.ledger.csv();
+  if (a === 'fx') { t.textContent = 'Fetching…'; updateRate(true); }
 });
 document.addEventListener('input', e => {
   const u = e.target.dataset.ui;
@@ -75,6 +76,7 @@ document.addEventListener('input', e => {
   if (k) {
     db.settings[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' ? num(e.target.value) : e.target.value;
     if (k === 'meShare') db.settings.meShare = Math.max(0, Math.min(100, db.settings.meShare));
+    if (k === 'rate') db.settings.rateManual = today();
     clearTimeout(render._s); render._s = setTimeout(() => { const id = document.activeElement && document.activeElement.dataset.set; commit(); if (id) { const el = $(`[data-set="${id}"]`); if (el) { el.focus(); if (el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } } }, 500);
   }
 });
@@ -112,10 +114,41 @@ function demoData() {
   return d;
 }
 
+/* ---------- live EUR → EGP rate (free APIs, no key) ---------- */
+async function fetchRate() {
+  const sources = [
+    ['https://open.er-api.com/v6/latest/EUR', j => j && j.rates && j.rates.EGP, 'exchangerate-api.com'],
+    ['https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json', j => j && j.eur && j.eur.egp, 'currency-api (jsDelivr)']
+  ];
+  for (const [url, pick, name] of sources) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) continue;
+      const v = num(pick(await r.json()));
+      if (v > 1) return { rate: Math.round(v * 100) / 100, source: name };
+    } catch (e) { }
+  }
+  throw new Error('Couldn’t get the live rate. Check your internet connection; you can still type the rate yourself.');
+}
+async function updateRate(manual) {
+  try {
+    const { rate: r, source } = await fetchRate(), s = db.settings, same = num(s.rate) === r;
+    Object.assign(s, { rate: r, rateSource: source, rateAt: new Date().toISOString(), rateManual: '' });
+    commit();
+    if (manual) toast(`Live rate: €1 = ${r} EGP${same ? ' (unchanged)' : ''}`);
+  } catch (e) { if (manual) { toast(e.message); render(); } }
+}
+function fxHint() {
+  const s = db.settings, tail = ' Used as the default for new entries; old entries keep their own rate.';
+  if (s.rateManual) return `Typed in by hand on ${fDate(s.rateManual)}.` + tail;
+  if (s.rateAt) return `Live rate from ${esc(s.rateSource || 'the internet')}, ${new Date(s.rateAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. You can still type your own.` + tail;
+  return 'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.';
+}
+
 /* ---------- start ---------- */
 (async () => {
   render();
   const h = await IDB.get('handle');
   if (Cloud.on()) { Cloud.sync(); Cloud.startPolling(); }
   if (h && h.queryPermission) { fileHandle = h; fileName = h.name; filePerm = await verifyPerm(h, false); renderFile(); }
+  setTimeout(() => { const s = db.settings; if (s.rateAuto !== false && (s.rateAt || '').slice(0, 10) !== today() && s.rateManual !== today()) updateRate(false); }, 4000);
 })();

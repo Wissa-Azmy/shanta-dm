@@ -215,8 +215,8 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .rx-table{max-height:46vh}
 .rx-table td{padding:5px 8px;vertical-align:middle}
 .rx-table tr.off td{opacity:.45}
-.cell{font:inherit;font-size:13px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;width:100%;min-width:90px}
-.cell:hover,.cell:focus{border-color:var(--line);background:#fff;outline:none}
+.cell{font:inherit;font-size:13px;color:var(--ink);border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 7px;width:100%;min-width:90px}
+.cell:hover{border-color:#c9b998}.cell:focus{border-color:var(--nile);outline:2px solid var(--nile-soft);outline-offset:0}
 .cell.wide{min-width:260px}
 .cell.n{width:64px;min-width:0;text-align:right}
 @media (max-width:820px){.rx-opts{grid-template-columns:minmax(0,1fr)}}
@@ -231,3 +231,5 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 #o_tot .kv dd{font-size:13.5px}
 .terra-text{color:var(--terra)!important}
 .pline{display:block;white-space:nowrap}
+.raterow{display:flex;gap:8px;align-items:center}
+.raterow input{flex:1}
