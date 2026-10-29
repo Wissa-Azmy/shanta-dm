@@ -86,7 +86,7 @@ function rdlg() {
 function openReceipt(shipmentId) {
   RX.items = []; RX.meta = {}; RX.warn = []; RX.err = ''; RX.busy = false;
   RX.o = { shipmentId: shipmentId || '', paidBy: 'me', method: 'Card', date: today(), receipt: '', place: 'dm.de', spread: true };
-  drawReceipt(); const d = rdlg(); if (!d.open) d.showModal();
+  const d = rdlg(); drawReceipt(); if (!d.open) d.showModal();
 }
 function factor() {
   const m = RX.meta;
