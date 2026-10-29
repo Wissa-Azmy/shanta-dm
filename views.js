@@ -87,7 +87,7 @@ V.shipments = R => {
   return `<div class="toolbar">${search('Search shipments')}</div><div class="ships">${list.map(s => {
     const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
     const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
-    return `<div class="ship"><h3>${esc(s.name)}</h3><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
+    return `<div class="ship" data-ship-id="${s.id}"><h3>${esc(s.name)}</h3><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
       <div class="steps">${OPT.status.map((_, i) => `<span class="${i <= idx ? 'on' : ''}"></span>`).join('')}</div>
       <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
       <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>

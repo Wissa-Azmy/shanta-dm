@@ -233,3 +233,15 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .pline{display:block;white-space:nowrap}
 .raterow{display:flex;gap:8px;align-items:center}
 .raterow input{flex:1}
+
+/* drag and drop */
+.rdrop{display:flex;flex-direction:column;align-items:center;gap:8px;transition:background .15s,border-color .15s}
+.rdrop .rdrop-t{font:600 20px var(--display)}
+.rdrop details{align-self:stretch}
+.rdrop.over{border-color:var(--nile);background:var(--nile-soft)}
+.ship.over{outline:3px dashed var(--nile);outline-offset:3px;background:var(--nile-soft)}
+#dropHint{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(14,106,93,.12);border:4px dashed var(--nile);pointer-events:none;opacity:0;transition:opacity .15s}
+#dropHint.on{opacity:1}
+#dropHint div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 24px;text-align:center;box-shadow:0 20px 60px rgba(29,42,37,.18)}
+#dropHint b{display:block;font:600 24px var(--display)}
+#dropHint span{color:var(--muted);font-size:13px}

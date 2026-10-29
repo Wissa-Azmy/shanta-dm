@@ -148,7 +148,8 @@ function drawReceipt() {
   $('#rbody').innerHTML = `<div class="rhead"><div><h2>Import dm receipt</h2><p class="lead">Every product line on the receipt becomes a purchase in the chosen box. Check the list, fix anything that looks off, then import.</p></div>
     <button type="button" class="ib" data-rx="close" title="Close">✕</button></div>
     ${!RX.items.length ? `<div class="rdrop">
-        <label class="btn" for="rx_file">${RX.busy ? 'Reading…' : 'Choose PDF receipt'}</label><input type="file" id="rx_file" accept="application/pdf,.pdf" hidden>
+        <b class="rdrop-t">${RX.busy ? "Reading the receipt…" : "Drag &amp; drop the PDF here"}</b><span class="note">or</span>
+        <label class="btn" for="rx_file">Choose PDF receipt</label><input type="file" id="rx_file" accept="application/pdf,.pdf" hidden>
         <p class="note">dm.de online invoices (“Rechnung”) and dm store eBons, as PDF. The file stays on your device.</p>
         <details${RX.err ? ' open' : ''}><summary>Or paste the receipt text</summary>
           <p class="note">Open the PDF, press ⌘A (Ctrl+A) then ⌘C (Ctrl+C), and paste here.</p>
@@ -207,12 +208,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
-  if (t.id === 'rx_file' && t.files[0]) {
-    RX.busy = true; RX.err = ''; drawReceipt();
-    try { loadText(await pdfToText(t.files[0])); }
-    catch (x) { console.warn(x); RX.busy = false; RX.err = 'This PDF could not be read here (the PDF reader needs an internet connection and may be blocked in previews). Use “paste the receipt text” below instead.'; drawReceipt(); }
-    return;
-  }
+  if (t.id === 'rx_file' && t.files[0]) { readReceiptFile(t.files[0]); return; }
   if (t.dataset.rx === 'all') { RX.items.forEach(x => x.on = t.checked); drawReceipt(); return; }
   if (t.dataset.ro) { RX.o[t.dataset.ro] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.ro === 'spread') drawReceipt(); return; }
   if (t.dataset.rk === 'on' || t.dataset.rk === 'category') { RX.items[+t.dataset.ri][t.dataset.rk] = t.type === 'checkbox' ? t.checked : t.value; if (t.type === 'checkbox') drawReceipt(); }
@@ -227,4 +223,51 @@ document.addEventListener('input', e => {
     $('#rt_' + t.dataset.ri).textContent = fEUR(num(x.qty) * x.unit * f);
     $('#rx_sum').textContent = `${tt.lines} lines · ${tt.units} units`; $('#rx_tot').textContent = fEUR(tt.total);
   }
+});
+
+/* ---------- drag and drop ---------- */
+async function readReceiptFile(file) {
+  const pdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name), txt = /^text\//.test(file.type) || /\.txt$/i.test(file.name);
+  if (!pdf && !txt) { RX.err = `“${file.name}” is not a PDF. Drop the dm invoice or eBon PDF.`; drawReceipt(); return; }
+  RX.busy = true; RX.err = ''; drawReceipt();
+  try { loadText(pdf ? await pdfToText(file) : await file.text()); }
+  catch (x) { console.warn(x); RX.busy = false; RX.err = 'This PDF could not be read here (the PDF reader needs an internet connection and may be blocked in previews). Use “paste the receipt text” below instead.'; drawReceipt(); }
+}
+let dragDepth = 0;
+const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+const otherDialogOpen = () => ['#modal', '#odlg'].some(s => { const d = $(s); return d && d.open; });
+function dropHint(on) {
+  let h = $('#dropHint');
+  if (!h) { h = document.createElement('div'); h.id = 'dropHint'; h.innerHTML = '<div><b>Drop the dm receipt</b><span>PDF invoice or eBon · drop it on a shipment card to add it to that box</span></div>'; document.body.appendChild(h); }
+  h.classList.toggle('on', on);
+}
+function clearDrag() { dragDepth = 0; dropHint(false); document.querySelectorAll('.over').forEach(x => x.classList.remove('over')); }
+document.addEventListener('dragenter', e => {
+  if (!hasFiles(e) || otherDialogOpen()) return;
+  e.preventDefault(); dragDepth++;
+  const d = $('#rdlg'); dropHint(!(d && d.open));
+});
+document.addEventListener('dragover', e => {
+  if (!hasFiles(e) || otherDialogOpen()) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+  const z = e.target.closest && e.target.closest('.rdrop, [data-ship-id]');
+  document.querySelectorAll('.over').forEach(x => { if (x !== z) x.classList.remove('over'); });
+  if (z) z.classList.add('over');
+});
+document.addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) clearDrag(); });
+document.addEventListener('drop', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  const card = e.target.closest && e.target.closest('[data-ship-id]');
+  clearDrag();
+  if (otherDialogOpen()) return;
+  const file = e.dataTransfer.files[0]; if (!file) return;
+  const d = $('#rdlg');
+  if (d && d.open) {
+    if (RX.items.length && !confirm('Replace the receipt you are checking with the one you dropped?')) return;
+    RX.items = []; readReceiptFile(file); return;
+  }
+  if (/\.json$/i.test(file.name)) return toast('To load a data file, use Settings → Backup & sync.');
+  openReceipt(card ? card.dataset.shipId : '');
+  readReceiptFile(file);
 });
