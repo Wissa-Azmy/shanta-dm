@@ -157,7 +157,7 @@ async function saveFile(saveAs, silent) {
   if (!canFS()) { downloadJSON(); return; }
   try {
     if (saveAs || !fileHandle) {
-      fileHandle = await window.showSaveFilePicker({ suggestedName: fileName || 'shanta-ledger.json', types: [{ description: 'Shanta ledger', accept: { 'application/json': ['.json'] } }] });
+      fileHandle = await window.showSaveFilePicker({ suggestedName: fileName || 'shanta-ledger.json', types: [{ description: 'Shanta dm data', accept: { 'application/json': ['.json'] } }] });
       fileName = fileHandle.name; IDB.set('handle', fileHandle);
     }
     filePerm = await verifyPerm(fileHandle, !silent);
@@ -175,7 +175,7 @@ async function saveFile(saveAs, silent) {
 async function openFile() {
   if (!canFS()) { $('#fileInput').click(); return; }
   try {
-    const [h] = await window.showOpenFilePicker({ types: [{ description: 'Shanta ledger', accept: { 'application/json': ['.json'] } }] });
+    const [h] = await window.showOpenFilePicker({ types: [{ description: 'Shanta dm data', accept: { 'application/json': ['.json'] } }] });
     const data = JSON.parse(await (await h.getFile()).text());
     if (!confirmReplace()) return;
     fileHandle = h; fileName = h.name; IDB.set('handle', h);

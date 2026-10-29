@@ -42,7 +42,7 @@ function render() {
   $("#view").innerHTML = Cloud.bannerHTML() + V[view](R);
   V[view].after && V[view].after();
   renderFile();
-  document.title = 'Shanta Ledger · ' + n[2];
+  document.title = 'Shanta dm · ' + n[2];
 }
 function go(v) { view = v; UI.q = ''; UI.type = ''; localStorage.setItem('shanta-view', v); render(); window.scrollTo(0, 0); }
 

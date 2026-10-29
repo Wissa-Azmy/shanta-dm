@@ -15,17 +15,21 @@ const COLLS = ['shipments', 'purchases', 'sales', 'expenses', 'transfers'];
 const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
   : v && typeof v === 'object' ? '{' + Object.keys(v).filter(k => v[k] !== undefined && v[k] !== null).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}'
   : JSON.stringify(v);
-const emptySnap = () => { const o = { settings: '' }; COLLS.forEach(c => o[c] = {}); return o; };
-function snapLocal(d) { const o = { settings: stable(d.settings) }; COLLS.forEach(c => { o[c] = {}; d[c].forEach(r => o[c][r.id] = stable(r)); }); return o; }
+/* Settings sync field by field (settings/<key>), so one device never overwrites the other's
+   settings with its own stale or default values. 'autosave' belongs to this device only. */
+const LOCAL_KEYS = ['autosave'];
+const emptySnap = () => { const o = { settings: {} }; COLLS.forEach(c => o[c] = {}); return o; };
+function snapSettings(s) { const o = {}; Object.entries(s || {}).forEach(([k, v]) => { if (!LOCAL_KEYS.includes(k) && v !== undefined && v !== null) o[k] = stable(v); }); return o; }
+function snapLocal(d) { const o = { settings: snapSettings(d.settings) }; COLLS.forEach(c => { o[c] = {}; d[c].forEach(r => o[c][r.id] = stable(r)); }); return o; }
 function snapRemote(r) {
   r = r || {};
-  const o = { settings: r.settings ? stable(Object.assign(DEFAULT_DB().settings, r.settings)) : '' };
+  const o = { settings: snapSettings(r.settings) };
   COLLS.forEach(c => { o[c] = {}; Object.entries(r[c] || {}).forEach(([id, rec]) => o[c][id] = stable(Object.assign({ id }, rec))); });
   return o;
 }
 function snapDiff(cur, base) {
   const p = {};
-  if (cur.settings && cur.settings !== base.settings) p.settings = JSON.parse(cur.settings);
+  Object.entries(cur.settings).forEach(([k, s]) => { if (base.settings[k] !== s) p['settings/' + k] = JSON.parse(s); });
   COLLS.forEach(c => {
     Object.entries(cur[c]).forEach(([id, s]) => { if (base[c][id] !== s) p[c + '/' + id] = JSON.parse(s); });
     Object.keys(base[c]).forEach(id => { if (!(id in cur[c])) p[c + '/' + id] = null; });
@@ -34,13 +38,19 @@ function snapDiff(cur, base) {
 }
 function snapApply(s, patch) {
   Object.entries(patch).forEach(([k, v]) => {
-    if (k === 'settings') { s.settings = stable(v); return; }
     const [c, id] = k.split('/');
     if (v === null) delete s[c][id]; else s[c][id] = stable(v);
   });
   return s;
 }
-const snapToData = s => { const o = { settings: s.settings ? JSON.parse(s.settings) : db.settings }; COLLS.forEach(c => o[c] = Object.values(s[c]).map(x => JSON.parse(x))); return o; };
+function snapToData(s) {
+  const o = { settings: Object.assign(DEFAULT_DB().settings, db.settings) };
+  Object.entries(s.settings).forEach(([k, v]) => o.settings[k] = JSON.parse(v));
+  COLLS.forEach(c => o[c] = Object.values(s[c]).map(x => JSON.parse(x)));
+  return o;
+}
+/* bases saved by older versions stored settings as one string: take the cloud's values instead of pushing ours */
+function fixBase(base, remote) { if (base && typeof base.settings !== 'object') base.settings = Object.assign({}, remote.settings); return base; }
 const snapHasData = s => COLLS.some(c => Object.keys(s[c]).length);
 
 function authMsg(code) {
@@ -106,6 +116,7 @@ const Cloud = {
     if (snapHasData(rs) && snapHasData(local) && !confirm('The shared ledger in the cloud already has data.\n\nOK = also add the entries from this browser to it\nCancel = use only the cloud data on this device')) {
       this.base = rs; Object.assign(db, snapToData(rs)); persistLocal();
     } else this.base = emptySnap();
+    if (Object.keys(rs.settings).length) { this.base.settings = Object.assign({}, rs.settings); db.settings = snapToData(rs).settings; persistLocal(); }
     this.saveBase();
     await this.sync();
     this.startPolling();
@@ -123,8 +134,8 @@ const Cloud = {
     try {
       const raw = await this.req('GET');
       const merged = snapRemote(raw);
-      const patch = snapDiff(snapLocal(db), this.base || emptySnap());
-      if (!merged.settings && !patch.settings) patch.settings = JSON.parse(stable(db.settings));
+      const base = this.base ? fixBase(this.base, merged) : Object.assign(emptySnap(), { settings: Object.assign({}, merged.settings) });
+      const patch = snapDiff(snapLocal(db), base);
       const dels = Object.values(patch).filter(v => v === null).length;
       if (dels >= 3) await this.snapshot(`Automatic backup before deleting ${dels} entries`, raw);
       snapApply(merged, patch);
@@ -181,7 +192,7 @@ const Cloud = {
     try {
       const rs = snapRemote(await this.req('GET', null, true, name));
       this.cfg.ledger = name; this.saveCfg();
-      const s = db.settings; Object.assign(db, snapToData(rs)); if (!rs.settings) db.settings = s;
+      Object.assign(db, snapToData(rs));
       persistLocal(); this.base = rs; this.saveBase();
       this.last = new Date();
     } finally { this.busy = false; }
@@ -328,7 +339,7 @@ document.addEventListener('input', e => {
 function showGate() {
   if ($('#gate')) return;
   const g = document.createElement('div'); g.id = 'gate';
-  g.innerHTML = `<div class="gatebox"><div class="logo">€<span>⇄</span>£E</div><h1>Shanta</h1><p class="note">Sign in to open the shared ledger</p>
+  g.innerHTML = `<div class="gatebox"><div class="logo">€<span>⇄</span>£E</div><h1>Shanta dm</h1><p class="note">Sign in to open the shared ledger</p>
     <form data-login="g">${Cloud.loginFields('g')}<button class="btn">Sign in</button></form>
     <div class="err" id="g_msg" hidden></div>
     <button type="button" class="linkbtn" data-act="cloud-skip">Use without signing in on this device</button></div>`;
