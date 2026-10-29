@@ -245,3 +245,5 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 #dropHint div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 24px;text-align:center;box-shadow:0 20px 60px rgba(29,42,37,.18)}
 #dropHint b{display:block;font:600 24px var(--display)}
 #dropHint span{color:var(--muted);font-size:13px}
+.bkbanner .row{display:flex;gap:8px;flex-wrap:wrap}
+.bklist .mini .r{display:flex;gap:6px;align-items:center}

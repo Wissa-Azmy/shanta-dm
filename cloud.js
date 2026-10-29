@@ -152,18 +152,18 @@ const Cloud = {
   },
 
   /* ---- backups: a backup is a full copy stored as its own ledger, listed in shared/_backups ---- */
-  async snapshot(reason, raw) {
+  async snapshot(reason, raw, from = this.cfg.ledger) {
     raw = raw || await this.req('GET') || {};
     const counts = {}; COLLS.forEach(c => counts[c] = Object.keys(raw[c] || {}).length);
     if (!COLLS.some(c => counts[c])) return null;
     const d = new Date(), p = n => String(n).padStart(2, '0');
     const name = `backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
     const copy = Object.assign({}, raw); delete copy._backups;
-    copy._meta = { backupOf: this.cfg.ledger, createdAt: d.toISOString(), by: this.cfg.email, reason };
+    copy._meta = { backupOf: from, createdAt: d.toISOString(), by: this.cfg.email, reason };
     await this.req('PUT', copy, true, name);
     const check = await this.req('GET', null, true, name) || {};
     if (COLLS.some(c => Object.keys(check[c] || {}).length !== counts[c])) throw new Error('The backup could not be verified, so nothing was deleted.');
-    await this.req('PATCH', { [name]: { createdAt: d.toISOString(), by: this.cfg.email, reason, from: this.cfg.ledger, counts } }, true, CLOUD.ledger + '/_backups');
+    await this.req('PATCH', { [name]: { createdAt: d.toISOString(), by: this.cfg.email, reason, from, counts } }, true, CLOUD.ledger + '/_backups');
     this.backups = null;
     return name;
   },
@@ -179,6 +179,35 @@ const Cloud = {
       this.base = snapLocal(db); this.saveBase();
       return name;
     } finally { this.busy = false; }
+  },
+  async backupNow() {
+    await this.sync();
+    if (this.state !== 'ok') throw new Error('Couldn’t reach the cloud, so no backup was made. ' + this.msg);
+    const raw = await this.req('GET', null, true, CLOUD.ledger) || {};
+    const name = await this.snapshot('Manual backup', raw, CLOUD.ledger);
+    if (!name) throw new Error('The live ledger is empty, so there is nothing to back up.');
+    return name;
+  },
+  /* copy a backup over the live ledger, after saving the live ledger as a backup itself */
+  async restore(name) {
+    await this.sync();
+    if (this.state !== 'ok') throw new Error('Couldn’t reach the cloud, so nothing was restored. ' + this.msg);
+    this.busy = true;
+    try {
+      const src = await this.req('GET', null, true, name) || {};
+      if (!COLLS.some(c => Object.keys(src[c] || {}).length)) throw new Error('That backup is empty, so nothing was restored.');
+      const live = await this.req('GET', null, true, CLOUD.ledger) || {};
+      const when = (this.backups || []).find(b => b.name === name);
+      await this.snapshot(`Automatic backup before restoring the backup from ${when ? fDateTime(when.createdAt) : name}`, live, CLOUD.ledger);
+      const put = {}; COLLS.forEach(c => put[c] = src[c] || null);
+      if (src.settings) put.settings = src.settings;
+      await this.req('PATCH', put, true, CLOUD.ledger);
+      const rs = snapRemote(await this.req('GET', null, true, CLOUD.ledger));
+      this.cfg.ledger = CLOUD.ledger; this.saveCfg();
+      Object.assign(db, snapToData(rs)); persistLocal();
+      this.base = rs; this.saveBase(); this.last = new Date(); this.backups = null;
+    } finally { this.busy = false; }
+    this.set('ok'); render();
   },
   async listBackups() {
     const o = await this.req('GET', null, true, CLOUD.ledger + '/_backups') || {};
@@ -202,15 +231,15 @@ const Cloud = {
   bannerHTML() {
     if (!this.isBackup()) return '';
     const b = (this.backups || []).find(x => x.name === this.cfg.ledger);
-    return `<div class="bkbanner"><span>📦 You are looking at a <b>backup</b>${b ? ' from ' + esc(fDateTime(b.createdAt)) : ' (' + esc(this.cfg.ledger) + ')'}. Changes here only affect this backup.</span><button class="btn sm" data-act="cloud-live">Back to the live ledger</button></div>`;
+    return `<div class="bkbanner"><span>📦 You are looking at a <b>backup</b>${b ? ' from ' + esc(fDateTime(b.createdAt)) : ' (' + esc(this.cfg.ledger) + ')'}. Changes here only affect this backup.</span><span class="row"><button class="btn sm terra" data-act="cloud-restore" data-ledger="${esc(this.cfg.ledger)}">Restore this backup</button><button class="btn sm" data-act="cloud-live">Back to the live ledger</button></span></div>`;
   },
   backupsHTML() {
     const list = this.backups;
     const cur = this.cfg.ledger;
-    return `<div class="bklist"><h4>Ledger in use: ${cur === CLOUD.ledger ? '<span class="pill ok">Live (shared)</span>' : '<span class="pill warn">Backup</span>'}</h4>
+    return `<div class="bklist"><h4>Ledger in use: ${cur === CLOUD.ledger ? '<span class="pill ok">Live (shared)</span>' : '<span class="pill warn">Backup</span>'}<button class="btn sm" data-act="cloud-backup" style="margin-left:auto">Back up now</button></h4>
       ${list === undefined || list === null ? '<p class="note">Loading backups…</p>' : !list.length ? '<p class="note">No backups yet. One is made automatically before data is cleared or many entries are deleted at once.</p>' :
       `<ul class="mini">${list.map(b => `<li><span><b>${esc(fDateTime(b.createdAt))}</b><span class="sub note">${esc(b.reason || '')} · ${COLLS.reduce((a, c) => a + num(b.counts && b.counts[c]), 0)} entries · by ${esc(userName(b.by || ''))}</span></span>
-        <span class="r">${b.name === cur ? '<span class="pill warn">Open</span>' : `<button class="btn sm ghost" data-act="cloud-open" data-ledger="${esc(b.name)}">Open</button>`}</span></li>`).join('')}</ul>`}
+        <span class="r">${b.name === cur ? '<span class="pill warn">Open</span>' : `<button class="btn sm ghost" data-act="cloud-open" data-ledger="${esc(b.name)}">Open</button>`}<button class="btn sm ghost terra-text" data-act="cloud-restore" data-ledger="${esc(b.name)}">Restore</button></span></li>`).join('')}</ul>`}
       ${cur !== CLOUD.ledger ? '<button class="btn sm" data-act="cloud-live">Back to the live ledger</button>' : ''}</div>`;
   },
   async fillBackups() {
@@ -277,6 +306,19 @@ document.addEventListener('click', async e => {
   if (a === 'cloud-off') { if (confirm('Disconnect this device from the shared cloud ledger?')) Cloud.disconnect(); }
   if (a === 'cloud-copy') { const ta = $('#cl_rules'); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied'); }
   if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
+  if (a === 'cloud-backup') {
+    t.disabled = true; t.textContent = 'Backing up…';
+    try { await Cloud.backupNow(); toast('Backup saved'); } catch (x) { toast(x.message); }
+    render();
+  }
+  if (a === 'cloud-restore') {
+    const b = (Cloud.backups || []).find(x => x.name === t.dataset.ledger);
+    const label = b ? fDateTime(b.createdAt) : t.dataset.ledger;
+    if (!confirm(`Restore the backup from ${label}?\n\nIt replaces ALL shipments, purchases, sales, expenses, transfers and settings in the live ledger, for you and ${db.settings.friendName}.\nThe current live data is saved as a backup first, so you can undo this.`)) return;
+    t.disabled = true; t.textContent = 'Restoring…';
+    try { await Cloud.restore(t.dataset.ledger); toast('Backup restored to the live ledger'); go('overview'); }
+    catch (x) { console.warn(x); alert(x.message); render(); }
+  }
   if (a === 'cloud-open' || a === 'cloud-live') {
     const name = a === 'cloud-live' ? CLOUD.ledger : t.dataset.ledger;
     t.disabled = true; t.textContent = 'Opening…';

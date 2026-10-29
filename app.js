@@ -26,7 +26,7 @@ function renderFile() {
   } else if (!canFS()) {
     st = dirty ? 'Download a backup' : 'Backup downloaded'; dot = dirty ? 'bad' : 'ok';
     p = 'This browser can’t write files directly. Download a backup after changes.';
-    btns = `<button class="btn sm" data-act="download">Download</button><button class="btn sm ghost" data-act="import">Import</button>`;
+    btns = `<button class="btn sm" data-act="download">Download</button><button class="btn sm ghost" data-act="import">Restore from file</button>`;
   }
   box.innerHTML = `<div class="st"><span class="dot ${dot}"></span>${st}</div><p>${p}</p><div class="row">${btns}</div>` + Cloud.statusHTML();
 }

@@ -191,7 +191,7 @@ V.settings = () => {
   <div class="card"><h3>Backup & sync</h3><div class="filebox" id="filebox"></div>
     <p class="note">${canFS() ? 'Data is written straight to a <code>.json</code> file on your disk. Pick it once with “Save as…”; after that every change is saved to it automatically. A backup copy also stays in this browser.' : 'This browser can’t write to files directly, so use “Download backup” to save a <code>.json</code> file and “Import” to load it again.'}</p>
     <div class="f chk"><input type="checkbox" id="as" data-set="autosave"${s.autosave ? ' checked' : ''}><label for="as">Save to the file automatically after every change</label></div>
-    <div class="topact" style="margin-top:10px"><button class="btn" data-act="saveas">Save as…</button><button class="btn ghost" data-act="open">Open file</button><button class="btn ghost" data-act="download">Download backup</button><button class="btn ghost" data-act="import">Import</button></div></div>
+    <div class="topact" style="margin-top:10px"><button class="btn" data-act="saveas">Save as…</button><button class="btn ghost" data-act="open">Open file</button><button class="btn ghost" data-act="download">Download backup</button><button class="btn ghost" data-act="import">Restore from file</button></div></div>
   ${Cloud.settingsHTML()}
   <div class="card"><h3>Start over</h3><p class="note">Sample data shows how a full cycle looks. Before anything is cleared or replaced, a full backup is made: in the cloud when you are signed in (open it from the list above), otherwise as a downloaded file.</p>
     <div class="topact"><button class="btn ghost" data-act="demo">Load sample data</button><button class="btn terra" data-act="reset">Clear all data</button></div></div></div>`;
