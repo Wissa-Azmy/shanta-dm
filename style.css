@@ -284,3 +284,6 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .kv dt.kvsub span{color:var(--muted);opacity:.8}
 .kv dd.kvsub{font-size:12.5px}
 .kv dd .pill{font-size:10.5px;padding:1px 6px;margin-left:4px}
+.kv dd{white-space:nowrap}
+.kv .kvnote{color:var(--muted);font-size:12px}
+.kv dd .pill{vertical-align:1px}

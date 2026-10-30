@@ -87,17 +87,19 @@ V.shipments = R => {
   return `<div class="toolbar">${search('Search shipments')}</div>${shipInfoHTML()}<div class="ships">${list.map(s => {
     const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
     const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
-    return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">✎</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
+    return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">✎</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}</div>
       <div class="steps">${OPT.status.map((_, i) => `<span class="${i <= idx ? 'on' : ''}"></span>`).join('')}</div>
       <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
-      <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>
-      <dt>Costs as % of goods</dt><dd>${x.goods ? Math.round(x.costs / x.goods * 100) + '%' : '—'}</dd>
-      <dt>Shipping weight</dt><dd>${x.measuredG ? fG(x.measuredG) + ' weighed' : x.byWeight ? fG(x.grams) + ' calculated' + (x.estimated ? ` (${x.estimated} est.)` : '') : 'no weights, split by price'}</dd>
+      <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd>
+      <dt>Shipping &amp; other costs</dt><dd>${fEUR(x.costs)}${x.goods ? `<span class="kvnote"> · ${Math.round(x.costs / x.goods * 100)}% of goods</span>` : ""}</dd>
       ${x.byWeight ? (() => { const kn = items.filter(p => num(p.netG) > 0), un = items.filter(p => !(num(p.netG) > 0)), u = a => a.reduce((t, p) => t + num(p.qty), 0);
-        const row = (n, list, label, g) => n ? `<dt class="kvsub">${n} ${label} <span>· ${u(list)} unit${u(list) === 1 ? '' : 's'}</span></dt><dd class="kvsub">${g}</dd>` : '';
-        return row(kn.length, kn, 'known product' + (kn.length === 1 ? '' : 's'), fG(x.wG)) +
-          row(un.length, un, 'unknown product' + (un.length === 1 ? '' : 's'), x.useRest ? fG(x.rest) + ' <span class="pill">from box</span>' : x.estimated ? fG(x.grams - x.wG) + ' <span class="pill warn">est.</span>' : '—'); })() : ''}
-      <dt>Shipping per kg</dt><dd>${x.byWeight && (x.measuredG || x.grams) ? fEUR(x.costs / (x.measuredG || x.grams) * 1000) : '—'}</dd>
+        const tag = (t, cls, tip) => `<span class="pill ${cls}" title="${tip}">${t}</span>`;
+        const row = (list, g, t) => list.length ? `<dt class="kvsub">${list.length} product${list.length === 1 ? "" : "s"} <span>· ${u(list)} unit${u(list) === 1 ? "" : "s"}</span></dt><dd class="kvsub">${g} ${t}</dd>` : "";
+        const total = x.measuredG || x.grams;
+        return `<dt>Shipping weight</dt><dd>${fG(total)} ${x.measuredG ? tag("weighed", "ok", "Packed box on the scale") : tag("calculated", "", "Sum of the products below")}</dd>` +
+          row(kn, fG(x.wG), tag("label", "", "Content weight from the receipt or label + " + num(db.settings.packagingPct) + "% packaging")) +
+          row(un, x.useRest ? fG(x.rest) : fG(x.grams - x.wG), x.useRest ? tag("from box", "", "What is left of the weighed box after the products with a label weight") : tag("est.", "warn", "No weight known: estimated from the price")) +
+          `<dt>Shipping per kg</dt><dd>${fEUR(x.costs / total * 1000)}</dd>`; })() : `<dt>Shipping split</dt><dd>by price <span class="pill" title="No product weights and the box was not weighed">no weights</span></dd>`}
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
       ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
       ${x.impliedPack !== undefined && !x.tooLight && Math.abs(x.impliedPack - num(db.settings.packagingPct)) >= 3 ? `<div class="wnote">This box suggests about <b>${x.impliedPack}%</b> packaging (now ${num(db.settings.packagingPct)}%). <button class="btn sm ghost" data-act="setpack:${x.impliedPack}">Use ${x.impliedPack}%</button></div>` : ""}
