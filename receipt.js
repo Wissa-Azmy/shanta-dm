@@ -52,7 +52,7 @@ function parseBon(text) {
     if (pending && Math.abs(pending.qty * pending.unit - total) < 0.015) { qty = pending.qty; unit = pending.unit; }
     pending = null;
     const [brand, product] = bonBrand(m[1].replace(/\s+/g, ' '));
-    items.push({ on: true, brand, product: product || brand, qty, unit, total, category: guessCategory(brand + ' ' + product) });
+    items.push({ on: true, brand, product: product || brand, qty, unit, total, netG: parseWeightG(m[1]), category: guessCategory(brand + ' ' + product) });
   }
   const parsed = items.reduce((a, x) => a + x.total, 0);
   if (meta.sum && Math.abs(parsed - meta.sum) > 0.02) {
@@ -92,7 +92,7 @@ function parseInvoice(raw) {
     if (!lines.length) { odd++; continue; }
     if (qty === 0) { zero++; continue; }
     const [brand, product] = splitBrand(lines.slice(-2));
-    items.push({ on: true, brand, product: product || brand, qty, unit, total, category: guessCategory(brand + ' ' + product) });
+    items.push({ on: true, brand, product: product || brand, qty, unit, total, netG: parseWeightG(lines.join(' ')) || parseWeightG(product), category: guessCategory(brand + ' ' + product) });
   }
   const parsed = items.reduce((a, x) => a + x.total, 0);
   if (zero) warn.push(`${zero} line${zero > 1 ? 's' : ''} with quantity 0 (not delivered) skipped.`);
@@ -167,15 +167,16 @@ function drawReceipt() {
     </div>
     ${dup ? `<div class="err">This receipt (${esc(m.invoice)}) looks like it was imported before. Importing again will add the products twice.</div>` : ''}
     ${RX.warn.map(w => `<div class="info">${esc(w)}</div>`).join('')}
-    <div class="tablewrap rx-table"><table class="t"><thead><tr><th><input type="checkbox" data-rx="all"${RX.items.every(x => x.on) ? ' checked' : ''}></th><th>Brand</th><th>Product</th><th>Category</th><th class="num">Qty</th><th class="num">Per unit${f < 1 ? ' (after coupons)' : ''}</th><th class="num">Total</th></tr></thead><tbody>
+    <div class="tablewrap rx-table"><table class="t"><thead><tr><th><input type="checkbox" data-rx="all"${RX.items.every(x => x.on) ? ' checked' : ''}></th><th>Brand</th><th>Product</th><th>Category</th><th class="num" title="Net content per unit from the receipt; packaging is added when splitting shipping">Content (g/ml)</th><th class="num">Qty</th><th class="num">Per unit${f < 1 ? ' (after coupons)' : ''}</th><th class="num">Total</th></tr></thead><tbody>
     ${RX.items.map((x, i) => `<tr class="${x.on ? '' : 'off'}"><td><input type="checkbox" data-ri="${i}" data-rk="on"${x.on ? ' checked' : ''}></td>
       <td><input class="cell" data-ri="${i}" data-rk="brand" value="${esc(x.brand)}"></td>
       <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}"></td>
       <td><select class="cell" data-ri="${i}" data-rk="category">${OPT.category.map(c => `<option${c === x.category ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
+      <td class="num"><input class="cell n w" type="number" min="0" step="1" data-ri="${i}" data-rk="netG" value="${x.netG || ''}" placeholder="?"></td>
       <td class="num"><input class="cell n" type="number" min="1" step="1" data-ri="${i}" data-rk="qty" value="${x.qty}"></td>
       <td class="num">${fEUR(x.unit * f)}${f < 1 ? `<span class="sub">${fEUR(x.unit)}</span>` : ''}</td>
       <td class="num" id="rt_${i}">${fEUR(num(x.qty) * x.unit * f)}</td></tr>`).join('')}
-    </tbody><tfoot><tr><td></td><td colspan="3" id="rx_sum">${t.lines} lines · ${t.units} units</td><td></td><td></td><td class="num" id="rx_tot">${fEUR(t.total)}</td></tr></tfoot></table></div>
+    </tbody><tfoot><tr><td></td><td colspan="4" id="rx_sum">${t.lines} lines · ${t.units} units</td><td></td><td></td><td class="num" id="rx_tot">${fEUR(t.total)}</td></tr></tfoot></table></div>
     <div class="mact"><button type="button" class="btn ghost" data-rx="reset">Use another receipt</button><button type="button" class="btn ghost" data-rx="close">Cancel</button>
       <button type="button" class="btn" data-rx="import" id="rx_go">Import ${t.lines} products</button></div>`}`;
 }
@@ -190,7 +191,7 @@ function doImport() {
   const f = factor(), o = RX.o, on = RX.items.filter(x => x.on && num(x.qty) > 0 && x.product.trim());
   if (!on.length) return toast('Nothing selected to import');
   on.forEach(x => db.purchases.push({ id: uid(), date: o.date, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
-    qty: num(x.qty), unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt,
+    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt,
     notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }));
   commit(); rdlg().close();
   toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}`);
@@ -217,7 +218,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.ro && t.type !== 'checkbox') { RX.o[t.dataset.ro] = t.value; return; }
   if (!t.dataset.rk || t.dataset.rk === 'on') return;
-  const x = RX.items[+t.dataset.ri]; x[t.dataset.rk] = t.dataset.rk === 'qty' ? num(t.value) : t.value;
+  const x = RX.items[+t.dataset.ri]; x[t.dataset.rk] = t.dataset.rk === 'qty' || t.dataset.rk === 'netG' ? num(t.value) : t.value;
   if (t.dataset.rk === 'qty') {
     const f = factor(), tt = rTotals();
     $('#rt_' + t.dataset.ri).textContent = fEUR(num(x.qty) * x.unit * f);

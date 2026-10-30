@@ -251,3 +251,17 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .bklist .mini .r{display:flex;gap:6px;align-items:center}
 .ico{width:16px;height:16px;display:block}
 .ib{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
+
+/* shipping split info */
+.howto{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:14px 0;font-size:13.5px}
+.howto summary{cursor:pointer;padding:10px 14px;font-weight:600;display:flex;align-items:center;gap:8px;list-style:none}
+.howto summary::-webkit-details-marker{display:none}
+.ii{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--nile);color:#fff;font:700 12px var(--display);font-style:italic;flex:none}
+.howto[open] summary{border-bottom:1px dashed var(--line)}
+.howto-b{padding:10px 16px 12px}
+.howto-b p{margin:6px 0}
+.howto-b ul{margin:6px 0;padding-left:18px}
+.howto-b li{margin:3px 0}
+.formula{font:12.5px/1.8 var(--mono);background:var(--gold-soft);border-radius:8px;padding:10px 12px;margin:8px 0}
+.formula span{font-weight:700}
+.settings .howto{margin-top:4px}

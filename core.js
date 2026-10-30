@@ -17,6 +17,14 @@ const toEGP = (amount, cur, r) => cur === 'EGP' ? num(amount) : num(amount) * (n
 const eur2egp = x => x * rate();
 const both = x => `${fEUR(x)}<span class="sub">${fEGP(eur2egp(x))}</span>`;
 const TRASH = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* content weight per unit in grams from a product name: "200g", "1,5kg", ", 150 ml", "0,5 l" (1 ml counted as 1 g) */
+function parseWeightG(t) {
+  const m = String(t || "").match(/(?<![\d.,])(0[.,]\d+|[1-9]\d*(?:[.,]\d+)?)\s?(kg|g|ml|l)(?![a-zäöü])/i);
+  if (!m) return 0;
+  const v = parseFloat(m[1].replace(",", ".")), u = m[2].toLowerCase();
+  return Math.round(u === "kg" || u === "l" ? v * 1000 : v);
+}
+const fG = g => g >= 1000 ? (g / 1000).toLocaleString("en-US", { maximumFractionDigits: 2 }) + " kg" : Math.round(g) + " g";
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('on');
@@ -26,7 +34,7 @@ function toast(msg) {
 /* ---------- data ---------- */
 const DEFAULT_DB = () => ({
   app: 'shanta-ledger', version: 1,
-  settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo' },
+  settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo' },
   shipments: [], purchases: [], sales: [], expenses: [], transfers: [],
   meta: { created: new Date().toISOString(), updatedAt: null, savedAt: null }
 });
@@ -63,12 +71,27 @@ function calc() {
       l.revEUR += toEUR(q * num(x.unitPrice), x.currency, x.rate);
     } else l.lost += q;
   });
-  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0 });
+  /* Shipping split by weight: a product's share of its box's costs = its shipping weight ÷ the box's total weight.
+     Shipping weight = content weight × (1 + packaging %). Products without a weight are estimated from their price,
+     using the box's average grams per euro. A box with no weights at all is split by price instead. */
+  const pack = 1 + num(s.packagingPct) / 100;
+  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0, wG: 0, wV: 0, basis: 0, consumedB: 0, grams: 0, estimated: 0 });
   Object.values(R.lots).forEach(l => {
     l.left = l.qty - l.sold - l.lost;
     l.consumed = l.paidQty + l.lost;
+    l.grossG = num(l.p.netG) > 0 ? num(l.p.netG) * pack : 0;
     const sh = R.ship[l.p.shipmentId];
-    if (sh) { sh.goods += l.qty * l.unit; sh.consumed += l.consumed * l.unit; sh.units += l.qty; sh.items++; }
+    if (sh) { sh.goods += l.qty * l.unit; sh.consumed += l.consumed * l.unit; sh.units += l.qty; sh.items++;
+      if (l.grossG) { sh.wG += l.qty * l.grossG; sh.wV += l.qty * l.unit; } }
+  });
+  Object.values(R.lots).forEach(l => {
+    const sh = R.ship[l.p.shipmentId]; if (!sh) return;
+    sh.byWeight = sh.wG > 0;
+    l.estG = !l.grossG && sh.byWeight && sh.wV > 0;
+    l.shipG = l.grossG || (l.estG ? l.unit * sh.wG / sh.wV : 0);
+    l.basis = sh.byWeight ? l.shipG : l.unit;
+    sh.basis += l.qty * l.basis; sh.consumedB += l.consumed * l.basis;
+    sh.grams += l.qty * l.shipG; if (l.estG) sh.estimated++;
   });
   db.expenses.forEach(e => {
     const sh = R.ship[e.shipmentId];
@@ -76,7 +99,8 @@ function calc() {
   });
   Object.values(R.lots).forEach(l => {
     const sh = R.ship[l.p.shipmentId];
-    l.landed = l.unit + (sh && sh.goods > 0 ? sh.costs * l.unit / sh.goods : 0);
+    l.shipShare = sh && sh.basis > 0 ? sh.costs * l.basis / sh.basis : 0;
+    l.landed = l.unit + l.shipShare;
     R.stockEUR += Math.max(0, l.left) * l.landed;
     R.unpaidCostEUR += l.unpaid * l.landed;
     R.lossEUR += l.lost * l.landed;
@@ -90,7 +114,7 @@ function calc() {
   db.expenses.forEach(e => {
     const eur = toEUR(e.amount, e.currency, e.rate), sh = R.ship[e.shipmentId];
     P(e.paidBy).outlay += eur;
-    P(e.paidBy).recovered += sh && sh.goods > 0 ? eur * sh.consumed / sh.goods : eur;
+    P(e.paidBy).recovered += sh && sh.basis > 0 ? eur * sh.consumedB / sh.basis : eur;
   });
   db.sales.forEach(x => {
     if (x.kind !== 'sale') return;

@@ -62,6 +62,7 @@ const SCHEMAS = {
       { k: 'category', l: 'Category', t: 'select', opts: OPT.category, def: 'Skin care' },
       { k: 'qty', l: 'Quantity', t: 'number', step: '1', def: 1, req: true },
       { k: 'unitCost', l: 'Price per unit (€)', t: 'number', step: '0.01', req: true },
+      { k: 'netG', l: 'Content per unit (g or ml)', t: 'number', step: '1', hint: 'Net weight from the label (1 ml counts as 1 g). Used to split shipping; packaging is added automatically. Leave empty to read it from the product name.' },
       { k: 'paidBy', l: 'Paid by', t: 'person', def: 'me' },
       { k: 'method', l: 'Paid with', t: 'select', opts: OPT.payDE, def: 'Card' },
       { k: 'shipmentId', l: 'Shipment', t: 'select', opts: shipOpts, def: '' },
@@ -72,6 +73,7 @@ const SCHEMAS = {
       if (num(v.qty) <= 0) return 'Quantity must be at least 1.';
       if (old) { const used = db.sales.filter(s => s.purchaseId === old.id).reduce((a, s) => a + num(s.qty), 0); if (num(v.qty) < used) return `${used} of these are already sold or given away, so quantity can’t be lower than that.`; }
     },
+    beforeSave(v) { if (!num(v.netG)) v.netG = parseWeightG(v.product) || ''; },
     canDelete: rec => db.sales.some(s => s.purchaseId === rec.id) ? 'This product has sales recorded. Delete those sales first.' : null
   },
   sales: {
