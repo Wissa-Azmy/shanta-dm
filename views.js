@@ -221,3 +221,78 @@ function shipInfoHTML(open) {
       </ul>${missingW().length ? `<button class="btn sm" data-act="fillw">Read weights from product names for ${missingW().length} older purchase${missingW().length === 1 ? '' : 's'}</button>` : ''}</div></details>`;
 }
 const missingW = () => db.purchases.filter(p => !num(p.netG) && parseWeightG(p.product));
+
+/* ---------- deleting a box: keep, move or delete its products and costs ---------- */
+function bdlg() {
+  let d = $('#bdlg');
+  if (!d) { d = document.createElement('dialog'); d.id = 'bdlg'; d.innerHTML = '<div id="bbody"></div>'; document.body.appendChild(d); }
+  return d;
+}
+function openShipDelete(id) {
+  const sh = db.shipments.find(s => s.id === id); if (!sh) return;
+  const items = db.purchases.filter(p => p.shipmentId === id), costs = db.expenses.filter(e => e.shipmentId === id);
+  if (!items.length && !costs.length) {
+    if (confirm(`Delete ${sh.name}? It has no products or costs.`)) { db.shipments = db.shipments.filter(s => s.id !== id); commit(); toast('Box deleted'); }
+    return;
+  }
+  const ids = new Set(items.map(p => p.id)), sold = db.sales.filter(s => ids.has(s.purchaseId));
+  const others = db.shipments.filter(s => s.id !== id).sort(byDate);
+  const units = items.reduce((a, p) => a + num(p.qty), 0);
+  const value = items.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0);
+  const costEUR = costs.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
+  $('#bbody').innerHTML = `<div class="rhead"><div><h2>Delete ${esc(sh.name)}</h2>
+      <p class="lead">This box has <b>${items.length} product line${items.length === 1 ? '' : 's'}</b> (${units} units, ${fEUR(value)})${costs.length ? ` and <b>${costs.length} cost${costs.length === 1 ? '' : 's'}</b> (${fEUR(costEUR)})` : ''}${sold.length ? `. ${sold.length} sale line${sold.length === 1 ? ' is' : 's are'} recorded for its products.` : '.'} What should happen to them?</p></div>
+      <button type="button" class="ib" data-b="close" title="Close">✕</button></div>
+    <div class="bopts">
+      <label class="bopt"><input type="radio" name="bmode" value="keep" checked><span><b>Keep them, unassigned</b>
+        <span class="note">Products show as “Not shipped”, costs become general expenses.</span></span></label>
+      <label class="bopt${others.length ? '' : ' off'}"><input type="radio" name="bmode" value="move"${others.length ? '' : ' disabled'}><span><b>Move them to another box</b>
+        <span class="note">${others.length ? 'Products and costs go to the box you pick; its cost split is recalculated.' : 'There is no other box yet. Create one first.'}</span>
+        ${others.length ? `<select id="b_target">${others.map(s => `<option value="${s.id}">${esc(s.name)} · ${esc(s.status)}</option>`).join('')}</select>` : ''}</span></label>
+      <label class="bopt${sold.length ? ' off' : ''}"><input type="radio" name="bmode" value="all"${sold.length ? ' disabled' : ''}><span><b>Delete them too</b>
+        <span class="note">${sold.length ? 'Not possible: some of these products have sales. Delete those sales first, or move the products to another box.' : `Removes the box, its products and its costs. A backup is made first (${Cloud.on() ? 'in the cloud, listed under Settings' : 'downloaded as a file'}).`}</span></span></label>
+    </div>
+    <div class="err" id="b_err" hidden></div>
+    <div class="mact"><button type="button" class="btn ghost" data-b="close">Cancel</button><button type="button" class="btn terra" data-b="go" data-id="${id}">Delete box</button></div>`;
+  const d = bdlg(); if (!d.open) d.showModal();
+}
+async function runShipDelete(id, btn) {
+  const sh = db.shipments.find(s => s.id === id); if (!sh) return bdlg().close();
+  const mode = (document.querySelector('input[name="bmode"]:checked') || {}).value || 'keep';
+  const err = m => { const e = $('#b_err'); e.textContent = m; e.hidden = false; btn.disabled = false; btn.textContent = 'Delete box'; };
+  btn.disabled = true;
+  if (mode === 'move') {
+    const to = $('#b_target').value, target = db.shipments.find(s => s.id === to);
+    if (!target) return err('Pick a box to move to.');
+    db.purchases.forEach(p => { if (p.shipmentId === id) p.shipmentId = to; });
+    db.expenses.forEach(e => { if (e.shipmentId === id) e.shipmentId = to; });
+    db.shipments = db.shipments.filter(s => s.id !== id);
+    commit(); bdlg().close(); return toast(`${sh.name} deleted; its contents moved to ${target.name}`);
+  }
+  if (mode === 'all') {
+    btn.textContent = 'Saving a backup…';
+    try {
+      if (Cloud.on()) {
+        await Cloud.sync();
+        if (Cloud.state !== 'ok') return err('Couldn’t reach the cloud to make a backup, so nothing was deleted. ' + Cloud.msg);
+        await Cloud.snapshot(`Automatic backup before deleting ${sh.name} with its products`);
+      } else downloadJSON();
+    } catch (x) { return err(x.message || 'The backup failed, so nothing was deleted.'); }
+    const ids = new Set(db.purchases.filter(p => p.shipmentId === id).map(p => p.id));
+    if (db.sales.some(s => ids.has(s.purchaseId))) return err('Sales were added for these products meanwhile, so nothing was deleted.');
+    db.purchases = db.purchases.filter(p => !ids.has(p.id));
+    db.expenses = db.expenses.filter(e => e.shipmentId !== id);
+    db.shipments = db.shipments.filter(s => s.id !== id);
+    commit(); bdlg().close(); return toast(`${sh.name} deleted with ${ids.size} products. A backup was saved first.`);
+  }
+  SCHEMAS.shipments.onDelete(sh);
+  db.shipments = db.shipments.filter(s => s.id !== id);
+  commit(); bdlg().close(); toast(`${sh.name} deleted; its contents are unassigned`);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-del^="shipments:"]');
+  if (t) { e.stopImmediatePropagation(); e.preventDefault(); return openShipDelete(t.dataset.del.split(':')[1]); }
+  const b = e.target.closest('[data-b]'); if (!b) return;
+  if (b.dataset.b === 'close') bdlg().close();
+  if (b.dataset.b === 'go') runShipDelete(b.dataset.id, b);
+}, true);

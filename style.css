@@ -265,3 +265,15 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .formula{font:12.5px/1.8 var(--mono);background:var(--gold-soft);border-radius:8px;padding:10px 12px;margin:8px 0}
 .formula span{font-weight:700}
 .settings .howto{margin-top:4px}
+
+/* delete box dialog */
+#bdlg{border:0;border-radius:18px;padding:0;background:var(--card);color:var(--ink);width:min(620px,94vw);box-shadow:0 30px 80px rgba(29,42,37,.35)}
+#bdlg::backdrop{background:rgba(29,42,37,.45);backdrop-filter:blur(2px)}
+#bbody{padding:22px 24px}
+.bopts{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.bopt{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.bopt:has(input:checked){border-color:var(--nile);background:var(--nile-soft)}
+.bopt.off{opacity:.55;cursor:not-allowed}
+.bopt input[type=radio]{margin-top:3px;accent-color:var(--nile)}
+.bopt > span{display:flex;flex-direction:column;gap:4px;flex:1}
+.bopt select{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;margin-top:4px}
