@@ -92,9 +92,12 @@ V.shipments = R => {
       <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
       <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>
       <dt>Costs as % of goods</dt><dd>${x.goods ? Math.round(x.costs / x.goods * 100) + '%' : '—'}</dd>
-      <dt>Shipping weight</dt><dd>${x.byWeight ? fG(x.grams) + (x.estimated ? ` (${x.estimated} est.)` : '') : 'no weights, split by price'}</dd>
-      <dt>Shipping per kg</dt><dd>${x.byWeight && x.grams ? fEUR(x.costs / x.grams * 1000) : '—'}</dd>
+      <dt>Shipping weight</dt><dd>${x.measuredG ? fG(x.measuredG) + ' weighed' : x.byWeight ? fG(x.grams) + ' calculated' + (x.estimated ? ` (${x.estimated} est.)` : '') : 'no weights, split by price'}</dd>
+      ${x.measuredG && x.wG ? `<dt>From known products</dt><dd>${fG(x.wG)}${x.useRest ? ` · ${fG(x.rest)} shared by ${x.fromBox} without weight` : ''}</dd>` : ''}
+      <dt>Shipping per kg</dt><dd>${x.byWeight && (x.measuredG || x.grams) ? fEUR(x.costs / (x.measuredG || x.grams) * 1000) : '—'}</dd>
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
+      ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
+      ${x.impliedPack !== undefined && !x.tooLight && Math.abs(x.impliedPack - num(db.settings.packagingPct)) >= 3 ? `<div class="wnote">This box suggests about <b>${x.impliedPack}%</b> packaging (now ${num(db.settings.packagingPct)}%). <button class="btn sm ghost" data-act="setpack:${x.impliedPack}">Use ${x.impliedPack}%</button></div>` : ""}
       <div class="lines"><ul class="mini">${items.map(p => `<li><span>${esc(p.product)} ×${p.qty}</span><span class="r">${fEUR(num(p.qty) * num(p.unitCost))} ${pill(p.paidBy)}</span></li>`).join('') || '<li class="empty">No products yet</li>'}
       ${costs.map(e => `<li><span>${esc(e.category)}${e.onDelivery ? ' (paid on delivery)' : ''}</span><span class="r">${fAmt(e.amount, e.currency)} ${pill(e.paidBy)}</span></li>`).join('')}</ul></div>
       ${s.notes ? `<p class="note">${esc(s.notes)}</p>` : ''}
@@ -126,7 +129,7 @@ V.stock = R => {
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
     return `<tr><td><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
     <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid ? `<span class="sub">${l.unpaid} unpaid</span>` : ''}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
-    <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ' <span class="pill warn" title="Estimated from price">est.</span>' : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
+    <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ' <span class="pill warn" title="Estimated from price">est.</span>' : l.boxG ? ' <span class="pill" title="Share of the weighed box after the products with a known weight">from box</span>' : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
     <td class="num">${fEGP(cEGP)}<span class="sub">${fEUR(l.unit)} + ${fEUR(l.shipShare || 0)} shipping</span></td><td class="num">${avg ? fEGP(avg) : '—'}</td>
     <td class="num">${mk === null ? '—' : `<span class="pill ${mk >= num(db.settings.targetMargin) ? 'ok' : mk >= 0 ? 'warn' : 'bad'}">${Math.round(mk)}%</span>`}</td>
     <td class="num">${fEGP(Math.ceil(cEGP * (1 + tm) / 5) * 5)}</td>
@@ -216,7 +219,8 @@ function shipInfoHTML(open) {
         <li><b>Content weight</b> comes from the receipt (“150 ml”, “200g”, “1,5kg”; 1 ml counts as 1 g). You can change it on each purchase.</li>
         <li><b>Packaging</b> (bottle, jar, box) isn’t on the receipt, so ${p}% is added. Change it in Settings → Money &amp; stock.</li>
         <li><b>No weight known</b> (e.g. tablets sold by count): it is estimated from the price, using the box’s average grams per euro. These show “est.”.</li>
-        <li><b>A box with no weights at all</b> is split by purchase price instead.</li>
+        <li><b>Weighed box:</b> if you enter the packed box’s weight on the shipment, products without a weight share what is left after the known ones (shown as “from box”) instead of being estimated. If every product has a weight, the card suggests a better packaging %.</li>
+        <li><b>A box with no weights at all</b> (and not weighed) is split by purchase price instead.</li>
         <li>Whoever paid the box costs gets them back in the same proportion as its products are sold.</li>
       </ul>${missingW().length ? `<button class="btn sm" data-act="fillw">Read weights from product names for ${missingW().length} older purchase${missingW().length === 1 ? '' : 's'}</button>` : ''}</div></details>`;
 }

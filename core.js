@@ -72,26 +72,36 @@ function calc() {
     } else l.lost += q;
   });
   /* Shipping split by weight: a product's share of its box's costs = its shipping weight ÷ the box's total weight.
-     Shipping weight = content weight × (1 + packaging %). Products without a weight are estimated from their price,
-     using the box's average grams per euro. A box with no weights at all is split by price instead. */
+     Shipping weight = content weight × (1 + packaging %). Products without a weight:
+     - if the packed box was weighed, they share what is left of the measured weight (by price among themselves);
+     - otherwise they are estimated from their price, using the box's average grams per euro.
+     A box with no weights at all (and not weighed) is split by price instead. */
   const pack = 1 + num(s.packagingPct) / 100;
-  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0, wG: 0, wV: 0, basis: 0, consumedB: 0, grams: 0, estimated: 0 });
+  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0, wG: 0, wV: 0, netG: 0, uV: 0, unknown: 0, basis: 0, consumedB: 0, grams: 0, estimated: 0, fromBox: 0, measuredG: num(sh.weight) * 1000 });
   Object.values(R.lots).forEach(l => {
     l.left = l.qty - l.sold - l.lost;
     l.consumed = l.paidQty + l.lost;
     l.grossG = num(l.p.netG) > 0 ? num(l.p.netG) * pack : 0;
     const sh = R.ship[l.p.shipmentId];
     if (sh) { sh.goods += l.qty * l.unit; sh.consumed += l.consumed * l.unit; sh.units += l.qty; sh.items++;
-      if (l.grossG) { sh.wG += l.qty * l.grossG; sh.wV += l.qty * l.unit; } }
+      if (l.grossG) { sh.wG += l.qty * l.grossG; sh.wV += l.qty * l.unit; sh.netG += l.qty * num(l.p.netG); }
+      else { sh.uV += l.qty * l.unit; sh.unknown++; } }
+  });
+  Object.values(R.ship).forEach(sh => {
+    sh.rest = sh.measuredG - sh.wG;
+    sh.useRest = sh.measuredG > 0 && sh.uV > 0 && sh.rest > 0;
+    sh.byWeight = sh.wG > 0 || sh.useRest;
+    sh.tooLight = sh.measuredG > 0 && sh.rest <= 0 && sh.wG > 0;
+    if (sh.measuredG > 0 && !sh.unknown && sh.netG > 0) sh.impliedPack = Math.round((sh.measuredG / sh.netG - 1) * 100);
   });
   Object.values(R.lots).forEach(l => {
     const sh = R.ship[l.p.shipmentId]; if (!sh) return;
-    sh.byWeight = sh.wG > 0;
-    l.estG = !l.grossG && sh.byWeight && sh.wV > 0;
-    l.shipG = l.grossG || (l.estG ? l.unit * sh.wG / sh.wV : 0);
+    l.boxG = !l.grossG && sh.useRest;
+    l.estG = !l.grossG && !sh.useRest && sh.wG > 0 && sh.wV > 0;
+    l.shipG = l.grossG || (l.boxG ? l.unit * sh.rest / sh.uV : l.estG ? l.unit * sh.wG / sh.wV : 0);
     l.basis = sh.byWeight ? l.shipG : l.unit;
     sh.basis += l.qty * l.basis; sh.consumedB += l.consumed * l.basis;
-    sh.grams += l.qty * l.shipG; if (l.estG) sh.estimated++;
+    sh.grams += l.qty * l.shipG; if (l.estG) sh.estimated++; if (l.boxG) sh.fromBox++;
   });
   db.expenses.forEach(e => {
     const sh = R.ship[e.shipmentId];

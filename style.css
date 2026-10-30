@@ -277,3 +277,5 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .bopt input[type=radio]{margin-top:3px;accent-color:var(--nile)}
 .bopt > span{display:flex;flex-direction:column;gap:4px;flex:1}
 .bopt select{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;margin-top:4px}
+.wnote{margin-top:10px;font-size:12.5px;background:var(--gold-soft);border-radius:9px;padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wnote.bad{background:var(--terra-soft);color:#8a3415}

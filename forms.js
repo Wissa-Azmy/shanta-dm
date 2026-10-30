@@ -27,7 +27,7 @@ const SCHEMAS = {
       { k: 'status', l: 'Status', t: 'select', opts: OPT.status, def: 'Packing' },
       { k: 'carrier', l: 'Carrier', t: 'text', list: ['DHL', 'Hermes', 'Aramex', 'Egypt Post', 'Traveller / suitcase'] },
       { k: 'tracking', l: 'Tracking number', t: 'text' },
-      { k: 'weight', l: 'Weight (kg)', t: 'number', step: '0.1' },
+      { k: 'weight', l: 'Weighed box (kg)', t: 'number', step: '0.01', hint: 'Optional: the packed box on the scale. Products without a known weight share what is left after the known ones; also used to check the packaging %.' },
       { k: 'deliveredOn', l: 'Delivered on', t: 'date', show: v => v.status === 'Delivered' },
       { k: 'notes', l: 'Notes', t: 'textarea', span: true },
       { t: 'section', l: 'Shipping cost (optional, saved as an expense on this shipment)', createOnly: true },
