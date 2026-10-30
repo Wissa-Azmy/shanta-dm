@@ -279,3 +279,8 @@ details.admin summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(
 .bopt select{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;margin-top:4px}
 .wnote{margin-top:10px;font-size:12.5px;background:var(--gold-soft);border-radius:9px;padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .wnote.bad{background:var(--terra-soft);color:#8a3415}
+.kv dt.kvsub{padding-left:14px;position:relative;font-size:12.5px}
+.kv dt.kvsub:before{content:"";position:absolute;left:3px;top:-2px;width:7px;height:11px;border-left:1.5px solid var(--line);border-bottom:1.5px solid var(--line);border-bottom-left-radius:3px}
+.kv dt.kvsub span{color:var(--muted);opacity:.8}
+.kv dd.kvsub{font-size:12.5px}
+.kv dd .pill{font-size:10.5px;padding:1px 6px;margin-left:4px}

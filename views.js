@@ -93,7 +93,10 @@ V.shipments = R => {
       <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>
       <dt>Costs as % of goods</dt><dd>${x.goods ? Math.round(x.costs / x.goods * 100) + '%' : '—'}</dd>
       <dt>Shipping weight</dt><dd>${x.measuredG ? fG(x.measuredG) + ' weighed' : x.byWeight ? fG(x.grams) + ' calculated' + (x.estimated ? ` (${x.estimated} est.)` : '') : 'no weights, split by price'}</dd>
-      ${x.measuredG && x.wG ? `<dt>From known products</dt><dd>${fG(x.wG)}${x.useRest ? ` · ${fG(x.rest)} shared by ${x.fromBox} without weight` : ''}</dd>` : ''}
+      ${x.byWeight ? (() => { const kn = items.filter(p => num(p.netG) > 0), un = items.filter(p => !(num(p.netG) > 0)), u = a => a.reduce((t, p) => t + num(p.qty), 0);
+        const row = (n, list, label, g) => n ? `<dt class="kvsub">${n} ${label} <span>· ${u(list)} unit${u(list) === 1 ? '' : 's'}</span></dt><dd class="kvsub">${g}</dd>` : '';
+        return row(kn.length, kn, 'known product' + (kn.length === 1 ? '' : 's'), fG(x.wG)) +
+          row(un.length, un, 'unknown product' + (un.length === 1 ? '' : 's'), x.useRest ? fG(x.rest) + ' <span class="pill">from box</span>' : x.estimated ? fG(x.grams - x.wG) + ' <span class="pill warn">est.</span>' : '—'); })() : ''}
       <dt>Shipping per kg</dt><dd>${x.byWeight && (x.measuredG || x.grams) ? fEUR(x.costs / (x.measuredG || x.grams) * 1000) : '—'}</dd>
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
       ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
