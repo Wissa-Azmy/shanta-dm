@@ -80,7 +80,7 @@ function drawOrder(err) {
       <div class="f"><label>Customer</label><input data-oh="customer" value="${esc(h.customer)}" list="o_customers" autocomplete="off"><datalist id="o_customers">${uniq(db.sales.map(s => s.customer)).map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
       <div class="f"><label>Where</label><input data-oh="place" value="${esc(h.place)}"></div>
       ${sale ? `<div class="f"><label>Currency</label>${sel('data-oh="currency"', OPT.cur, cur)}</div>
-      ${cur !== 'EUR' ? `<div class="f"><label>Rate (EGP per €1)</label><input type="number" step="0.01" data-oh="rate" value="${esc(h.rate)}"></div>` : ''}
+      ${cur !== 'EUR' ? `<div class="f"><label>Rate (EGP per €1)</label><input type="text" inputmode="decimal" data-num="1" step="0.01" data-oh="rate" value="${esc(h.rate)}"></div>` : ''}
       <div class="f"><label>Money collected by</label>${sel('data-oh="receivedBy"', people, h.receivedBy)}</div>
       <div class="f"><label>Paid with</label>${sel('data-oh="method"', OPT.payEG, h.method)}</div>
       <div class="f chk"><input type="checkbox" id="o_paid" data-oh="paid"${h.paid ? ' checked' : ''}><label for="o_paid">Customer has paid</label></div>` : ''}
@@ -91,8 +91,8 @@ function drawOrder(err) {
     ${OR.lines.map((x, i) => { const l = R.lots[x.purchaseId];
       return `<tr><td>${sel(`class="cell wide" data-ol="${i}" data-k="purchaseId"`, [['', 'Choose a product…']].concat(lots.map(l => [l.p.id, `${l.p.product}${l.p.brand ? ' (' + l.p.brand + ')' : ''} · ${avail(l.p.id)} available`])), x.purchaseId)}
         ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${db.settings.targetMargin}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
-        <td class="num"><input class="cell n" type="number" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
-        ${sale ? `<td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
+        <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
+        ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
         <td class="num" id="ol_t_${i}">${fAmt(num(x.qty) * num(x.unitPrice), cur)}</td>` : ''}
         <td class="acts">${OR.lines.length > 1 ? `<button type="button" class="ib del" data-o="del-line:${i}" title="Remove">${TRASH}</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
@@ -102,9 +102,9 @@ function drawOrder(err) {
     ${OR.extras.length ? `<div class="tablewrap rx-table"><table class="t"><thead><tr><th>What</th><th>Description</th><th class="num">We pay (${cur})</th><th>Paid by</th>${sale ? `<th class="num">Customer pays (${cur})</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.extras.map((x, i) => `<tr><td>${sel(`class="cell" data-oe="${i}" data-k="category"`, EXTRA_CATS, x.category)}</td>
       <td><input class="cell" data-oe="${i}" data-k="description" value="${esc(x.description)}" placeholder="e.g. Bosta courier"></td>
-      <td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-oe="${i}" data-k="cost" value="${esc(x.cost)}"></td>
+      <td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-oe="${i}" data-k="cost" value="${esc(x.cost)}"></td>
       <td>${sel(`class="cell" data-oe="${i}" data-k="paidBy"`, people, x.paidBy)}</td>
-      ${sale ? `<td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-oe="${i}" data-k="charge" value="${esc(x.charge)}"></td>` : ''}
+      ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-oe="${i}" data-k="charge" value="${esc(x.charge)}"></td>` : ''}
       <td class="acts"><button type="button" class="ib del" data-o="del-extra:${i}" title="Remove">${TRASH}</button></td></tr>`).join('')}
     </tbody></table></div>` : '<p class="note">No extra costs. Add delivery, packaging or anything else this sale cost you, or that the customer pays on top.</p>'}
     <div class="topact" style="margin-top:8px">${EXTRA_CATS.map(c => `<button type="button" class="btn sm ghost" data-o="add-extra:${c}">+ ${c === 'Delivery to customer' ? 'Delivery' : c}</button>`).join('')}</div>
@@ -169,7 +169,7 @@ V.sales = R => {
       <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td>${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : h.paid ? '<span class="pill ok">Paid</span>' : `<button class="btn sm terra" data-act="paid:${o.id}">Mark paid</button>`}</td>
-      <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">✎</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
+      <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
   return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Unpaid'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
@@ -202,7 +202,7 @@ document.addEventListener('click', e => {
 });
 function orderInput(e, redraw) {
   const t = e.target; if (!OR || !t.closest('#obody')) return;
-  const val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value;
+  const val = t.type === 'checkbox' ? t.checked : t.dataset.num ? (t.value === '' ? '' : num(t.value)) : t.value;
   if (t.dataset.oh) OR.h[t.dataset.oh] = val;
   else if (t.dataset.ol) {
     const x = OR.lines[+t.dataset.ol]; x[t.dataset.k] = val;

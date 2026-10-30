@@ -76,7 +76,7 @@ document.addEventListener('input', e => {
   }
   const k = e.target.dataset.set;
   if (k) {
-    db.settings[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' ? num(e.target.value) : e.target.value;
+    db.settings[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.dataset.num ? num(e.target.value) : e.target.value;
     if (k === 'meShare') db.settings.meShare = Math.max(0, Math.min(100, db.settings.meShare));
     if (k === 'rate') db.settings.rateManual = today();
     clearTimeout(render._s); render._s = setTimeout(() => { const id = document.activeElement && document.activeElement.dataset.set; commit(); if (id) { const el = $(`[data-set="${id}"]`); if (el) { el.focus(); if (el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } } }, 500);

@@ -3,7 +3,7 @@ const UI = { q: '', person: '', type: '', stockOnly: true };
 let chart = null;
 const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
 const shipName = id => { const s = db.shipments.find(x => x.id === id); return s ? s.name : ''; };
-const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">✎</button><button class="ib del" data-del="${coll}:${id}" title="Delete">${TRASH}</button></td>`;
+const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="${coll}:${id}" title="Delete">${TRASH}</button></td>`;
 const match = (...vals) => !UI.q || vals.join(' ').toLowerCase().includes(UI.q.toLowerCase());
 const search = ph => `<input type="search" placeholder="${ph}" value="${esc(UI.q)}" data-ui="q">`;
 const personFilter = () => `<select data-ui="person"><option value="">Everyone</option>${PEOPLE.map(p => `<option value="${p}"${UI.person === p ? ' selected' : ''}>${esc(pname(p))}</option>`).join('')}</select>`;
@@ -87,7 +87,7 @@ V.shipments = R => {
   return `<div class="toolbar">${search('Search shipments')}</div><div class="ships">${list.map(s => {
     const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
     const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
-    return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">✎</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}</div>
+    return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}</div>
       <div class="steps">${OPT.status.map((_, i) => `<span class="${i <= idx ? 'on' : ''}"></span>`).join('')}</div>
       <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
       <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd>
@@ -178,7 +178,7 @@ V.ledger = R => {
   <div class="tablewrap"><table class="t"><thead><tr><th>When</th><th>What</th><th>Who</th><th>Where</th><th>How</th><th class="num">How much</th><th class="num">In €</th><th>Flow</th><th></th></tr></thead><tbody>
   ${rows.map(r => `<tr><td>${fDate(r.date)}</td><td><b>${esc(r.type)}</b><span class="sub">${esc(r.desc)}</span></td><td>${pill(r.who)}${r.to ? ' → ' + pill(r.to) : ''}</td><td>${esc(r.place || '')}</td><td>${esc(r.how || '')}</td>
     <td class="num">${fAmt(r.amt, r.cur)}</td><td class="num ${r.dir === 'in' ? 'in-amt' : r.dir === 'out' ? 'out-amt' : ''}">${r.dir === 'out' ? '−' : r.dir === 'in' ? '+' : ''}${fEUR(r.eur)}</td>
-    <td><span class="pill ${flow[r.dir][1]}">${flow[r.dir][0]}</span></td><td class="acts"><button class="ib" data-edit="${r.coll}:${r.id}">✎</button></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nothing recorded yet.</td></tr>'}
+    <td><span class="pill ${flow[r.dir][1]}">${flow[r.dir][0]}</span></td><td class="acts"><button class="ib" data-edit="${r.coll}:${r.id}">${PENCIL}</button></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nothing recorded yet.</td></tr>'}
   </tbody></table></div>`;
 };
 V.ledger.csv = () => {
@@ -189,13 +189,13 @@ V.ledger.csv = () => {
 
 V.settings = () => {
   const s = db.settings;
-  const f = (k, l, t = 'text', extra = '', hint = '') => `<div class="f"><label>${l}</label><input data-set="${k}" type="${t}" value="${esc(s[k])}" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
+  const f = (k, l, t = 'text', extra = '', hint = '') => `<div class="f"><label>${l}</label><input data-set="${k}" type="${t === "number" ? "text" : t}"${t === "number" ? " inputmode=\"decimal\" data-num=\"1\"" : ""} value="${esc(s[k])}" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
   return `<div class="grid2 settings"><div class="card"><h3>The two of you</h3>
     <div class="fgrid">${f('meName', 'Your name (in Germany)')}${f('friendName', 'Friend’s name (in Egypt)')}</div>
     ${f('meShare', 'Your share of the profit (%)', 'number', 'min="0" max="100" step="1"', `${esc(s.friendName)} gets ${100 - num(s.meShare)}%`)}
     <div class="fgrid">${f('cityDE', 'Default place to buy')}${f('cityEG', 'Default city for sales')}</div></div>
   <div class="card"><h3>Money & stock</h3>
-    <div class="f"><label>Today’s rate: EGP for €1</label><div class="raterow"><input data-set="rate" type="number" step="0.01" value="${esc(s.rate)}"><button type="button" class="btn sm ghost" data-act="fx">↻ Live rate</button></div><span class="hint" id="fx_hint">${fxHint()}</span></div>
+    <div class="f"><label>Today’s rate: EGP for €1</label><div class="raterow"><input data-set="rate" type="text" inputmode="decimal" data-num="1" step="0.01" value="${esc(s.rate)}"><button type="button" class="btn sm ghost" data-act="fx">↻ Live rate</button></div><span class="hint" id="fx_hint">${fxHint()}</span></div>
     <div class="f chk"><input type="checkbox" id="fx_auto" data-set="rateAuto"${s.rateAuto !== false ? ' checked' : ''}><label for="fx_auto">Update the rate from the internet once a day</label></div>
     ${f('targetMargin', 'Target markup on cost (%)', 'number', 'step="1"', 'Used for the suggested selling price.')}
     ${f('packagingPct', 'Packaging added to content weight (%)', 'number', 'step="1" min="0"', 'Receipts only show the net content. This much is added for bottle, jar and box when splitting shipping by weight.')}

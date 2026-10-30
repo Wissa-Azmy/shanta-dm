@@ -172,8 +172,8 @@ function drawReceipt() {
       <td><input class="cell" data-ri="${i}" data-rk="brand" value="${esc(x.brand)}"></td>
       <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}"></td>
       <td><select class="cell" data-ri="${i}" data-rk="category">${OPT.category.map(c => `<option${c === x.category ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
-      <td class="num"><input class="cell n w" type="number" min="0" step="1" data-ri="${i}" data-rk="netG" value="${x.netG || ''}" placeholder="?"></td>
-      <td class="num"><input class="cell n" type="number" min="1" step="1" data-ri="${i}" data-rk="qty" value="${x.qty}"></td>
+      <td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="1" data-ri="${i}" data-rk="netG" value="${x.netG || ''}" placeholder="?"></td>
+      <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ri="${i}" data-rk="qty" value="${x.qty}"></td>
       <td class="num">${fEUR(x.unit * f)}${f < 1 ? `<span class="sub">${fEUR(x.unit)}</span>` : ''}</td>
       <td class="num" id="rt_${i}">${fEUR(num(x.qty) * x.unit * f)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td></td><td colspan="4" id="rx_sum">${t.lines} lines · ${t.units} units</td><td></td><td></td><td class="num" id="rx_tot">${fEUR(t.total)}</td></tr></tfoot></table></div>

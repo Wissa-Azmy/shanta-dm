@@ -18,6 +18,7 @@ function lotLabel(l, R) {
   return `${l.p.product}${l.p.brand ? ' (' + l.p.brand + ')' : ''} · ${l.left} left · ${sh ? sh.name : 'not shipped'}`;
 }
 
+const CARRIERS = ['DHL', 'Hermes', 'DPD', 'UPS', 'Aramex', 'Egypt Post', 'Traveller / suitcase'];
 const SCHEMAS = {
   shipments: {
     title: 'shipment', lead: 'A box/parcel going from Germany to Egypt. Add the products to it from Purchases.',
@@ -25,7 +26,8 @@ const SCHEMAS = {
       { k: 'name', l: 'Name', t: 'text', req: true, def: () => 'Box #' + (db.shipments.length + 1) },
       { k: 'date', l: 'Ship date', t: 'date', def: today },
       { k: 'status', l: 'Status', t: 'select', opts: OPT.status, def: 'Packing' },
-      { k: 'carrier', l: 'Carrier', t: 'text', list: ['DHL', 'Hermes', 'Aramex', 'Egypt Post', 'Traveller / suitcase'] },
+      { k: 'carrier', l: 'Carrier', t: 'select', opts: v => [['', 'Choose…']].concat(uniq(CARRIERS.concat(db.shipments.map(s => s.carrier))).filter(c => c !== '__other').map(c => [c, c])).concat(v.carrier && v.carrier !== '__other' && !CARRIERS.includes(v.carrier) && !db.shipments.some(s => s.carrier === v.carrier) ? [[v.carrier, v.carrier]] : []).concat([['__other', 'Other…']]), def: '' },
+      { k: '_carrierOther', l: 'Other carrier', t: 'text', show: v => v.carrier === '__other' },
       { k: 'tracking', l: 'Tracking number', t: 'text' },
       { k: 'weight', l: 'Weighed box (kg)', t: 'number', step: '0.01', hint: 'Optional: the packed box on the scale. Products without a known weight share what is left after the known ones; also used to check the packaging %.' },
       { k: 'deliveredOn', l: 'Delivered on', t: 'date', show: v => v.status === 'Delivered' },
@@ -37,6 +39,8 @@ const SCHEMAS = {
       { k: '_paidBy', l: 'Paid by', t: 'person', def: 'me', createOnly: true },
       { k: '_cod', l: 'Paid on delivery in Egypt', t: 'check', createOnly: true }
     ],
+    validate(v) { if (v.carrier === "__other" && !String(v._carrierOther || "").trim()) return "Type the name of the other carrier."; },
+    beforeSave(v) { if (v.carrier === "__other") v.carrier = String(v._carrierOther || "").trim(); delete v._carrierOther; },
     afterSave(rec, isNew) {
       if (isNew && num(rec._cost) > 0) {
         db.expenses.push({ id: uid(), date: rec.date, category: 'Shipping', description: 'Shipping for ' + rec.name, amount: num(rec._cost), currency: rec._cur, rate: rec._rate,
@@ -166,7 +170,7 @@ function fieldHTML(f, v, i) {
     input = `<textarea id="${id}" name="${f.k}">${esc(val)}</textarea>`;
   } else {
     const list = f.list ? (typeof f.list === 'function' ? f.list() : f.list) : null;
-    input = `<input id="${id}" name="${f.k}" type="${f.t}" value="${esc(val)}"${f.step ? ` step="${f.step}" inputmode="decimal"` : ''}${list ? ` list="dl_${f.k}"` : ''} autocomplete="off">` +
+    input = `<input id="${id}" name="${f.k}" type="${f.t === 'number' ? 'text' : f.t}" value="${esc(val)}"${f.t === 'number' ? ' inputmode="decimal" data-num="1"' : ''}${list ? ` list="dl_${f.k}"` : ''} autocomplete="off">` +
       (list ? `<datalist id="dl_${f.k}">${list.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : '');
   }
   return `<div class="${cls}"><label for="${id}">${esc(f.l)}${f.req ? ' *' : ''}</label>${input}${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ''}</div>`;
@@ -185,7 +189,7 @@ function readForm() {
   visibleFields().forEach(f => {
     if (!f.k) return;
     const el = $('#mbody [name="' + f.k + '"]'); if (!el) return;
-    modal.v[f.k] = f.t === 'check' ? el.checked : f.t === 'number' ? (el.value === '' ? '' : parseFloat(el.value)) : el.value;
+    modal.v[f.k] = f.t === 'check' ? el.checked : f.t === 'number' ? (el.value.trim() === '' ? '' : num(el.value)) : el.value;
   });
 }
 function openForm(coll, id, preset) {
@@ -195,7 +199,8 @@ function openForm(coll, id, preset) {
   modal = { coll, id, v, isNew: !old, old };
   drawForm();
   const d = $('#modal'); if (!d.open) d.showModal();
-  setTimeout(() => { const first = $('#mbody input:not([type=checkbox]),#mbody select'); first && first.focus(); }, 30);
+  /* focus the first plain field on desktop only: on phones it pops up the keyboard, and date fields open their picker */
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) setTimeout(() => { const first = $('#mbody input:not([type=checkbox]):not([type=date]),#mbody select'); first && first.focus(); }, 30);
 }
 function submitForm(again) {
   readForm();

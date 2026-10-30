@@ -2,7 +2,7 @@
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => new Date().toISOString().slice(0, 10);
-const num = x => +x || 0;
+const num = x => +String(x ?? "").trim().replace(",", ".") || 0; // accepts "6,5" and "6.5"
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fEUR = x => (x < 0 ? '−' : '') + '€' + Math.abs(x).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const fEGP = x => (x < 0 ? '−' : '') + 'EGP ' + Math.round(Math.abs(x)).toLocaleString('en-US');
@@ -17,6 +17,7 @@ const toEGP = (amount, cur, r) => cur === 'EGP' ? num(amount) : num(amount) * (n
 const eur2egp = x => x * rate();
 const both = x => `${fEUR(x)}<span class="sub">${fEGP(eur2egp(x))}</span>`;
 const TRASH = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PENCIL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 /* content weight per unit in grams from a product name: "200g", "1,5kg", ", 150 ml", "0,5 l" (1 ml counted as 1 g) */
 function parseWeightG(t) {
   const m = String(t || "").match(/(?<![\d.,])(0[.,]\d+|[1-9]\d*(?:[.,]\d+)?)\s?(kg|g|ml|l)(?![a-zäöü])/i);
