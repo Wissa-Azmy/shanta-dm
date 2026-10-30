@@ -84,7 +84,7 @@ V.overview.after = () => {
 V.shipments = R => {
   const list = db.shipments.slice().sort(byDate).filter(s => match(s.name, s.carrier, s.tracking, s.notes));
   if (!db.shipments.length) return `<div class="welcome"><h2>No shipments yet</h2><p>A shipment is one box or suitcase going to Egypt. Create one, then add your dm purchases to it.</p><button class="btn" data-new="shipments">New shipment</button></div>`;
-  return `<div class="toolbar">${search('Search shipments')}</div>${shipInfoHTML()}<div class="ships">${list.map(s => {
+  return `<div class="toolbar">${search('Search shipments')}</div><div class="ships">${list.map(s => {
     const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
     const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
     return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">✎</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}</div>
@@ -140,7 +140,7 @@ V.stock = R => {
     <td class="num">${fEGP(Math.ceil(cEGP * (1 + tm) / 5) * 5)}</td>
     <td class="acts">${l.left > 0 ? `<button class="btn sm" data-new="sales" ${pre({ purchaseId: l.p.id })}>Sell</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="12" class="empty">Nothing here.</td></tr>'}
   </tbody><tfoot><tr><td colspan="5">Stock value at cost</td><td class="num">${rows.reduce((a, l) => a + Math.max(0, l.left), 0)}</td><td></td><td class="num">${fEUR(rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0))}</td><td colspan="4"></td></tr></tfoot></table></div>
-  <p class="note">EGP amounts use today’s rate (${db.settings.rate} EGP/€).</p>${shipInfoHTML()}`;
+  <p class="note">EGP amounts use today’s rate (${db.settings.rate} EGP/€).</p>`;
 };
 
 V.expenses = R => {
