@@ -3,7 +3,7 @@ const UI = { q: '', person: '', type: '', stockOnly: true };
 let chart = null;
 const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
 const shipName = id => { const s = db.shipments.find(x => x.id === id); return s ? s.name : ''; };
-const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">✎</button><button class="ib del" data-del="${coll}:${id}" title="Delete">✕</button></td>`;
+const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">✎</button><button class="ib del" data-del="${coll}:${id}" title="Delete">${TRASH}</button></td>`;
 const match = (...vals) => !UI.q || vals.join(' ').toLowerCase().includes(UI.q.toLowerCase());
 const search = ph => `<input type="search" placeholder="${ph}" value="${esc(UI.q)}" data-ui="q">`;
 const personFilter = () => `<select data-ui="person"><option value="">Everyone</option>${PEOPLE.map(p => `<option value="${p}"${UI.person === p ? ' selected' : ''}>${esc(pname(p))}</option>`).join('')}</select>`;
@@ -87,7 +87,7 @@ V.shipments = R => {
   return `<div class="toolbar">${search('Search shipments')}</div><div class="ships">${list.map(s => {
     const x = R.ship[s.id], idx = OPT.status.indexOf(s.status);
     const items = db.purchases.filter(p => p.shipmentId === s.id), costs = db.expenses.filter(e => e.shipmentId === s.id);
-    return `<div class="ship" data-ship-id="${s.id}"><h3>${esc(s.name)}</h3><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
+    return `<div class="ship" data-ship-id="${s.id}"><div class="shiphead"><h3>${esc(s.name)}</h3><span class="shipacts"><button class="ib" data-edit="shipments:${s.id}" title="Edit">✎</button><button class="ib del" data-del="shipments:${s.id}" title="Delete">${TRASH}</button></span></div><div class="meta">${fDate(s.date)} · ${esc(s.carrier || 'carrier?')}${s.tracking ? ' · ' + esc(s.tracking) : ''}${s.weight ? ' · ' + s.weight + ' kg' : ''}</div>
       <div class="steps">${OPT.status.map((_, i) => `<span class="${i <= idx ? 'on' : ''}"></span>`).join('')}</div>
       <div class="steplbl">${OPT.status.map((t, i) => i === idx ? `<b>${t}</b>` : `<span>${t}</span>`).join('')}</div>
       <dl class="kv"><dt>Products</dt><dd>${x.units} units · ${fEUR(x.goods)}</dd><dt>Shipping & other costs</dt><dd>${fEUR(x.costs)}</dd>
@@ -100,7 +100,7 @@ V.shipments = R => {
       <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
       <button class="btn sm ghost" data-receipt="${s.id}">⇪ dm receipt</button>
       <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
-      <button class="ib" data-edit="shipments:${s.id}">✎ Edit</button><button class="ib del" data-del="shipments:${s.id}">✕</button></div></div>`;
+      </div></div>`;
   }).join('')}</div>`;
 };
 

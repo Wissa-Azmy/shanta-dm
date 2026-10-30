@@ -94,7 +94,7 @@ function drawOrder(err) {
         <td class="num"><input class="cell n" type="number" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
         ${sale ? `<td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
         <td class="num" id="ol_t_${i}">${fAmt(num(x.qty) * num(x.unitPrice), cur)}</td>` : ''}
-        <td class="acts">${OR.lines.length > 1 ? `<button type="button" class="ib del" data-o="del-line:${i}" title="Remove">✕</button>` : ''}</td></tr>`; }).join('')}
+        <td class="acts">${OR.lines.length > 1 ? `<button type="button" class="ib del" data-o="del-line:${i}" title="Remove">${TRASH}</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
     <button type="button" class="btn sm ghost" data-o="add-line" style="margin-top:8px">+ Add product</button>
 
@@ -105,7 +105,7 @@ function drawOrder(err) {
       <td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-oe="${i}" data-k="cost" value="${esc(x.cost)}"></td>
       <td>${sel(`class="cell" data-oe="${i}" data-k="paidBy"`, people, x.paidBy)}</td>
       ${sale ? `<td class="num"><input class="cell n w" type="number" min="0" step="0.01" data-oe="${i}" data-k="charge" value="${esc(x.charge)}"></td>` : ''}
-      <td class="acts"><button type="button" class="ib del" data-o="del-extra:${i}" title="Remove">✕</button></td></tr>`).join('')}
+      <td class="acts"><button type="button" class="ib del" data-o="del-extra:${i}" title="Remove">${TRASH}</button></td></tr>`).join('')}
     </tbody></table></div>` : '<p class="note">No extra costs. Add delivery, packaging or anything else this sale cost you, or that the customer pays on top.</p>'}
     <div class="topact" style="margin-top:8px">${EXTRA_CATS.map(c => `<button type="button" class="btn sm ghost" data-o="add-extra:${c}">+ ${c === 'Delivery to customer' ? 'Delivery' : c}</button>`).join('')}</div>
 
@@ -169,7 +169,7 @@ V.sales = R => {
       <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td>${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : h.paid ? '<span class="pill ok">Paid</span>' : `<button class="btn sm terra" data-act="paid:${o.id}">Mark paid</button>`}</td>
-      <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">✎</button><button class="ib del" data-del="sales:${o.id}" title="Delete">✕</button></td></tr>`; }).join('');
+      <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">✎</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
   return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Unpaid'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
