@@ -240,7 +240,8 @@ function openShipDelete(id) {
   const units = items.reduce((a, p) => a + num(p.qty), 0);
   const value = items.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0);
   const costEUR = costs.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
-  $('#bbody').innerHTML = `<div class="rhead"><div><h2>Delete ${esc(sh.name)}</h2>
+  const d = bdlg();
+  $("#bbody").innerHTML = `<div class="rhead"><div><h2>Delete ${esc(sh.name)}</h2>
       <p class="lead">This box has <b>${items.length} product line${items.length === 1 ? '' : 's'}</b> (${units} units, ${fEUR(value)})${costs.length ? ` and <b>${costs.length} cost${costs.length === 1 ? '' : 's'}</b> (${fEUR(costEUR)})` : ''}${sold.length ? `. ${sold.length} sale line${sold.length === 1 ? ' is' : 's are'} recorded for its products.` : '.'} What should happen to them?</p></div>
       <button type="button" class="ib" data-b="close" title="Close">✕</button></div>
     <div class="bopts">
@@ -254,7 +255,7 @@ function openShipDelete(id) {
     </div>
     <div class="err" id="b_err" hidden></div>
     <div class="mact"><button type="button" class="btn ghost" data-b="close">Cancel</button><button type="button" class="btn terra" data-b="go" data-id="${id}">Delete box</button></div>`;
-  const d = bdlg(); if (!d.open) d.showModal();
+  if (!d.open) d.showModal();
 }
 async function runShipDelete(id, btn) {
   const sh = db.shipments.find(s => s.id === id); if (!sh) return bdlg().close();
