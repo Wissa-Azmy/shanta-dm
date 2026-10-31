@@ -36,7 +36,7 @@ function toast(msg) {
 const DEFAULT_DB = () => ({
   app: 'shanta-ledger', version: 1,
   settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo' },
-  shipments: [], purchases: [], sales: [], expenses: [], transfers: [],
+  shipments: [], purchases: [], sales: [], payments: [], expenses: [], transfers: [],
   meta: { created: new Date().toISOString(), updatedAt: null, savedAt: null }
 });
 let db;
@@ -45,7 +45,7 @@ function normalize(d) {
   const base = DEFAULT_DB();
   d = Object.assign(base, d || {});
   d.settings = Object.assign(DEFAULT_DB().settings, d.settings || {});
-  ['shipments', 'purchases', 'sales', 'expenses', 'transfers'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  ['shipments', 'purchases', 'sales', 'payments', 'expenses', 'transfers'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
   d.meta = Object.assign(DEFAULT_DB().meta, d.meta || {});
   return d;
 }
@@ -58,16 +58,82 @@ db = normalize(db);
       Unlinked expenses are given back in full straight away.
    2. What remains of collected revenue is profit, split by the share in Settings.
    3. Whoever holds more collected money than they are entitled to owes the difference. */
+
+/* ---------- sale book: what each sale costs the customer and what has been collected ----------
+   Paid in full: collected at the sale. Down payment: that part is collected at the sale, the rest goes on the
+   customer's credit balance. Credit payments (db.payments) pay a chosen sale, or the customer's oldest open sales first. */
+const custKey = c => String(c || '').trim().toLowerCase();
+function saleBook(skipPaymentId) {
+  const byId = {}, orders = [], customers = {}, unused = {};
+  db.sales.forEach(x => {
+    if (x.kind !== 'sale') return;
+    const k = x.orderId || x.id;
+    let o = byId[k];
+    if (!o) {
+      o = byId[k] = { id: k, h: x, cur: x.currency || 'EGP', rate: num(x.rate) || rate(), bill: 0, collected: 0, cash: [], payments: [] };
+      o.mode = x.payMode || (x.paid ? 'full' : 'credit');
+      orders.push(o);
+    }
+    o.bill += num(x.qty) * num(x.unitPrice);
+  });
+  const toOrderCur = (o, p) => { const eur = toEUR(p.amount, p.currency, p.rate); return p.currency === o.cur ? num(p.amount) : o.cur === 'EUR' ? eur : eur * o.rate; };
+  const take = (o, amt, who, date, eurPerUnit, egpPerUnit, payment) => {
+    const t = Math.min(amt, o.bill - o.collected); if (t <= 0.0001) return 0;
+    o.collected += t;
+    o.cash.push({ who, date, amt: t, eur: t * eurPerUnit, egp: t * egpPerUnit, payment: payment && payment.id });
+    if (payment) o.payments.push({ id: payment.id, date, amt: t });
+    return t;
+  };
+  const ownEUR = o => o.cur === 'EUR' ? 1 : 1 / o.rate, ownEGP = o => o.cur === 'EGP' ? 1 : o.rate;
+  orders.forEach(o => {
+    const h = o.h;
+    if (o.mode === 'full') take(o, o.bill, h.receivedBy, h.date, ownEUR(o), ownEGP(o));
+    else if (o.mode === 'down') take(o, num(h.downPayment), h.receivedBy, h.date, ownEUR(o), ownEGP(o));
+  });
+  const open = c => orders.filter(o => custKey(o.h.customer) === c && o.bill - o.collected > 0.0001)
+    .sort((a, b) => (a.h.dueDate || a.h.date || '').localeCompare(b.h.dueDate || b.h.date || '') || (a.h.date || '').localeCompare(b.h.date || ''));
+  const pays = db.payments.filter(p => p.id !== skipPaymentId).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  pays.forEach(p => {
+    if (num(p.amount) <= 0) return;
+    const eur = toEUR(p.amount, p.currency, p.rate), egp = toEGP(p.amount, p.currency, p.rate);
+    let targets = p.orderId && byId[p.orderId] ? [byId[p.orderId]].concat(open(custKey(p.customer)).filter(o => o.id !== p.orderId)) : open(custKey(p.customer));
+    let left = num(p.amount);
+    for (const o of targets) {
+      if (left <= 0.0001) break;
+      const inOC = toOrderCur(o, Object.assign({}, p, { amount: left }));
+      const per = inOC > 0 ? left / inOC : 0;
+      const t = take(o, inOC, p.receivedBy, p.date, per * eur / num(p.amount), per * egp / num(p.amount), p);
+      left -= t * per;
+    }
+    unused[p.id] = Math.max(0, left);
+  });
+  const t = today();
+  orders.forEach(o => {
+    o.f = o.bill > 0 ? o.collected / o.bill : 1;
+    o.balance = Math.max(0, o.bill - o.collected);
+    o.balanceEGP = o.cur === 'EGP' ? o.balance : o.balance * o.rate;
+    o.overdue = o.balance > 0.0001 && o.h.dueDate && o.h.dueDate < t;
+    const c = custKey(o.h.customer); if (!c) return;
+    const cu = customers[c] = customers[c] || { key: c, name: String(o.h.customer).trim(), balanceEGP: 0, billEGP: 0, orders: [], overdue: 0, nextDue: '' };
+    cu.orders.push(o); cu.balanceEGP += o.balanceEGP; cu.billEGP += o.cur === 'EGP' ? o.bill : o.bill * o.rate;
+    if (o.overdue) cu.overdue += o.balanceEGP;
+    if (o.balance > 0.0001 && o.h.dueDate && (!cu.nextDue || o.h.dueDate < cu.nextDue)) cu.nextDue = o.h.dueDate;
+  });
+  return { byId, orders, customers, unused };
+}
 function calc() {
   const s = db.settings;
   const R = { lots: {}, ship: {}, person: {}, rev: 0, revEGP: 0, unpaidEUR: 0, unpaidEGP: 0, stockEUR: 0, unpaidCostEUR: 0, spent: 0, lossEUR: 0 };
   PEOPLE.forEach(p => R.person[p] = { outlay: 0, recovered: 0, received: 0, tin: 0, tout: 0 });
   db.purchases.forEach(p => R.lots[p.id] = { p, qty: num(p.qty), unit: num(p.unitCost), sold: 0, paidQty: 0, unpaid: 0, lost: 0, revEGP: 0, revEUR: 0 });
+  const B = R.book = saleBook();
   db.sales.forEach(x => {
     const l = R.lots[x.purchaseId]; if (!l) return;
     const q = num(x.qty);
     if (x.kind === 'sale') {
-      l.sold += q; if (x.paid) l.paidQty += q; else l.unpaid += q;
+      /* a sale counts in proportion to what the customer has paid so far */
+      const o = B.byId[x.orderId || x.id], f = o ? o.f : 0;
+      l.sold += q; l.paidQty += q * f; l.unpaid += q * (1 - f);
       l.revEGP += toEGP(q * num(x.unitPrice), x.currency, x.rate);
       l.revEUR += toEUR(q * num(x.unitPrice), x.currency, x.rate);
     } else l.lost += q;
@@ -129,12 +195,12 @@ function calc() {
   });
   db.sales.forEach(x => {
     if (x.kind !== 'sale') return;
+    const o = B.byId[x.orderId || x.id], f = o ? o.f : 0;
     const eur = toEUR(num(x.qty) * num(x.unitPrice), x.currency, x.rate);
     const egp = toEGP(num(x.qty) * num(x.unitPrice), x.currency, x.rate);
-    if (!x.paid) { R.unpaidEUR += eur; R.unpaidEGP += egp; return; }
-    R.rev += eur; R.revEGP += egp;
-    (R.person[x.receivedBy] || R.person.friend).received += eur;
+    R.unpaidEUR += eur * (1 - f); R.unpaidEGP += egp * (1 - f);
   });
+  B.orders.forEach(o => o.cash.forEach(c => { R.rev += c.eur; R.revEGP += c.egp; (R.person[c.who] || R.person.friend).received += c.eur; }));
   db.transfers.forEach(t => {
     const eur = toEUR(t.amount, t.currency, t.rate);
     if (R.person[t.from]) R.person[t.from].tout += eur;

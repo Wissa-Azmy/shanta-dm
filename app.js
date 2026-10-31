@@ -6,15 +6,16 @@ const NAV = [
   ['purchases', '🛒', 'Purchases', 'What was bought at dm'],
   ['stock', '▦', 'Stock', 'What is left and what to charge'],
   ['sales', '£', 'Sales', 'What was sold in Egypt'],
+  ['customers', '☺', 'Customers', 'Who still owes what, and their payments'],
   ['expenses', '✉', 'Expenses', 'Shipping, customs and other costs'],
   ['transfers', '⇄', 'Transfers', 'Money between the two of you'],
   ['ledger', '☰', 'Ledger', 'Every movement: who, when, where, how much'],
   ['settings', '⚙', 'Settings', 'Names, split, rate and your data file']
 ];
-const NEWBTN = { shipments: 'New shipment', purchases: 'Add purchase', sales: 'Record sale', expenses: 'Add expense', transfers: 'Record transfer', stock: 'Record sale' };
+const NEWBTN = { shipments: 'New shipment', purchases: 'Add purchase', sales: 'Record sale', customers: 'Credit payment', expenses: 'Add expense', transfers: 'Record transfer', stock: 'Record sale' };
 let view = localStorage.getItem('shanta-view') || 'overview';
 
-function counts() { return { shipments: db.shipments.length, purchases: db.purchases.length, sales: db.sales.length, expenses: db.expenses.length, transfers: db.transfers.length }; }
+function counts() { return { shipments: db.shipments.length, purchases: db.purchases.length, sales: db.sales.length, customers: Object.values(calc().book.customers).filter(c => c.balanceEGP > 0.005).length, expenses: db.expenses.length, transfers: db.transfers.length }; }
 function renderFile() {
   const box = $('#filebox'); if (!box) return;
   let dot = 'bad', st = 'Only in this browser', p = 'Not saved to a file yet. Click “Save as…” to pick a file on your disk.', btns = `<button class="btn sm" data-act="saveas">Save as…</button><button class="btn sm ghost" data-act="open">Open</button>`;
@@ -35,7 +36,7 @@ function render() {
   $('#nav').innerHTML = NAV.map(([k, i, l]) => `<button class="${k === view ? 'on' : ''}" data-go="${k}"><i>${i}</i>${l}${c[k] ? `<span class="cnt">${c[k]}</span>` : ''}</button>`).join('');
   const n = NAV.find(x => x[0] === view) || NAV[0];
   $('#eyebrow').textContent = n[3]; $('#vtitle').textContent = n[2];
-  $('#topact').innerHTML = NEWBTN[view] ? `${view === 'purchases' || view === 'shipments' ? '<button class="btn ghost" data-receipt="">⇪ Import dm receipt</button>' : ''}<button class="btn" data-new="${view === 'stock' ? 'sales' : view}">+ ${NEWBTN[view]}</button>` :
+  $('#topact').innerHTML = NEWBTN[view] ? `${view === 'purchases' || view === 'shipments' ? '<button class="btn ghost" data-receipt="">⇪ Import dm receipt</button>' : ''}<button class="btn" data-new="${view === 'stock' ? 'sales' : view === 'customers' ? 'payments' : view}">+ ${NEWBTN[view]}</button>` :
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();

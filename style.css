@@ -300,3 +300,8 @@ input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;margin-left:6px}
 @media (max-width:820px),(pointer:coarse){
   .f input,.f select,.f textarea,.cell,.toolbar input,.toolbar select{font-size:16px}
 }
+
+/* credit */
+td.paycell{min-width:150px}
+td.paycell .pill{display:inline-block}
+td.paycell .sub{white-space:nowrap}

@@ -11,7 +11,7 @@ const CLOUD = {
 const toEmail = u => { u = String(u || '').trim().toLowerCase(); return u.includes('@') ? u : u.replace(/[^a-z0-9._-]/g, '') + '@' + CLOUD.domain; };
 const fDateTime = s => s ? new Date(s).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 const userName = e => String(e || '').endsWith('@' + CLOUD.domain) ? e.slice(0, -CLOUD.domain.length - 1) : e;
-const COLLS = ['shipments', 'purchases', 'sales', 'expenses', 'transfers'];
+const COLLS = ['shipments', 'purchases', 'sales', 'payments', 'expenses', 'transfers'];
 const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
   : v && typeof v === 'object' ? '{' + Object.keys(v).filter(k => v[k] !== undefined && v[k] !== null).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}'
   : JSON.stringify(v);

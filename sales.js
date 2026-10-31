@@ -35,14 +35,14 @@ function openOrder(id, preset) {
     o.costs.forEach(e => { const k = e.extraKey || e.id; ex[k] = Object.assign(ex[k] || { category: e.category, description: e.description || '', charge: '' }, { cost: num(e.amount), paidBy: e.paidBy }); });
     o.extras.forEach(s => { const k = s.extraKey || s.id; ex[k] = Object.assign(ex[k] || { category: s.category || 'Other', description: s.product || '', cost: '', paidBy: 'friend' }, { charge: num(s.unitPrice) }); });
     OR = { id: o.id, isNew: false,
-      h: { date: h.date, customer: h.customer || '', place: h.place || '', receivedBy: h.receivedBy || 'friend', method: h.method || 'Cash', paid: !!h.paid, currency: h.currency || 'EGP', rate: h.rate || db.settings.rate, kind: h.kind || 'sale', notes: h.notes || '' },
+      h: { date: h.date, customer: h.customer || '', place: h.place || '', receivedBy: h.receivedBy || 'friend', method: h.method || 'Cash', paid: !!h.paid, payMode: h.payMode || (h.paid ? 'full' : 'credit'), downPayment: h.downPayment || '', dueDate: h.dueDate || '', currency: h.currency || 'EGP', rate: h.rate || db.settings.rate, kind: h.kind || 'sale', notes: h.notes || '' },
       lines: o.lines.map(s => ({ purchaseId: s.purchaseId, qty: num(s.qty), unitPrice: h.kind === 'sale' ? num(s.unitPrice) : '' })),
       extras: Object.values(ex),
       old: { sales: o.lines.concat(o.extras).map(s => s.id), exps: o.costs.map(e => e.id) }, orig: {} };
     o.lines.forEach(s => OR.orig[s.purchaseId] = (OR.orig[s.purchaseId] || 0) + num(s.qty));
   } else {
     OR = { id: null, isNew: true,
-      h: { date: today(), customer: '', place: db.settings.cityEG, receivedBy: 'friend', method: 'Cash', paid: true, currency: 'EGP', rate: db.settings.rate, kind: 'sale', notes: '' },
+      h: { date: today(), customer: '', place: db.settings.cityEG, receivedBy: 'friend', method: 'Cash', paid: true, payMode: 'full', downPayment: '', dueDate: '', currency: 'EGP', rate: db.settings.rate, kind: 'sale', notes: '' },
       lines: [{ purchaseId: (preset && preset.purchaseId) || '', qty: 1, unitPrice: '' }], extras: [], old: { sales: [], exps: [] }, orig: {} };
   }
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
@@ -61,7 +61,9 @@ function totalsHTML() {
   const t = orderTotals(), sale = OR.h.kind === 'sale', f = x => fAmt(OR.h.currency === 'EUR' ? x / (num(OR.h.rate) || rate()) : x, OR.h.currency);
   return `<dl class="kv">
     ${sale ? `<dt>Products (${t.units} units)</dt><dd>${f(t.goods)}</dd><dt>Extras the customer pays</dt><dd>${f(t.charged)}</dd>
-    <dt><b>Customer pays in total</b></dt><dd><b>${f(t.bill)}</b></dd>` : `<dt>Units leaving stock</dt><dd>${t.units}</dd>`}
+    <dt><b>Customer pays in total</b></dt><dd><b>${f(t.bill)}</b></dd>
+    ${OR.h.payMode !== 'full' ? (() => { const now = OR.h.payMode === 'down' ? toEGP(num(OR.h.downPayment), OR.h.currency, OR.h.rate) : 0;
+      return `<dt class="kvsub">Paid now</dt><dd class="kvsub">${f(now)}</dd><dt class="kvsub">On ${esc(OR.h.customer || 'the customer')}’s credit</dt><dd class="kvsub">${f(Math.max(0, t.bill - now))}${OR.h.dueDate ? ` <span class="pill warn">due ${fDate(OR.h.dueDate)}</span>` : ''}</dd>`; })() : ''}` : `<dt>Units leaving stock</dt><dd>${t.units}</dd>`}
     <dt>Product cost incl. shipping</dt><dd>${fEGP(t.landed)}</dd><dt>Extra costs we pay</dt><dd>${f(t.cost)}</dd>
     <dt><b>${sale ? 'Profit on this sale' : 'Cost of this ' + (OR.h.kind === 'gift' ? 'gift' : 'loss')}</b></dt><dd class="${t.profit >= 0 ? 'in-amt' : 'out-amt'}"><b>${fEGP(t.profit)}</b></dd></dl>`;
 }
@@ -83,7 +85,9 @@ function drawOrder(err) {
       ${cur !== 'EUR' ? `<div class="f"><label>Rate (EGP per €1)</label><input type="text" inputmode="decimal" data-num="1" step="0.01" data-oh="rate" value="${esc(h.rate)}"></div>` : ''}
       <div class="f"><label>Money collected by</label>${sel('data-oh="receivedBy"', people, h.receivedBy)}</div>
       <div class="f"><label>Paid with</label>${sel('data-oh="method"', OPT.payEG, h.method)}</div>
-      <div class="f chk"><input type="checkbox" id="o_paid" data-oh="paid"${h.paid ? ' checked' : ''}><label for="o_paid">Customer has paid</label></div>` : ''}
+      <div class="f"><label>Payment</label>${sel('data-oh="payMode"', PAY_MODES, h.payMode)}</div>
+      ${h.payMode === 'down' ? `<div class="f"><label>Down payment now (${cur})</label><input type="text" inputmode="decimal" data-num="1" data-oh="downPayment" value="${esc(h.downPayment)}" placeholder="e.g. 500"></div>` : ''}
+      ${h.payMode !== 'full' ? `<div class="f"><label>Due date for the rest (optional)</label><input type="date" data-oh="dueDate" value="${esc(h.dueDate)}"></div>` : ''}` : ''}
     </div>
 
     <h3 class="osec">Products</h3>
@@ -127,9 +131,15 @@ function saveOrder() {
     if (q > av) return drawOrder(`Only ${av} of “${l ? l.p.product : 'this product'}” are available.`);
   }
   if (sale && lines.some(x => x.unitPrice === '' || x.unitPrice == null)) return drawOrder('Enter a price for every product.');
+  if (sale && h.payMode !== 'full') {
+    if (!String(h.customer || '').trim()) return drawOrder('Enter the customer’s name: the rest goes on their credit balance.');
+    const bill = orderTotals().bill, dp = toEGP(num(h.downPayment), h.currency, h.rate);
+    if (h.payMode === 'down' && !(dp > 0)) return drawOrder('Enter the down payment, or choose “On credit” if nothing was paid now.');
+    if (h.payMode === 'down' && dp >= bill - 0.005) return drawOrder('The down payment covers the whole sale; choose “Paid in full” instead.');
+  }
   const oid = OR.id || uid();
   const base = { orderId: oid, date: h.date, kind: h.kind, currency: sale ? h.currency : 'EGP', rate: h.rate, customer: h.customer, place: h.place,
-    receivedBy: h.receivedBy, method: h.method, paid: sale && !!h.paid, notes: h.notes };
+    receivedBy: h.receivedBy, method: h.method, paid: sale && h.payMode === 'full', payMode: sale ? h.payMode : '', downPayment: sale && h.payMode === 'down' ? num(h.downPayment) : '', dueDate: sale && h.payMode !== 'full' ? h.dueDate : '', notes: h.notes };
   db.sales = db.sales.filter(s => !OR.old.sales.includes(s.id));
   db.expenses = db.expenses.filter(e => !OR.old.exps.includes(e.id));
   lines.forEach(x => db.sales.push(Object.assign({ id: uid() }, base, { purchaseId: x.purchaseId, qty: num(x.qty), unitPrice: sale ? num(x.unitPrice) : 0 })));
@@ -142,14 +152,26 @@ function saveOrder() {
   commit(); odlg().close(); toast('Sale saved');
 }
 function deleteOrder(oid) {
-  if (!confirm('Delete this sale with all its products and extra costs? The products go back into stock.')) return false;
+  const paid = db.payments.filter(p => p.orderId === oid);
+  if (!confirm('Delete this sale with all its products and extra costs? The products go back into stock.' + (paid.length ? `\n\n${paid.length} credit payment${paid.length === 1 ? '' : 's'} recorded for it will stay on the customer’s account and count toward their other open sales.` : ''))) return false;
   db.sales = db.sales.filter(s => !inOrder(s, oid));
   db.expenses = db.expenses.filter(e => e.orderId !== oid);
+  paid.forEach(p => p.orderId = '');
   commit(); toast('Sale deleted'); return true;
 }
+/* "Record payment" on a sale: open the credit payment form with what is still owed */
 function markPaid(oid) {
-  db.sales.forEach(s => { if (inOrder(s, oid) && s.kind === 'sale') s.paid = true; });
-  commit(); toast('Marked as paid');
+  const o = calc().book.byId[oid];
+  if (!o || o.balance <= 0.005) return toast('Nothing left to pay on this sale');
+  openForm('payments', null, { customer: o.h.customer || '', orderId: oid, amount: Math.round(o.balance * 100) / 100, currency: o.cur, rate: o.rate, receivedBy: o.h.receivedBy || 'friend' });
+}
+const PAY_MODES = [['full', 'Paid in full'], ['down', 'Down payment, rest on credit'], ['credit', 'On credit (nothing paid now)']];
+function payStatus(o, kind) {
+  if (kind !== 'sale') return '';
+  if (!o || o.balance <= 0.005) return '<span class="pill ok">Paid</span>';
+  const part = o.collected > 0.005 ? `<span class="sub">${fAmt(o.collected, o.cur)} of ${fAmt(o.bill, o.cur)} paid</span>` : '';
+  const due = o.h.dueDate ? `<span class="sub ${o.overdue ? 'out-amt' : ''}">${o.overdue ? 'Overdue since' : 'Due'} ${fDate(o.h.dueDate)}</span>` : '';
+  return `<span class="pill ${o.overdue ? 'bad' : 'warn'}">Owes ${fAmt(o.balance, o.cur)}</span>${part}${due}<button class="btn sm terra" data-act="paid:${o.id}" style="margin-top:4px">+ Payment</button>`;
 }
 
 /* ---------- sales list ---------- */
@@ -157,7 +179,8 @@ V.sales = R => {
   const kinds = Object.fromEntries(OPT.kind);
   const pn = s => { const l = R.lots[s.purchaseId]; return l ? l.p.product : '(deleted product)'; };
   const rows = salesOrders().filter(o => { const h = o.h;
-    return (!UI.person || h.receivedBy === UI.person) && (!UI.type || (UI.type === 'unpaid' ? h.kind === 'sale' && !h.paid : h.kind === UI.type))
+    const b = R.book.byId[o.id];
+    return (!UI.person || h.receivedBy === UI.person) && (!UI.type || (UI.type === 'unpaid' ? h.kind === 'sale' && b && b.balance > 0.005 : UI.type === 'overdue' ? b && b.overdue : h.kind === UI.type))
       && match(o.lines.map(pn).join(' '), o.extras.map(s => s.product).join(' '), h.customer, h.place, h.method, h.notes); }).sort(byDate);
   let bill = 0, prof = 0;
   const body = rows.map(o => { const h = o.h, m = orderMoney(o, R); bill += m.bill; prof += m.profit;
@@ -168,9 +191,9 @@ V.sales = R => {
       <td class="num">${m.cost ? fEGP(m.cost) : '—'}</td>
       <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
-      <td>${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : h.paid ? '<span class="pill ok">Paid</span>' : `<button class="btn sm terra" data-act="paid:${o.id}">Mark paid</button>`}</td>
+      <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
-  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Unpaid'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
   </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>
@@ -214,3 +237,68 @@ function orderInput(e, redraw) {
 }
 document.addEventListener('input', e => orderInput(e, false));
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') orderInput(e, true); });
+
+/* ---------- credit payments: later payments against a customer's balance ---------- */
+function openCustomers(skip) {
+  const B = saleBook(skip);
+  return Object.values(B.customers).filter(c => c.balanceEGP > 0.005).sort((a, b) => a.name.localeCompare(b.name));
+}
+SCHEMAS.payments = {
+  title: 'credit payment', lead: 'Money a customer pays later against what they still owe.',
+  fields: [
+    { k: 'date', l: 'Date', t: 'date', def: today, req: true },
+    { k: 'customer', l: 'Customer', t: 'select', req: true, opts: v => {
+      const list = openCustomers(modal && modal.id).map(c => [c.name, `${c.name} · owes ${fEGP(c.balanceEGP)}`]);
+      if (v.customer && !list.some(([n]) => custKey(n) === custKey(v.customer))) list.unshift([v.customer, v.customer]);
+      return [['', list.length ? 'Choose a customer…' : 'Nobody owes anything']].concat(list); } },
+    { k: 'orderId', l: 'Pays for', t: 'select', opts: v => {
+      const B = saleBook(modal && modal.id), c = custKey(v.customer);
+      const open = B.orders.filter(o => custKey(o.h.customer) === c && (o.balance > 0.005 || o.id === v.orderId)).sort((a, b) => (a.h.date || '').localeCompare(b.h.date || ''));
+      return [['', 'Oldest open sales first']].concat(open.map(o => [o.id, `Sale of ${fDate(o.h.date)} · owes ${fAmt(o.balance, o.cur)}${o.h.dueDate ? ' · due ' + fDate(o.h.dueDate) : ''}`])); } },
+    { t: 'info', html: v => { const B = saleBook(modal && modal.id), c = B.customers[custKey(v.customer)]; if (!c) return '';
+      return `${esc(c.name)} owes <b>${fEGP(c.balanceEGP)}</b> in total${c.overdue ? `, of which <b>${fEGP(c.overdue)}</b> is overdue` : ''}${c.nextDue ? ` · next due ${fDate(c.nextDue)}` : ''}.`; } },
+    { k: 'amount', l: 'Amount', t: 'number', req: true },
+    { k: 'currency', l: 'Currency', t: 'select', opts: OPT.cur, def: 'EGP' },
+    rateField(),
+    { k: 'receivedBy', l: 'Money collected by', t: 'person', def: 'friend' },
+    { k: 'method', l: 'Paid with', t: 'select', opts: OPT.payEG, def: 'Cash' },
+    { k: 'notes', l: 'Notes', t: 'textarea', span: true }
+  ],
+  validate(v) {
+    if (!(num(v.amount) > 0)) return 'Enter the amount paid.';
+    const B = saleBook(modal && modal.id), c = B.customers[custKey(v.customer)];
+    if (!c || c.balanceEGP <= 0.005) return 'This customer has nothing left to pay.';
+    const egp = toEGP(num(v.amount), v.currency, v.rate);
+    if (egp > c.balanceEGP + 0.5) return `${c.name} only owes ${fEGP(c.balanceEGP)}. Enter at most that amount.`;
+  }
+};
+
+/* ---------- customers screen ---------- */
+V.customers = R => {
+  const B = R.book, t = today();
+  const list = Object.values(B.customers).filter(c => match(c.name)).sort((a, b) => b.overdue - a.overdue || b.balanceEGP - a.balanceEGP || a.name.localeCompare(b.name));
+  const owing = list.filter(c => c.balanceEGP > 0.005);
+  const pays = db.payments.slice().sort(byDate).filter(p => match(p.customer, p.method, p.notes));
+  const total = owing.reduce((a, c) => a + c.balanceEGP, 0), overdue = owing.reduce((a, c) => a + c.overdue, 0);
+  return `<div class="stamps">
+    <div class="stamp t"><div class="in"><div class="k">Customers owe</div><div class="v">${fEGP(total)}</div><div class="s">${owing.length} customer${owing.length === 1 ? '' : 's'}</div></div></div>
+    <div class="stamp ${overdue ? 't' : 'n'}"><div class="in"><div class="k">Overdue</div><div class="v">${fEGP(overdue)}</div><div class="s">past the due date</div></div></div>
+    <div class="stamp n"><div class="in"><div class="k">Credit payments</div><div class="v">${fEGP(db.payments.reduce((a, p) => a + toEGP(p.amount, p.currency, p.rate), 0))}</div><div class="s">${db.payments.length} recorded</div></div></div>
+  </div>
+  <div class="toolbar">${search('Search customer')}</div>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Customer</th><th class="num">Bought</th><th class="num">Still owes</th><th>Due</th><th>Open sales</th><th></th></tr></thead><tbody>
+  ${list.map(c => { const open = c.orders.filter(o => o.balance > 0.005);
+    return `<tr><td><b>${esc(c.name)}</b></td><td class="num">${fEGP(c.billEGP)}</td>
+      <td class="num">${c.balanceEGP > 0.005 ? `<b class="${c.overdue ? 'out-amt' : ''}">${fEGP(c.balanceEGP)}</b>${c.overdue ? `<span class="sub out-amt">${fEGP(c.overdue)} overdue</span>` : ''}` : '<span class="pill ok">Nothing</span>'}</td>
+      <td>${c.nextDue ? `<span class="pill ${c.nextDue < t ? 'bad' : 'warn'}">${fDate(c.nextDue)}</span>` : '—'}</td>
+      <td>${open.map(o => `<span class="pline">${fDate(o.h.date)} · ${fAmt(o.balance, o.cur)} <button class="ib" data-edit="sales:${o.id}" title="Open sale">${PENCIL}</button></span>`).join('') || '<span class="note">none</span>'}</td>
+      <td class="acts">${c.balanceEGP > 0.005 ? `<button class="btn sm" data-new="payments" ${pre({ customer: c.name, amount: Math.round(c.balanceEGP), currency: 'EGP' })}>+ Payment</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">No customers yet. They appear here when you record a sale with a customer name.</td></tr>'}
+  </tbody></table></div>
+  <h3 style="margin-top:24px">Credit payments</h3>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Pays for</th><th class="num">Amount</th><th>Collected by</th><th>How</th><th></th></tr></thead><tbody>
+  ${pays.map(p => { const parts = B.orders.flatMap(o => o.payments.filter(x => x.id === p.id).map(x => `${fDate(o.h.date)}: ${fAmt(x.amt, o.cur)}`));
+    return `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.customer)}</b>${p.notes ? `<span class="sub">${esc(p.notes)}</span>` : ''}</td>
+      <td>${parts.length ? parts.map(s => `<span class="pline note">Sale ${esc(s)}</span>`).join('') : '<span class="note">—</span>'}${B.unused[p.id] > 0.005 ? `<span class="sub out-amt">${fAmt(B.unused[p.id], p.currency)} not matched to any sale</span>` : ''}</td>
+      <td class="num">${fAmt(p.amount, p.currency)}</td><td>${pill(p.receivedBy)}</td><td>${esc(p.method || '')}</td>${actions('payments', p.id)}</tr>`; }).join('') || '<tr><td colspan="7" class="empty">No credit payments yet.</td></tr>'}
+  </tbody></table></div>`;
+};

@@ -47,7 +47,7 @@ V.overview = R => {
     <li>Create a <b>Shipment</b>, add your dm <b>Purchases</b> to it, then record <b>Sales</b>, <b>Expenses</b> and <b>Transfers</b> as they happen.</li></ol>
     <div class="topact"><button class="btn" data-new="shipments">Create first shipment</button><button class="btn ghost" data-go="settings">Settings</button><button class="btn ghost" data-act="demo">Load sample data to explore</button></div></div>`;
   const lows = Object.values(R.lots).filter(l => l.left > 0 && l.left <= num(db.settings.lowStock));
-  const unpaid = salesOrders().filter(o => o.h.kind === 'sale' && !o.h.paid).sort(byDate);
+  const unpaid = salesOrders().filter(o => { const b = R.book.byId[o.id]; return o.h.kind === 'sale' && b && b.balance > 0.005; }).sort((a, b) => (R.book.byId[a.id].h.dueDate || '9').localeCompare(R.book.byId[b.id].h.dueDate || '9') || byDate(a, b));
   const moving = db.shipments.filter(s => s.status !== 'Delivered');
   const prod = {}; Object.values(R.lots).forEach(l => { const k = l.p.product; prod[k] = prod[k] || { n: 0, rev: 0, cost: 0 }; prod[k].n += l.sold; prod[k].rev += l.revEUR; prod[k].cost += l.sold * l.landed; });
   const top = Object.entries(prod).filter(([, x]) => x.n).sort((a, b) => (b[1].rev - b[1].cost) - (a[1].rev - a[1].cost)).slice(0, 6);
@@ -56,7 +56,7 @@ V.overview = R => {
     <div class="stamp n"><div class="in"><div class="k">Collected from sales</div><div class="v">${fEGP(R.revEGP)}</div><div class="s">${fEUR(R.rev)}</div></div></div>
     <div class="stamp ${R.profit >= 0 ? 'n' : 't'}"><div class="in"><div class="k">Profit so far</div><div class="v">${fEUR(R.profit)}</div><div class="s">${fEGP(eur2egp(R.profit))} · on goods sold</div></div></div>
     <div class="stamp g"><div class="in"><div class="k">Stock not yet sold</div><div class="v">${fEUR(R.stockEUR)}</div><div class="s">${Object.values(R.lots).reduce((a, l) => a + Math.max(0, l.left), 0)} units at cost</div></div></div>
-    <div class="stamp t"><div class="in"><div class="k">Customers still owe</div><div class="v">${fEGP(R.unpaidEGP)}</div><div class="s">${unpaid.length} unpaid sale${unpaid.length === 1 ? '' : 's'}</div></div></div>
+    <div class="stamp t"><div class="in"><div class="k">Customers still owe</div><div class="v">${fEGP(R.unpaidEGP)}</div><div class="s">${unpaid.length} sale${unpaid.length === 1 ? "" : "s"} not fully paid</div></div></div>
   </div>
   <div class="grid2">
     <div class="card"><h3>Money in vs money out, by month</h3><div class="chartbox"><canvas id="chart"></canvas></div></div>
@@ -65,7 +65,7 @@ V.overview = R => {
   <div class="grid3" style="margin-top:18px">
     <div class="card"><h3>On the way</h3>${moving.length ? `<ul class="mini">${moving.map(s => `<li><span>${esc(s.name)}<span class="sub note">${esc(s.carrier || '')} ${fDate(s.date)}</span></span><span class="pill warn">${esc(s.status)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in transit.</div>'}</div>
     <div class="card"><h3>Running low</h3>${lows.length ? `<ul class="mini">${lows.map(l => `<li><span>${esc(l.p.product)}</span><span class="r">${l.left} left</span></li>`).join('')}</ul>` : '<div class="empty">Stock levels look fine.</div>'}</div>
-    <div class="card"><h3>Waiting for payment</h3>${unpaid.length ? `<ul class="mini">${unpaid.slice(0, 8).map(o => { const l = R.lots[(o.lines[0] || {}).purchaseId], more = o.lines.length - 1; return `<li><span>${esc(o.h.customer || 'Customer')}<span class="sub note">${esc(l ? l.p.product : '')}${more > 0 ? ` +${more} more` : ''} · ${fDate(o.date)}</span></span><span class="r"><button class="ib" data-act="paid:${o.id}" title="Mark paid">✓</button> ${fEGP(orderMoney(o, R).bill)}</span></li>`; }).join('')}</ul>` : '<div class="empty">Everyone has paid.</div>'}</div>
+    <div class="card"><h3>Waiting for payment</h3>${unpaid.length ? `<ul class="mini">${unpaid.slice(0, 8).map(o => { const l = R.lots[(o.lines[0] || {}).purchaseId], more = o.lines.length - 1, b = R.book.byId[o.id]; return `<li><span>${esc(o.h.customer || 'Customer')}<span class="sub note">${esc(l ? l.p.product : '')}${more > 0 ? ` +${more} more` : ''} · ${b.h.dueDate ? `<span class="${b.overdue ? 'out-amt' : ''}">due ${fDate(b.h.dueDate)}</span>` : fDate(o.date)}</span></span><span class="r"><button class="ib" data-act="paid:${o.id}" title="Record payment">+</button> ${fEGP(b.balanceEGP)}</span></li>`; }).join('')}</ul>` : '<div class="empty">Everyone has paid.</div>'}</div>
   </div>`;
 };
 V.overview.after = () => {
@@ -133,7 +133,7 @@ V.stock = R => {
   <div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
     return `<tr><td><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
-    <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid ? `<span class="sub">${l.unpaid} unpaid</span>` : ''}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
+    <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid > 0.05 ? `<span class="sub">${Math.round(l.unpaid * 10) / 10} not paid yet</span>` : ""}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
     <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ' <span class="pill warn" title="Estimated from price">est.</span>' : l.boxG ? ' <span class="pill" title="Share of the weighed box after the products with a known weight">from box</span>' : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
     <td class="num">${fEGP(cEGP)}<span class="sub">${fEUR(l.unit)} + ${fEUR(l.shipShare || 0)} shipping</span></td><td class="num">${avg ? fEGP(avg) : '—'}</td>
     <td class="num">${mk === null ? '—' : `<span class="pill ${mk >= num(db.settings.targetMargin) ? 'ok' : mk >= 0 ? 'warn' : 'bad'}">${Math.round(mk)}%</span>`}</td>
@@ -166,8 +166,14 @@ function ledgerRows(R) {
   const out = [];
   db.purchases.forEach(p => out.push({ date: p.date, type: 'Purchase', desc: `${p.product} ×${p.qty}`, who: p.paidBy, dir: 'out', place: p.place, how: p.method, amt: num(p.qty) * num(p.unitCost), cur: 'EUR', eur: num(p.qty) * num(p.unitCost), coll: 'purchases', id: p.id }));
   db.expenses.forEach(e => out.push({ date: e.date, type: e.category, desc: e.description || e.category, who: e.paidBy, dir: 'out', place: e.place, how: e.method + (e.onDelivery ? ', on delivery' : ''), amt: e.amount, cur: e.currency, eur: toEUR(e.amount, e.currency, e.rate), coll: 'expenses', id: e.id }));
-  db.sales.filter(s => s.kind === 'sale').forEach(s => { const l = R.lots[s.purchaseId], a = num(s.qty) * num(s.unitPrice);
-    out.push({ date: s.date, type: s.paid ? 'Sale' : 'Sale (unpaid)', desc: `${l ? l.p.product : (s.product || '?')} ×${s.qty}${s.customer ? ' to ' + s.customer : ''}`, who: s.receivedBy, dir: s.paid ? 'in' : 'pending', place: s.place, how: s.method, amt: a, cur: s.currency, eur: toEUR(a, s.currency, s.rate), coll: 'sales', id: s.id }); });
+  /* one row per sale for the money that came in with it, one for what went on credit, one per credit payment */
+  R.book.orders.forEach(o => { const h = o.h, items = db.sales.filter(s => (s.orderId || s.id) === o.id && !s.extra).length;
+    const desc = `${items} product${items === 1 ? '' : 's'}${h.customer ? ' to ' + h.customer : ''}`, base = { date: h.date, who: h.receivedBy, place: h.place, how: h.method, cur: o.cur, coll: 'sales', id: o.id };
+    const now = o.cash.filter(c => !c.payment).reduce((a, c) => a + c.amt, 0), nowEUR = o.cash.filter(c => !c.payment).reduce((a, c) => a + c.eur, 0);
+    if (now > 0.005) out.push(Object.assign({}, base, { type: o.mode === 'down' ? 'Sale · down payment' : 'Sale', desc, dir: 'in', amt: now, eur: nowEUR }));
+    const credit = o.bill - now;
+    if (credit > 0.005) out.push(Object.assign({}, base, { type: 'Sale · on credit', desc: desc + (h.dueDate ? ' · due ' + fDate(h.dueDate) : ''), dir: 'pending', amt: credit, eur: o.cur === 'EUR' ? credit : credit / o.rate, how: '' })); });
+  db.payments.forEach(p => out.push({ date: p.date, type: 'Credit payment', desc: `from ${p.customer}${p.notes ? ' · ' + p.notes : ''}`, who: p.receivedBy, dir: 'in', place: '', how: p.method, amt: p.amount, cur: p.currency, eur: toEUR(p.amount, p.currency, p.rate), coll: 'payments', id: p.id }));
   db.transfers.forEach(t => out.push({ date: t.date, type: 'Transfer', desc: `${pname(t.from)} → ${pname(t.to)}${t.notes ? ' · ' + t.notes : ''}`, who: t.from, to: t.to, dir: 'move', place: '', how: t.method, amt: t.amount, cur: t.currency, eur: toEUR(t.amount, t.currency, t.rate), coll: 'transfers', id: t.id }));
   return out.sort(byDate);
 }
