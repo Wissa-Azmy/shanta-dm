@@ -183,7 +183,7 @@ function fxHint() {
       if (!m || m[1] === APP_VERSION || $('#newver')) return;
       const b = document.createElement('div'); b.id = 'newver';
       b.innerHTML = `<span>A new version is available (<b class="notr">${esc(m[1])}</b>).</span><button type="button" class="btn sm" data-act="reload">Reload</button>`;
-      document.body.appendChild(b);
+      document.body.appendChild(b); document.body.classList.add('hasnew');
     } catch (e) { }
   };
   /* a plain reload takes the scripts from the browser's cache (GitHub Pages lets it keep them for

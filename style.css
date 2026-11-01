@@ -460,3 +460,20 @@ td.paycell .sub{white-space:nowrap}
   /* exactly two buttons: side by side on one row, as before */
   .top .topact .btn:first-child:nth-last-child(2),.top .topact .btn:nth-child(2):last-child{grid-column:auto}
 }
+
+/* ---------- new-version notice and version label on phones ---------- */
+#newver span{min-width:0}
+#newver .btn{flex:none}
+@media (max-width:820px){
+  /* a card above the bottom edge instead of a pill over the title */
+  #newver{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:12px;right:12px;transform:none;max-width:none;border-radius:14px;padding:12px 12px 12px 16px;justify-content:space-between;line-height:1.35}
+  #newver .btn{padding:9px 16px;font-size:14px}
+  body.hasnew #totop{bottom:calc(84px + env(safe-area-inset-bottom))}
+  /* version: short "v…" label that fits under the language switch */
+  .rail .ver{white-space:nowrap;font-size:11px}
+  .rail .ver span{display:none}
+  .rail .ver b::before{content:"v"}
+}
+[dir=rtl] #newver{padding:8px 16px 8px 10px}
+@media (max-width:820px){[dir=rtl] #newver{padding:12px 16px 12px 12px}}
+@media (max-width:820px){body.hasnew #toast{bottom:calc(96px + env(safe-area-inset-bottom))}}
