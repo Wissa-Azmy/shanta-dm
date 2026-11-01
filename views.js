@@ -115,10 +115,14 @@ V.shipments = R => {
   }).join('')}</div>`;
 };
 
+/* box filter, shared by Stock and Purchases */
+const inBoxP = p => !UI.box || (UI.box === 'none' ? !db.shipments.some(s => s.id === p.shipmentId) : p.shipmentId === UI.box);
+const boxFilter = () => { const o = (v, l) => `<option value="${v}"${UI.box === v ? ' selected' : ''}>${esc(l)}</option>`;
+  return `<select data-ui="box" title="Box">${o('', 'All boxes')}${db.shipments.slice().sort(byDate).map(s => o(s.id, s.name + ' · ' + s.status)).join('')}${o('none', 'Not in a box')}</select>`; };
 V.purchases = R => {
-  const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && match(p.product, p.brand, p.category, p.place, p.receipt, p.ean, shipName(p.shipmentId)));
+  const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && inBoxP(p) && match(p.product, p.brand, p.category, p.place, p.receipt, p.ean, shipName(p.shipmentId)));
   const tot = rows.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0), units = rows.reduce((a, p) => a + num(p.qty), 0);
-  return `<div class="toolbar">${search('Search product, brand, receipt…')}${personFilter()}</div>
+  return `<div class="toolbar">${search('Search product, brand, receipt…')}${boxFilter()}${personFilter()}${UI.box ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}</div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th>Barcode</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
   ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')}${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td><td>${p.ean ? `<span class="mono">${esc(p.ean)}</span>` : `<button class="btn sm ghost" data-scanrow="${p.id}" title="Scan to link this product">${SCANICON} Link</button>`}</td>
     <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
@@ -130,11 +134,11 @@ V.stock = R => {
   const tm = num(db.settings.targetMargin) / 100;
   const loc = l => { const s = db.shipments.find(x => x.id === l.p.shipmentId); if (!s || s.status === 'Packing') return ['In Germany', 'me']; if (s.status === 'Delivered') return ['In Egypt', 'friend']; return [s.status, '']; };
   const status = { left: l => l.left > 0, sold: l => l.left <= 0, all: () => true }[UI.stockStatus] || (l => l.left > 0);
-  const inBox = l => !UI.box || (UI.box === 'none' ? !db.shipments.some(s => s.id === l.p.shipmentId) : l.p.shipmentId === UI.box);
+  const inBox = l => inBoxP(l.p);
   const rows = Object.values(R.lots).filter(l => status(l) && inBox(l) && match(l.p.product, l.p.brand, l.p.category, l.p.ean)).sort((a, b) => a.p.product.localeCompare(b.p.product));
   const boxes = db.shipments.slice().sort(byDate), cnt = f => Object.values(R.lots).filter(l => inBox(l) && f(l)).length;
   const opt = (k, v, label) => `<option value="${v}"${UI[k] === v ? ' selected' : ''}>${esc(label)}</option>`;
-  const filters = `<select data-ui="box" title="Box">${opt('box', '', 'All boxes')}${boxes.map(s => opt('box', s.id, s.name + ' · ' + s.status)).join('')}${opt('box', 'none', 'Not in a box')}</select>
+  const filters = `${boxFilter()}
     <select data-ui="stockStatus" title="Status">${opt('stockStatus', 'left', 'Still in stock (' + cnt(l => l.left > 0) + ')')}${opt('stockStatus', 'sold', 'Sold out (' + cnt(l => l.left <= 0) + ')')}${opt('stockStatus', 'all', 'All bought (' + cnt(() => true) + ')')}</select>
     ${UI.box || UI.q || UI.stockStatus !== 'left' ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}`;
   return `<div class="toolbar">${search('Search stock')}${filters}</div>
