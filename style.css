@@ -375,3 +375,4 @@ td.paycell .sub{white-space:nowrap}
 [dir=rtl] .scantorch{right:auto;left:10px}
 [dir=rtl] .scantype input,[dir=rtl] .scanin input{direction:ltr;text-align:right}
 .scantorch[hidden]{display:none!important}
+.rxean{display:inline-block;margin-top:3px;font-size:11px}

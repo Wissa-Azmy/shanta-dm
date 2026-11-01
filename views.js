@@ -130,12 +130,12 @@ V.stock = R => {
   const loc = l => { const s = db.shipments.find(x => x.id === l.p.shipmentId); if (!s || s.status === 'Packing') return ['In Germany', 'me']; if (s.status === 'Delivered') return ['In Egypt', 'friend']; return [s.status, '']; };
   const status = { left: l => l.left > 0, sold: l => l.left <= 0, all: () => true }[UI.stockStatus] || (l => l.left > 0);
   const inBox = l => !UI.box || (UI.box === 'none' ? !db.shipments.some(s => s.id === l.p.shipmentId) : l.p.shipmentId === UI.box);
-  const rows = Object.values(R.lots).filter(l => status(l) && inBox(l) && match(l.p.product, l.p.brand, l.p.category)).sort((a, b) => a.p.product.localeCompare(b.p.product));
+  const rows = Object.values(R.lots).filter(l => status(l) && inBox(l) && match(l.p.product, l.p.brand, l.p.category, l.p.ean)).sort((a, b) => a.p.product.localeCompare(b.p.product));
   const boxes = db.shipments.slice().sort(byDate), cnt = f => Object.values(R.lots).filter(l => inBox(l) && f(l)).length;
   const opt = (k, v, label) => `<option value="${v}"${UI[k] === v ? ' selected' : ''}>${esc(label)}</option>`;
   const filters = `<select data-ui="box" title="Box">${opt('box', '', 'All boxes')}${boxes.map(s => opt('box', s.id, s.name + ' · ' + s.status)).join('')}${opt('box', 'none', 'Not in a box')}</select>
     <select data-ui="stockStatus" title="Status">${opt('stockStatus', 'left', 'Still in stock (' + cnt(l => l.left > 0) + ')')}${opt('stockStatus', 'sold', 'Sold out (' + cnt(l => l.left <= 0) + ')')}${opt('stockStatus', 'all', 'All bought (' + cnt(() => true) + ')')}</select>
-    ${UI.box || UI.stockStatus !== 'left' ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}`;
+    ${UI.box || UI.q || UI.stockStatus !== 'left' ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}`;
   return `<div class="toolbar">${search('Search stock')}${filters}</div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;

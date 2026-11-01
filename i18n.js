@@ -399,8 +399,11 @@ Object.assign(AR, {
   'Optional. Scan or type it once; other lines of the same product get it too, so scanning finds the product later.': 'اختياري. امسحه أو اكتبه مرة واحدة؛ تحصل عليه أسطر نفس المنتج الأخرى أيضاً، فيجد المسح المنتج لاحقاً.',
   'That barcode doesn’t look right. Check the digits (8 or 13 numbers).': 'هذا الباركود لا يبدو صحيحاً. راجع الأرقام (8 أو 13 رقماً).',
   'Scan with the camera': 'امسح بالكاميرا', 'Scan to link this product': 'امسح لربط هذا المنتج', 'Link': 'ربط', 'Link it to this product too?': 'ربطه بهذا المنتج أيضاً؟',
-  'Scan to sell': 'امسح للبيع', 'Scan products': 'امسح المنتجات', 'Scan the products': 'امسح المنتجات', 'Done': 'تم'
+  'Scan to sell': 'امسح للبيع', 'Scan products': 'امسح المنتجات', 'Scan the products': 'امسح المنتجات', 'Done': 'تم',
+  'Find by scan': 'ابحث بالمسح', 'Find a product': 'ابحث عن منتج', 'barcode known': 'الباركود معروف',
+  'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
+rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 rx(/^✓ (.+) · (\d+) in this sale$/, (m, p, n) => `✓ ${p} · ${n} في هذا البيع`);
 rx(/^No “(.+)” left in stock$/, (m, p) => `لم يتبقَّ «${p}» في المخزون`);
 rx(/^Scan the barcode of (.+)$/, (m, p) => `امسح باركود ${p}`);

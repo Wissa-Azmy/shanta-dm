@@ -170,7 +170,7 @@ function drawReceipt() {
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th><input type="checkbox" data-rx="all"${RX.items.every(x => x.on) ? ' checked' : ''}></th><th>Brand</th><th>Product</th><th>Category</th><th class="num" title="Net content per unit from the receipt; packaging is added when splitting shipping">Content (g/ml)</th><th class="num">Qty</th><th class="num">Per unit${f < 1 ? ' (after coupons)' : ''}</th><th class="num">Total</th></tr></thead><tbody>
     ${RX.items.map((x, i) => `<tr class="${x.on ? '' : 'off'}"><td><input type="checkbox" data-ri="${i}" data-rk="on"${x.on ? ' checked' : ''}></td>
       <td><input class="cell" data-ri="${i}" data-rk="brand" value="${esc(x.brand)}"></td>
-      <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}"></td>
+      <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}">${eanFor(x.product.trim(), x.brand.trim()) ? '<span class="pill ok rxean" title="This product was scanned before; the import links its barcode">barcode known</span>' : ''}</td>
       <td><select class="cell" data-ri="${i}" data-rk="category">${OPT.category.map(c => `<option value="${esc(c)}"${c === x.category ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
       <td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="1" data-ri="${i}" data-rk="netG" value="${x.netG || ''}" placeholder="?"></td>
       <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ri="${i}" data-rk="qty" value="${x.qty}"></td>
@@ -190,11 +190,13 @@ function loadText(text) {
 function doImport() {
   const f = factor(), o = RX.o, on = RX.items.filter(x => x.on && num(x.qty) > 0 && x.product.trim());
   if (!on.length) return toast('Nothing selected to import');
-  on.forEach(x => db.purchases.push({ id: uid(), date: o.date, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
-    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt,
-    notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }));
+  let linked = 0;
+  on.forEach(x => { const ean = eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
+    db.purchases.push({ id: uid(), date: o.date, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
+    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean,
+    notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }); });
   commit(); rdlg().close();
-  toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}`);
+  toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}${linked ? ` · ${linked} with a known barcode` : ''}`);
 }
 
 document.addEventListener('click', e => {

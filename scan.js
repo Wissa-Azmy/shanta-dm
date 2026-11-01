@@ -132,6 +132,15 @@ function unlinkedGroups() {
   });
   return Object.values(g).sort((a, b) => (b.left > 0) - (a.left > 0) || b.date.localeCompare(a.date) || a.product.localeCompare(b.product));
 }
+/* barcode already known for a product with this name: same name and brand first, then the same name
+   ignoring brand, case, spaces and punctuation. Only used when that name has exactly one barcode. */
+const nameKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9äöüß]+/g, '');
+function eanFor(product, brand) {
+  const k = grpKey({ product, brand }), n = nameKey(product), a = new Set(), b = new Set();
+  if (!n) return '';
+  db.purchases.forEach(p => { if (!p.ean) return; if (grpKey(p) === k) a.add(p.ean); if (nameKey(p.product) === n) b.add(p.ean); });
+  return a.size === 1 ? [...a][0] : !a.size && b.size === 1 ? [...b][0] : '';
+}
 /* gives the barcode to the chosen lines and to every other line of the same product still without one */
 function linkEan(ids, code, noCommit) {
   const keys = new Set(db.purchases.filter(p => ids.includes(p.id)).map(grpKey));
@@ -178,6 +187,15 @@ function linkListHTML() {
     || `<li class="empty">${SX.groups.length ? 'No product without a barcode matches.' : 'Every product already has a barcode.'}</li>`;
 }
 
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-scanfind]')) return;
+  Scan.read('Find a product').then(c => {
+    if (!c) return;
+    if (!eanLines(c).length) return showCode(c);
+    /* show every box of it, sold out ones too, so "0 left" is visible */
+    UI.q = c; UI.box = ''; UI.stockStatus = 'all'; render();
+  });
+});
 document.addEventListener('click', e => {
   const s = e.target.closest('[data-scan],[data-scanrow],[data-scanfield],[data-lx]'); if (!s) return;
   if (s.dataset.scan !== undefined) return scanNext();
