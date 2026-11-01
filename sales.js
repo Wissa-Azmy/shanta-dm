@@ -193,7 +193,7 @@ V.sales = R => {
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
-  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}</div>
   ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof)], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
   </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>
@@ -327,7 +327,7 @@ V.customers = R => {
     <div class="stamp ${overdue ? 't' : 'n'}"><div class="in"><div class="k">Overdue</div><div class="v">${fEGP(overdue)}</div><div class="s">past the due date</div></div></div>
     <div class="stamp n"><div class="in"><div class="k">Credit payments</div><div class="v">${fEGP(db.payments.reduce((a, p) => a + toEGP(p.amount, p.currency, p.rate), 0))}</div><div class="s">${db.payments.length} recorded</div></div></div>
   </div>
-  <div class="toolbar">${search('Search customer')}</div>
+  <div class="toolbar">${search('Search customer')}${resetBtn('q')}</div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Customer</th><th class="num">Bought</th><th class="num">Still owes</th><th>Due</th><th>Open sales</th><th></th></tr></thead><tbody>
   ${list.map(c => { const open = c.orders.filter(o => o.balance > 0.005);
     return `<tr><td><b>${esc(c.name)}</b></td><td class="num">${fEGP(c.billEGP)}</td>

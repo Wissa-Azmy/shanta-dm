@@ -63,7 +63,7 @@ document.addEventListener('click', e => {
   if (a === 'download') downloadJSON();
   if (a === 'import') $('#fileInput').click();
   if (a === 'csv') V.ledger.csv();
-  if (a === 'stockreset') { UI.box = ''; UI.stockStatus = 'left'; UI.q = ''; render(); }
+  if (a === 'filtersreset') { t.dataset.keys.split(',').forEach(k => UI[k] = FILTER_DEFAULT[k]); render(); }
   if (a === 'setpack') { db.settings.packagingPct = num(arg); commit(); toast('Packaging set to ' + num(arg) + '%'); }
   if (a === 'fillw') { const m = missingW(); m.forEach(p => p.netG = parseWeightG(p.product)); commit(); toast(m.length + ' weights filled in'); }
   if (a === 'fx') { t.textContent = 'Fetching…'; updateRate(true); }
