@@ -119,7 +119,7 @@ const Cloud = {
   ledger() { return (this.cfg && this.cfg.ledger) || CLOUD.ledger; },
   saveCfg() { localStorage.setItem('shanta-cloud', JSON.stringify(this.cfg)); },
   saveBase() { clearTimeout(this.bt); this.bt = setTimeout(() => { if (this.ready && this.on()) localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); }, 800); },
-  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $('#g_msg'); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } },
+  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $("#g_msg"); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } const lm = $("#ldmsg"); if (lm && this.msg) lm.textContent = this.msg; },
 
   async connect(email, pw) {
     let f; try { f = await fb(); } catch (e) { throw new Error(netMsg); }
@@ -213,7 +213,13 @@ const Cloud = {
     this.base0 = this.switching ? null : (this.base ? cloneSnap(this.base) : null);
     this.remote = emptySnap(); this.base = emptySnap();
     const done = k => { got[k] = true; if (!this.ready && ['settings'].concat(COLLS).every(x => got[x])) this.becomeReady(); };
-    const fail = e => { console.warn(e); this.set(e.code === 'unavailable' ? 'offline' : 'error', fsMsg(e)); };
+    /* a listener that fails stops for good: start them all again after a pause, instead of
+       waiting for a page refresh */
+    const fail = e => {
+      console.warn(e); this.set(e.code === 'unavailable' ? 'offline' : 'error', fsMsg(e));
+      clearTimeout(this.rt);
+      this.rt = setTimeout(() => { if (this.on() && this.unsubs.length) this.listen(); }, e.code === 'permission-denied' ? 20000 : 5000);
+    };
     COLLS.forEach(c => this.unsubs.push(F.S.onSnapshot(F.S.collection(F.fs, 'ledgers', l, c), { includeMetadataChanges: true }, snap => {
       snap.docChanges({ includeMetadataChanges: true }).forEach(ch => {
         const id = ch.doc.id;
@@ -251,6 +257,8 @@ const Cloud = {
     this.fromRemote(snapApply(cloneSnap(remote), pending));
     if (Object.keys(pending).length) this.write(pending);
     this.last = new Date(); this.set('ok'); this.saveBase();
+    /* always redraw: the screen may still show the loading view */
+    render();
     (this.readyWaiters || []).forEach(r => r()); this.readyWaiters = [];
   },
   whenReady(ms) { return this.ready ? Promise.resolve() : within(new Promise(r => (this.readyWaiters = this.readyWaiters || []).push(r)), ms, offlineMsg).catch(() => { }); },
@@ -332,6 +340,7 @@ const Cloud = {
   async sync() {
     if (!this.on()) return;
     if (!this.started) await this.start();
+    else if (!this.ready) this.listen();
     await this.whenReady(15000);
     if (!this.ready) { this.set('offline', offlineMsg); return; }
     this.push();
@@ -425,6 +434,25 @@ const Cloud = {
     render();
   },
   isBackup() { return this.on() && this.ledger() !== CLOUD.ledger; },
+  /* signed in, nothing on this device yet and the first data from the cloud hasn't arrived:
+     show a loading view instead of the empty "welcome" screen */
+  loading() {
+    if (!this.on() || this.ready || COLLS.some(c => db[c].length)) return false;
+    if (!this.loadingSince) this.loadingSince = Date.now();
+    return true;
+  },
+  loadingHTML() {
+    const slow = Date.now() - this.loadingSince > 12000;
+    if (!this.slowTimer) this.slowTimer = setTimeout(() => { this.slowTimer = null; if (this.loading()) render(); }, 12500);
+    const bar = w => `<i style="width:${w}%"></i>`;
+    return `<div class="loadview" aria-busy="true">
+      <div class="ldhead"><span class="spin" aria-hidden="true"></span><div><b>Loading the shared ledger…</b><p class="note" id="ldmsg">${esc(this.msg || (slow ? 'This is taking longer than usual. Check the internet connection.' : 'Getting your shipments, purchases and sales from the cloud.'))}</p></div></div>
+      ${slow ? '<div class="row"><button class="btn sm" data-act="cloud-sync">Try again</button></div>' : ''}
+      <div class="skel">
+        <div class="sk-tiles">${'<div class="sk-tile">' + bar(40) + bar(70) + '</div>'}${'<div class="sk-tile">' + bar(55) + bar(60) + '</div>'}${'<div class="sk-tile">' + bar(35) + bar(75) + '</div>'}</div>
+        <div class="sk-card">${[72, 58, 84, 64, 76, 52].map(w => `<div class="sk-row">${bar(w)}${bar(18)}</div>`).join('')}</div>
+      </div></div>`;
+  },
   bannerHTML() {
     if (!this.isBackup()) return '';
     const b = (this.backups || []).find(x => x.name === this.cfg.ledger);

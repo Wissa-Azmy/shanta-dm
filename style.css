@@ -477,3 +477,20 @@ td.paycell .sub{white-space:nowrap}
 [dir=rtl] #newver{padding:8px 16px 8px 10px}
 @media (max-width:820px){[dir=rtl] #newver{padding:12px 16px 12px 12px}}
 @media (max-width:820px){body.hasnew #toast{bottom:calc(96px + env(safe-area-inset-bottom))}}
+
+/* ---------- loading view (first sign-in on a device) ---------- */
+.loadview{display:flex;flex-direction:column;gap:16px}
+.ldhead{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.ldhead b{font-size:16px}.ldhead .note{margin:3px 0 0}
+.spin{width:26px;height:26px;flex:none;border-radius:50%;border:3px solid var(--line);border-top-color:var(--nile);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skel{display:flex;flex-direction:column;gap:12px}
+.sk-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sk-tile,.sk-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.sk-tile{display:flex;flex-direction:column;gap:10px}
+.sk-row{display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-bottom:1px dotted var(--line)}
+.sk-row:last-child{border-bottom:0}
+.skel i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,rgba(29,42,37,.07) 25%,rgba(29,42,37,.14) 50%,rgba(29,42,37,.07) 75%);background-size:300% 100%;animation:shimmer 1.4s ease-in-out infinite}
+.sk-tile i:last-child{height:22px}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.spin,.skel i{animation:none}}

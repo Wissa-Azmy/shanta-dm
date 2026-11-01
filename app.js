@@ -40,7 +40,7 @@ function render() {
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
-  $("#view").innerHTML = Cloud.bannerHTML() + V[view](R);
+  $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : V[view](R));
   V[view].after && V[view].after();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
