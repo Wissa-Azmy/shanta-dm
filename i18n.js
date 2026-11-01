@@ -403,7 +403,7 @@ Object.assign(AR, {
   'Find by scan': 'ابحث بالمسح', 'Find a product': 'ابحث عن منتج', 'barcode known': 'الباركود معروف',
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
-Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
+Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'Version': 'الإصدار', 'A new version is available (': 'يتوفر إصدار جديد (', ').': ').', 'Reload': 'إعادة التحميل', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
 /* ---- Firestore ---- */
 Object.assign(AR, {
   'Offline: changes are saved on this device and sent when the connection is back.': 'غير متصل: التغييرات محفوظة على هذا الجهاز وتُرسل عند عودة الاتصال.',

@@ -167,3 +167,26 @@ function fxHint() {
   const upd = () => b.classList.toggle('on', window.scrollY > Math.max(500, window.innerHeight * 0.8));
   window.addEventListener('scroll', upd, { passive: true }); upd();
 })();
+
+/* ---------- app version, and a notice when a newer one has been pushed ---------- */
+(() => {
+  const r = $('.rail'); if (!r) return;
+  const v = document.createElement('div'); v.className = 'ver';
+  v.innerHTML = `<span>Version</span> <b class="notr">${APP_VERSION}</b>`;
+  r.appendChild(v);
+  let lastCheck = 0;
+  const check = async () => {
+    if (Date.now() - lastCheck < 60000) return; lastCheck = Date.now();
+    try {
+      const t = await (await fetch('core.js?check=' + Date.now(), { cache: 'no-store' })).text();
+      const m = t.match(/const APP_VERSION = "([^"]+)"/);
+      if (!m || m[1] === APP_VERSION || $('#newver')) return;
+      const b = document.createElement('div'); b.id = 'newver';
+      b.innerHTML = `<span>A new version is available (<b class="notr">${esc(m[1])}</b>).</span><button type="button" class="btn sm" data-act="reload">Reload</button>`;
+      document.body.appendChild(b);
+    } catch (e) { }
+  };
+  document.addEventListener('click', e => { if (e.target.closest('[data-act="reload"]')) location.reload(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  setTimeout(check, 3000);
+})();
