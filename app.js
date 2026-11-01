@@ -152,7 +152,7 @@ function fxHint() {
 (async () => {
   render();
   const h = await IDB.get('handle');
-  if (Cloud.on()) { Cloud.sync(); Cloud.startPolling(); }
+  if (Cloud.on()) Cloud.start();
   if (h && h.queryPermission) { fileHandle = h; fileName = h.name; filePerm = await verifyPerm(h, false); renderFile(); }
   setTimeout(() => { const s = db.settings; if (s.rateAuto !== false && (s.rateAt || '').slice(0, 10) !== today() && s.rateManual !== today()) updateRate(false); }, 4000);
 })();

@@ -404,6 +404,25 @@ Object.assign(AR, {
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
 Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
+/* ---- Firestore ---- */
+Object.assign(AR, {
+  'Offline: changes are saved on this device and sent when the connection is back.': 'غير متصل: التغييرات محفوظة على هذا الجهاز وتُرسل عند عودة الاتصال.',
+  'Offline, saved on this device': 'غير متصل، محفوظ على هذا الجهاز',
+  'Moving the shared ledger to the new database…': 'جارٍ نقل السجل المشترك إلى قاعدة البيانات الجديدة…',
+  'The shared ledger was moved to the new database': 'تم نقل السجل المشترك إلى قاعدة البيانات الجديدة',
+  'The move to the new database could not be verified. It will be tried again.': 'تعذّر التحقق من النقل إلى قاعدة البيانات الجديدة. ستتم المحاولة مجدداً.',
+  'Couldn’t load the cloud library. Check your internet connection.': 'تعذّر تحميل مكتبة السحابة. تحقق من اتصالك بالإنترنت.',
+  'Please sign in again.': 'يرجى تسجيل الدخول مجدداً.',
+  'The app now uses a new, faster database. Please sign in once more; nothing is lost.': 'يستخدم التطبيق الآن قاعدة بيانات جديدة وأسرع. يرجى تسجيل الدخول مرة أخرى؛ لن يُفقد شيء.',
+  'Can’t reach Firestore. If this stays, check that the Firestore database was created (see “Admin” in Settings).': 'تعذّر الوصول إلى Firestore. إذا استمر ذلك، تأكد من إنشاء قاعدة بيانات Firestore (انظر «للمسؤول» في الإعدادات).',
+  'The Firestore database hasn’t been created yet. See “Admin” below.': 'لم يتم إنشاء قاعدة بيانات Firestore بعد. انظر «للمسؤول» أدناه.',
+  'Type both email addresses below and copy the rules. In': 'اكتب البريدين أدناه وانسخ القواعد. في', ', paste them and press': '، الصقها ثم اضغط',
+  '. (First time only:': '. (أول مرة فقط:', ', a location in Europe, production mode.)': '، موقع في أوروبا، وضع الإنتاج.)'
+});
+rx(/^Firestore refused access\. Check that the Firestore database exists and its rules list your email \((.*)\)\. See “Admin” below\.$/, (m, e) => `رفض Firestore الوصول. تأكد من وجود قاعدة بيانات Firestore وأن قواعدها تتضمن بريدك (${e}). انظر «للمسؤول» أدناه.`);
+rx(/^\. Changes appear on (.+)’s phone within seconds\. Without internet everything keeps working: changes are saved on this device and sent when the connection is back\. The file on disk still works as an extra backup\.$/,
+  (m, n) => `. تظهر التغييرات على هاتف ${n} خلال ثوانٍ. بدون إنترنت يستمر كل شيء في العمل: تُحفظ التغييرات على هذا الجهاز وتُرسل عند عودة الاتصال. ويبقى الملف على الجهاز نسخة احتياطية إضافية.`);
+rx(/^Couldn’t read the old database \((\d+)\)\.$/, (m, n) => `تعذّرت قراءة قاعدة البيانات القديمة (${n}).`);
 rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 Object.assign(AR, {
