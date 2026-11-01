@@ -148,7 +148,13 @@ function linkEan(ids, code, noCommit) {
   if (!noCommit) commit();
   document.dispatchEvent(new CustomEvent("shanta-linked", { detail: { ids, code } }));
 }
-function showCode(code, after) {
+async function showCode(code, after) {
+  /* the other phone may have linked it moments ago: get the latest data before calling it new */
+  if (!eanLines(code).length && typeof Cloud !== 'undefined' && Cloud.on()) {
+    toast('Checking the shared ledger…'); await Cloud.sync();
+    for (let i = 0; Cloud.busy && i < 50; i++) await new Promise(r => setTimeout(r, 200));
+    if (eanLines(code).length && after) return after(code);
+  }
   Object.assign(SX, { code, q: '', box: '', after: after || null });
   const d = scanDlg('lookdlg');
   eanLines(code).length ? drawKnown() : drawLink();

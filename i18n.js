@@ -410,7 +410,8 @@ Object.assign(AR, {
   'Scan what goes in the box': 'امسح ما يدخل الصندوق', 'Clear all counts for this box?': 'مسح كل العدّ لهذا الصندوق؟', 'No products in this box.': 'لا توجد منتجات في هذا الصندوق.',
   'units checked': 'وحدة تم فحصها', 'everything is in the box': 'كل شيء في الصندوق',
   'Open Beauty Facts knows this barcode:': 'Open Beauty Facts يعرف هذا الباركود:', 'Search for it': 'ابحث عنه',
-  'Filled in from Open Beauty Facts. Check it.': 'تم الملء من Open Beauty Facts. راجعه.'
+  'Filled in from Open Beauty Facts. Check it.': 'تم الملء من Open Beauty Facts. راجعه.',
+  'Checking the shared ledger…': 'جارٍ التحقق من السجل المشترك…'
 });
 rx(/^(\d+) of (\d+)$/, (m, a, b) => `${a} من ${b}`);
 rx(/^(\d+) products? still missing$/, (m, n) => `${n} منتج ما زال ناقصاً`);

@@ -296,7 +296,8 @@ async function reconnect() {
   try {
     const data = normalize(JSON.parse(await (await fileHandle.getFile()).text()));
     const fileT = data.meta.updatedAt || data.meta.savedAt || '', localT = db.meta.updatedAt || '';
-    if (fileT > localT) { db = data; persistLocal(); toast('Loaded latest data from ' + fileName); }
+    /* when signed in, the cloud is the source of truth: an older file must not overwrite it */
+    if (fileT > localT && !(typeof Cloud !== 'undefined' && Cloud.on())) { db = data; persistLocal(); toast('Loaded latest data from ' + fileName); }
     else { await writeTo(fileHandle); toast('File updated with your latest changes'); }
     dirty = false;
   } catch (e) { console.warn(e); toast('Could not read the file, try Open file'); }

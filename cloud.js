@@ -126,7 +126,18 @@ const Cloud = {
     localStorage.removeItem('shanta-cloud'); localStorage.removeItem('shanta-cloud-base');
     this.set('off'); toast('Signed out. Your data stays on this device.'); localStorage.removeItem('shanta-offline'); showGate();
   },
-  schedule() { if (!this.on()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), 600); },
+  schedule() { if (!this.on()) return; clearTimeout(this.timer); this.timer = setTimeout(() => { this.timer = null; this.sync(); }, 600); },
+  /* the cloud data, except for entries that changed locally between the snapshots cur and now */
+  keepEdits(merged, cur, now) {
+    if (stable(cur) === stable(now)) return merged;
+    const out = { settings: Object.assign({}, merged.settings) };
+    COLLS.forEach(c => out[c] = Object.assign({}, merged[c]));
+    ['settings'].concat(COLLS).forEach(c => new Set(Object.keys(cur[c]).concat(Object.keys(now[c]))).forEach(id => {
+      if (cur[c][id] === now[c][id]) return;
+      if (id in now[c]) out[c][id] = now[c][id]; else delete out[c][id];
+    }));
+    return out;
+  },
   async sync() {
     if (!this.on()) return;
     if (this.busy) { this.again = true; return; }
@@ -135,12 +146,16 @@ const Cloud = {
       const raw = await this.req('GET');
       const merged = snapRemote(raw);
       const base = this.base ? fixBase(this.base, merged) : Object.assign(emptySnap(), { settings: Object.assign({}, merged.settings) });
-      const patch = snapDiff(snapLocal(db), base);
+      const cur = snapLocal(db), patch = snapDiff(cur, base);
       const dels = Object.values(patch).filter(v => v === null).length;
       if (dels >= 3) await this.snapshot(`Automatic backup before deleting ${dels} entries`, raw);
       snapApply(merged, patch);
       if (Object.keys(patch).length) await this.req('PATCH', patch);
-      if (stable(merged) !== stable(snapLocal(db))) { Object.assign(db, snapToData(merged)); persistLocal(); render(); }
+      /* entries changed on this device while the sync was waiting for the cloud (e.g. a barcode
+         linked right after the camera closed) are kept and sent with the next sync, not overwritten */
+      const now = snapLocal(db), out = this.keepEdits(merged, cur, now);
+      if (out !== merged) this.again = true;
+      if (stable(out) !== stable(now)) { Object.assign(db, snapToData(out)); persistLocal(); render(); }
       this.base = merged; this.saveBase();
       this.last = new Date(); this.set('ok');
     } catch (e) {
@@ -391,4 +406,11 @@ function showGate() {
 function hideGate() { const g = $('#gate'); if (g) g.remove(); }
 if (!Cloud.on() && !localStorage.getItem('shanta-offline')) showGate();
 window.addEventListener('focus', () => Cloud.on() && Cloud.sync());
+/* phones don't reliably fire focus when switching apps: pull when the app comes back,
+   and send pending changes straight away when it goes to the background */
+document.addEventListener('visibilitychange', () => {
+  if (!Cloud.on()) return;
+  if (document.visibilityState === 'visible') Cloud.sync();
+  else if (Cloud.timer) { clearTimeout(Cloud.timer); Cloud.timer = null; Cloud.sync(); }
+});
 window.addEventListener('online', () => Cloud.on() && Cloud.sync());
