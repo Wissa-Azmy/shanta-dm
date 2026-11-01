@@ -89,9 +89,13 @@ const Cloud = {
   saveBase() { localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); },
   set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $('#g_msg'); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } },
 
+  /* every request gives up after 20 s: phones freeze pages in the background, and a request that
+     never returns used to leave the sync "busy" for good, so no change was ever sent again */
   async fetchJSON(url, opts) {
-    let r; try { r = await fetch(url, opts); } catch (e) { const x = new Error(netMsg); x.net = true; throw x; }
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000);
+    let r; try { r = await fetch(url, Object.assign({ signal: ctl.signal, cache: 'no-store' }, opts)); } catch (e) { clearTimeout(t); const x = new Error(netMsg); x.net = true; throw x; }
     let j = null; try { j = await r.json(); } catch (e) { }
+    clearTimeout(t);
     return { r, j };
   },
   async signIn(dbUrl, apiKey, email, password, ledger) {
@@ -159,8 +163,10 @@ const Cloud = {
   },
   async sync() {
     if (!this.on()) return;
+    /* a sync still "running" after a minute is stuck (page was frozen): start over */
+    if (this.busy && Date.now() - (this.busyAt || 0) > 60000) this.busy = false;
     if (this.busy) { this.again = true; return; }
-    this.busy = true; this.set('syncing');
+    this.busy = true; this.busyAt = Date.now(); this.set('syncing');
     try {
       const raw = await this.req('GET');
       const merged = snapRemote(raw);
@@ -337,7 +343,12 @@ const Cloud = {
 document.addEventListener('click', async e => {
   const t = e.target.closest('[data-act^="cloud-"]'); if (!t) return;
   const a = t.dataset.act;
-  if (a === 'cloud-sync') { await Cloud.sync(); if (Cloud.state === 'ok') toast('Synced'); }
+  if (a === 'cloud-sync') {
+    /* wait for a sync already running, then do a full one, and say what really happened */
+    for (let i = 0; Cloud.busy && i < 150; i++) await new Promise(r => setTimeout(r, 200));
+    await Cloud.sync();
+    toast(Cloud.state === 'ok' ? 'Synced' : (Cloud.msg || 'Couldn’t reach the cloud. Check your internet connection.'));
+  }
   if (a === 'cloud-off') { if (confirm('Disconnect this device from the shared cloud ledger?')) Cloud.disconnect(); }
   if (a === 'cloud-copy') { const ta = $('#cl_rules'); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied'); }
   if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
