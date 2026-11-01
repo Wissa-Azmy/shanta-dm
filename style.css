@@ -398,3 +398,6 @@ td.paycell .sub{white-space:nowrap}
 [dir=rtl] .pklist li.pk.warn{border-right-color:#d49a2a}
 [dir=rtl] .pklist li.pk.bad{border-right-color:#c0392b}
 [dir=rtl] .pkn{direction:ltr}
+/* camera view: Done/Cancel centred under the camera, reachable with either thumb */
+.scanbox .mact{justify-content:center;margin-top:14px}
+.scanbox .mact .btn{min-width:140px;justify-content:center}
