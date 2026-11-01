@@ -36,7 +36,7 @@ const Scan = {
     return new Promise(res => {
       this.res = res; this.last = ""; this.each = onEach || null; this.pause = 0;
       const d = scanDlg('scandlg');
-      d.innerHTML = `<div class="scanbox"><h2>${esc(title || 'Scan a barcode')}</h2>
+      d.innerHTML = `<div class="scanbox" tabindex="-1" autofocus><h2>${esc(title || 'Scan a barcode')}</h2>
         <div class="scanview"><video playsinline muted autoplay></video><div class="scanframe"></div>
         <button type="button" class="btn sm scantorch" data-sc="torch" hidden>Torch</button></div>
         <p class="scanmsg">Starting the camera…</p>
@@ -99,7 +99,7 @@ const Scan = {
     if (!this.each) return this.finish(code);
     const r = this.each(code); if (r === null) return this.finish(null);
     this.msg(r); this.last = ""; this.pause = Date.now() + 1500;
-    const i = $("#scandlg .scantype input"); if (i) i.value = "";
+    const i = $("#scandlg .scantype input"); if (i) { i.value = ""; i.blur(); }
   },
   finish(code) {
     clearTimeout(this.timer);
@@ -158,7 +158,7 @@ const scanNext = () => Scan.read().then(c => c && showCode(c));
 function drawKnown() {
   const R = calc(), ls = eanLines(SX.code).sort((a, b) => (b.date || '').localeCompare(a.date || '')), p = ls[0];
   const left = ls.reduce((a, x) => a + Math.max(0, (R.lots[x.id] || {}).left || 0), 0);
-  scanDlg('lookdlg').innerHTML = `<div class="sdbody"><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
+  scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
     <h2>${esc(p.product)}</h2><p class="lead">${esc(p.brand || '')}${p.brand ? ' · ' : ''}<b>${left} left</b> in stock</p>
     <div class="tablewrap"><table class="t"><thead><tr><th>Shipment</th><th>Bought</th><th class="num">Qty</th><th class="num">Left</th><th class="num">Cost incl. shipping</th></tr></thead><tbody>
     ${ls.map(x => { const l = R.lots[x.id] || {}; return `<tr><td>${x.shipmentId ? esc(shipName(x.shipmentId)) : '<span class="pill warn">Not shipped</span>'}${x.product !== p.product ? `<span class="sub">${esc(x.product)}</span>` : ''}</td>
@@ -171,7 +171,7 @@ function drawLink() {
   SX.groups = unlinkedGroups();
   const known = eanLines(SX.code).length, boxes = db.shipments.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const o = (v, l) => `<option value="${v}"${SX.box === v ? ' selected' : ''}>${esc(l)}</option>`;
-  scanDlg('lookdlg').innerHTML = `<div class="sdbody"><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
+  scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
     <h2>${known ? 'Link more lines' : 'New barcode'}</h2>
     <p class="lead">${known ? 'Pick another product line that has this barcode, e.g. the same product named differently on another receipt.' : 'This barcode isn’t linked to a product yet. Pick the product it belongs to; all its lines get the barcode, so the next scan finds it.'}</p>
     <div class="toolbar"><input type="search" data-lxq placeholder="Search product or brand" value="${esc(SX.q)}" autocomplete="off">

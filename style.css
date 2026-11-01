@@ -376,3 +376,7 @@ td.paycell .sub{white-space:nowrap}
 [dir=rtl] .scantype input,[dir=rtl] .scanin input{direction:ltr;text-align:right}
 .scantorch[hidden]{display:none!important}
 .rxean{display:inline-block;margin-top:3px;font-size:11px}
+/* the dialog itself takes the first focus, so phones don't open the keyboard;
+   16px inputs stop iPhone from zooming in when one is tapped */
+.scanbox:focus,.sdbody:focus{outline:none}
+.sdialog input{font-size:16px}
