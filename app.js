@@ -156,3 +156,14 @@ function fxHint() {
   if (h && h.queryPermission) { fileHandle = h; fileName = h.name; filePerm = await verifyPerm(h, false); renderFile(); }
   setTimeout(() => { const s = db.settings; if (s.rateAuto !== false && (s.rateAt || '').slice(0, 10) !== today() && s.rateManual !== today()) updateRate(false); }, 4000);
 })();
+
+/* ---------- back to top: shown once the page is scrolled down a screen ---------- */
+(() => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'totop'; b.title = 'Back to top'; b.setAttribute('aria-label', 'Back to top');
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  b.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  document.body.appendChild(b);
+  const upd = () => b.classList.toggle('on', window.scrollY > Math.max(500, window.innerHeight * 0.8));
+  window.addEventListener('scroll', upd, { passive: true }); upd();
+})();

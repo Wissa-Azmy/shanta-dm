@@ -403,6 +403,7 @@ Object.assign(AR, {
   'Find by scan': 'ابحث بالمسح', 'Find a product': 'ابحث عن منتج', 'barcode known': 'الباركود معروف',
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
+Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
 rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 Object.assign(AR, {

@@ -407,3 +407,17 @@ td.paycell .sub{white-space:nowrap}
 .sdact .full,.sdact .btn:only-child{grid-column:1/-1}
 .sdbody .tablewrap .sub{display:block}
 @media (max-width:420px){.sdbody{padding:16px 14px}.sdbody .t th,.sdbody .t td{padding-left:6px;padding-right:6px}}
+
+/* ---------- totals bar above a table ---------- */
+.totbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.totbar>div{flex:1 1 120px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:0}
+.totbar span{display:block;font-size:12px;color:var(--muted)}
+.totbar b{font:600 18px var(--mono);white-space:nowrap}
+[dir=rtl] .totbar b{font-family:var(--body);direction:ltr;display:block;text-align:right}
+
+/* ---------- back to top ---------- */
+#totop{all:unset;position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:40;width:46px;height:46px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 24px rgba(29,42,37,.25);opacity:0;transform:translateY(12px);pointer-events:none;transition:.2s}
+#totop.on{opacity:.92;transform:none;pointer-events:auto}
+#totop svg{width:22px;height:22px}
+[dir=rtl] #totop{right:auto;left:18px}
+@media print{#totop{display:none}}

@@ -115,6 +115,8 @@ V.shipments = R => {
   }).join('')}</div>`;
 };
 
+/* totals cards above a table: [[label, value], …]; hidden when nothing matches the filters */
+const totBar = (items, show = true) => show ? `<div class="totbar">${items.map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join('')}</div>` : '';
 /* box filter, shared by Stock and Purchases */
 const inBoxP = p => !UI.box || (UI.box === 'none' ? !db.shipments.some(s => s.id === p.shipmentId) : p.shipmentId === UI.box);
 const boxFilter = () => { const o = (v, l) => `<option value="${v}"${UI.box === v ? ' selected' : ''}>${esc(l)}</option>`;
@@ -123,7 +125,7 @@ V.purchases = R => {
   const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && inBoxP(p) && match(p.product, p.brand, p.category, p.place, p.receipt, p.ean, shipName(p.shipmentId)));
   const tot = rows.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0), units = rows.reduce((a, p) => a + num(p.qty), 0);
   return `<div class="toolbar">${search('Search product, brand, receipt…')}${boxFilter()}${personFilter()}${UI.box ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}</div>
-  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th>Barcode</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
+  ${totBar([["Total", fEUR(tot)], ["Units", units], ["Lines", rows.length], ...PEOPLE.map(k => [pname(k), fEUR(rows.filter(p => p.paidBy === k).reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0))])], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th>Barcode</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
   ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')}${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td><td>${p.ean ? `<span class="mono">${esc(p.ean)}</span>` : `<button class="btn sm ghost" data-scanrow="${p.id}" title="Scan to link this product">${SCANICON} Link</button>`}</td>
     <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
     <td>${esc(p.place || '')}<span class="sub">${esc(p.method || '')}</span></td><td>${p.shipmentId ? esc(shipName(p.shipmentId)) : '<span class="pill warn">Not shipped</span>'}</td>${actions('purchases', p.id)}</tr>`).join('') || '<tr><td colspan="11" class="empty">No purchases yet.</td></tr>'}
@@ -141,8 +143,9 @@ V.stock = R => {
   const filters = `${boxFilter()}
     <select data-ui="stockStatus" title="Status">${opt('stockStatus', 'left', 'Still in stock (' + cnt(l => l.left > 0) + ')')}${opt('stockStatus', 'sold', 'Sold out (' + cnt(l => l.left <= 0) + ')')}${opt('stockStatus', 'all', 'All bought (' + cnt(() => true) + ')')}</select>
     ${UI.box || UI.q || UI.stockStatus !== 'left' ? '<button class="btn sm ghost" data-act="stockreset">Reset filters</button>' : ''}`;
+  const leftU = rows.reduce((a, l) => a + Math.max(0, l.left), 0), leftV = rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0);
   return `<div class="toolbar">${search('Search stock')}${filters}</div>
-  <div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
+  ${totBar([['Stock value at cost', fEUR(leftV)], ['In EGP', fEGP(eur2egp(leftV))], ['Units left', leftU], ['Products', rows.length]], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
     return `<tr><td><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
     <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid > 0.05 ? `<span class="sub">${Math.round(l.unpaid * 10) / 10} not paid yet</span>` : ""}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
@@ -159,7 +162,7 @@ V.expenses = R => {
   const rows = db.expenses.slice().sort(byDate).filter(e => (!UI.person || e.paidBy === UI.person) && match(e.category, e.description, e.place, e.method, shipName(e.shipmentId)));
   const tot = rows.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
   return `<div class="toolbar">${search('Search expenses')}${personFilter()}</div>
-  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th class="num">In €</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
+  ${totBar([['Total', fEUR(tot)], ['Entries', rows.length], ...PEOPLE.map(k => [pname(k), fEUR(rows.filter(e => e.paidBy === k).reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0))])], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>What</th><th class="num">Amount</th><th class="num">In €</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
   ${rows.map(e => `<tr><td>${fDate(e.date)}</td><td><b>${esc(e.category)}</b><span class="sub">${esc(e.description || '')}</span></td><td class="num">${fAmt(e.amount, e.currency)}${e.currency === 'EGP' ? `<span class="sub">@ ${e.rate}</span>` : ''}</td>
     <td class="num">${fEUR(toEUR(e.amount, e.currency, e.rate))}</td><td>${pill(e.paidBy)}${e.onDelivery ? '<span class="sub">on delivery</span>' : ''}</td><td>${esc(e.place || '')}<span class="sub">${esc(e.method || '')}</span></td>
     <td>${e.shipmentId ? esc(shipName(e.shipmentId)) : e.orderId ? `<button class="ib" data-edit="sales:${e.orderId}">${esc(e.notes || 'Sale')}</button>` : '<span class="note">general</span>'}</td>${actions('expenses', e.id)}</tr>`).join('') || '<tr><td colspan="8" class="empty">No expenses yet.</td></tr>'}
