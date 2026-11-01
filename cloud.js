@@ -27,19 +27,35 @@ function snapRemote(r) {
   COLLS.forEach(c => { o[c] = {}; Object.entries(r[c] || {}).forEach(([id, rec]) => o[c][id] = stable(Object.assign({ id }, rec))); });
   return o;
 }
-function snapDiff(cur, base) {
+/* Changes are sent field by field (purchases/<id>/<field>), so when both devices edit the same
+   entry, e.g. one changes "Paid by" while the other links a barcode, neither change is lost. */
+const hasVal = (o, k) => o[k] !== undefined && o[k] !== null;
+function fieldDiff(a, b, path, p) {
+  new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
+    if (stable(hasVal(a, k) ? a[k] : null) !== stable(hasVal(b, k) ? b[k] : null)) p[path + "/" + k] = hasVal(a, k) ? a[k] : null;
+  });
+}
+function snapDiff(cur, base, remote) {
   const p = {};
   Object.entries(cur.settings).forEach(([k, s]) => { if (base.settings[k] !== s) p['settings/' + k] = JSON.parse(s); });
   COLLS.forEach(c => {
-    Object.entries(cur[c]).forEach(([id, s]) => { if (base[c][id] !== s) p[c + '/' + id] = JSON.parse(s); });
+    Object.entries(cur[c]).forEach(([id, s]) => {
+      if (base[c][id] === s) return;
+      /* new here, or deleted on the other device meanwhile: send the whole entry */
+      if (!(id in base[c]) || (remote && !(id in remote[c]))) p[c + '/' + id] = JSON.parse(s);
+      else fieldDiff(JSON.parse(s), JSON.parse(base[c][id]), c + '/' + id, p);
+    });
     Object.keys(base[c]).forEach(id => { if (!(id in cur[c])) p[c + '/' + id] = null; });
   });
   return p;
 }
 function snapApply(s, patch) {
   Object.entries(patch).forEach(([k, v]) => {
-    const [c, id] = k.split('/');
-    if (v === null) delete s[c][id]; else s[c][id] = stable(v);
+    const [c, id, f] = k.split('/');
+    if (f !== undefined) {
+      if (!(id in s[c])) return;
+      const r = JSON.parse(s[c][id]); if (v === null) delete r[f]; else r[f] = v; s[c][id] = stable(r);
+    } else if (v === null) delete s[c][id]; else s[c][id] = stable(v);
   });
   return s;
 }
@@ -134,7 +150,10 @@ const Cloud = {
     COLLS.forEach(c => out[c] = Object.assign({}, merged[c]));
     ['settings'].concat(COLLS).forEach(c => new Set(Object.keys(cur[c]).concat(Object.keys(now[c]))).forEach(id => {
       if (cur[c][id] === now[c][id]) return;
-      if (id in now[c]) out[c][id] = now[c][id]; else delete out[c][id];
+      if (!(id in now[c])) delete out[c][id];
+      else if (c === 'settings' || !(id in cur[c]) || !(id in out[c])) out[c][id] = now[c][id];
+      else { const p = {}; fieldDiff(JSON.parse(now[c][id]), JSON.parse(cur[c][id]), '', p);
+        const r = JSON.parse(out[c][id]); Object.entries(p).forEach(([k, v]) => { k = k.slice(1); if (v === null) delete r[k]; else r[k] = v; }); out[c][id] = stable(r); }
     }));
     return out;
   },
@@ -146,8 +165,9 @@ const Cloud = {
       const raw = await this.req('GET');
       const merged = snapRemote(raw);
       const base = this.base ? fixBase(this.base, merged) : Object.assign(emptySnap(), { settings: Object.assign({}, merged.settings) });
-      const cur = snapLocal(db), patch = snapDiff(cur, base);
-      const dels = Object.values(patch).filter(v => v === null).length;
+      const cur = snapLocal(db), patch = snapDiff(cur, base, merged);
+      /* whole entries removed (not single fields) */
+      const dels = Object.entries(patch).filter(([k, v]) => v === null && k.split('/').length === 2).length;
       if (dels >= 3) await this.snapshot(`Automatic backup before deleting ${dels} entries`, raw);
       snapApply(merged, patch);
       if (Object.keys(patch).length) await this.req('PATCH', patch);
