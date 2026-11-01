@@ -403,6 +403,7 @@ Object.assign(AR, {
   'Find by scan': 'ابحث بالمسح', 'Find a product': 'ابحث عن منتج', 'barcode known': 'الباركود معروف',
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
+rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 Object.assign(AR, {
   'Check box': 'فحص الصندوق', 'Packing check': 'فحص التعبئة', 'Not bought for this box': 'لم يُشترَ لهذا الصندوق', 'Start again': 'البدء من جديد', 'Scan': 'مسح',

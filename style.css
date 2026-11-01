@@ -401,3 +401,9 @@ td.paycell .sub{white-space:nowrap}
 /* camera view: Done/Cancel centred under the camera, reachable with either thumb */
 .scanbox .mact{justify-content:center;margin-top:14px}
 .scanbox .mact .btn{min-width:140px;justify-content:center}
+/* scan result / link / packing dialogs: buttons in an even two-column grid, main action first */
+.sdact{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sdact .btn{box-sizing:border-box;width:100%;min-height:44px;justify-content:center;text-align:center;white-space:normal;line-height:1.2;padding:8px 10px;margin:0}
+.sdact .full,.sdact .btn:only-child{grid-column:1/-1}
+.sdbody .tablewrap .sub{display:block}
+@media (max-width:420px){.sdbody{padding:16px 14px}.sdbody .t th,.sdbody .t td{padding-left:6px;padding-right:6px}}

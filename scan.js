@@ -167,12 +167,13 @@ function drawKnown() {
   const left = ls.reduce((a, x) => a + Math.max(0, (R.lots[x.id] || {}).left || 0), 0);
   scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
     <h2>${esc(p.product)}</h2><p class="lead">${esc(p.brand || '')}${p.brand ? ' · ' : ''}<b>${left} left</b> in stock</p>
-    <div class="tablewrap"><table class="t"><thead><tr><th>Shipment</th><th>Bought</th><th class="num">Qty</th><th class="num">Left</th><th class="num">Cost incl. shipping</th></tr></thead><tbody>
-    ${ls.map(x => { const l = R.lots[x.id] || {}; return `<tr><td>${x.shipmentId ? esc(shipName(x.shipmentId)) : '<span class="pill warn">Not shipped</span>'}${x.product !== p.product ? `<span class="sub">${esc(x.product)}</span>` : ''}</td>
-      <td>${fDate(x.date)}</td><td class="num">${x.qty}</td><td class="num"><b>${Math.max(0, l.left || 0)}</b></td><td class="num">${l.landed ? fEGP(eur2egp(l.landed)) : '—'}</td></tr>`; }).join('')}
+    <div class="tablewrap"><table class="t"><thead><tr><th>Shipment</th><th class="num">Left</th><th class="num">Cost incl. shipping</th></tr></thead><tbody>
+    ${ls.map(x => { const l = R.lots[x.id] || {}; return `<tr><td>${x.shipmentId ? esc(shipName(x.shipmentId)) : '<span class="pill warn">Not shipped</span>'}<span class="sub">${fDate(x.date)}${x.product !== p.product ? ' · ' + esc(x.product) : ''}</span></td>
+      <td class="num"><b>${Math.max(0, l.left || 0)}</b><span class="sub">of ${x.qty}</span></td><td class="num">${l.landed ? fEGP(eur2egp(l.landed)) : '—'}</td></tr>`; }).join('')}
     </tbody></table></div>
-    <div class="mact"><button type="button" class="btn ghost" data-lx="close">Close</button><button type="button" class="btn ghost" data-lx="more">Link more lines</button>
-    <button type="button" class="btn ghost" data-lx="buy">+ Add purchase</button>${left ? '<button type="button" class="btn ghost" data-lx="sell">Sell</button>' : ''}<button type="button" class="btn" data-lx="again">${SCANICON} Scan another</button></div></div>`;
+    <div class="mact sdact">${left ? '<button type="button" class="btn" data-lx="sell">Sell</button>' : ''}<button type="button" class="btn${left ? ' ghost' : ' full'}" data-lx="again">${SCANICON} Scan another</button>
+    <button type="button" class="btn ghost" data-lx="more">Link more lines</button><button type="button" class="btn ghost" data-lx="buy">+ Add purchase</button>
+    <button type="button" class="btn ghost full" data-lx="close">Close</button></div></div>`;
 }
 function drawLink() {
   SX.groups = unlinkedGroups();
@@ -189,7 +190,7 @@ function drawLink() {
     <select data-lxbox>${o('', 'All boxes')}${boxes.map(s => o(s.id, s.name)).join('')}${o('none', 'Not in a box')}</select></div>
     <div class="obfhint" id="obfhint"></div>
     <ul class="linklist" id="lxlist">${linkListHTML()}</ul>
-    <div class="mact"><button type="button" class="btn ghost" data-lx="${known ? 'back' : 'close'}">${known ? 'Back' : 'Cancel'}</button>${SX.after ? '' : '<button type="button" class="btn ghost" data-lx="new">+ Add as a new purchase</button>'}</div></div>`;
+    <div class="mact sdact">${SX.after ? "" : `<button type="button" class="btn ghost" data-lx="new">+ Add as a new purchase</button>`}<button type="button" class="btn ghost" data-lx="${known ? 'back' : 'close'}">${known ? 'Back' : 'Cancel'}</button></div></div>`;
 }
 function linkListHTML() {
   const q = SX.q.trim().toLowerCase();
@@ -302,7 +303,7 @@ function drawPack() {
     <div class="pkbar"><i style="width:${want ? Math.round(have / want * 100) : 0}%"></i></div>
     ${extras.length ? `<h3>Not bought for this box</h3><ul class="linklist pklist">${extras.map(([c, e]) => `<li class="pk bad"><span><b>${esc(e.product)}</b><span class="sub">${e.box ? esc(shipName(e.box)) : 'Not shipped'}</span></span><span class="pkn"><b>${e.n}</b><button type="button" class="ib" data-pk="noextra:${c}" title="Remove">×</button></span></li>`).join('')}</ul>` : ''}
     <ul class="linklist pklist">${rows.map(row).join('') || '<li class="empty">No products in this box.</li>'}</ul>
-    <div class="mact"><button type="button" class="btn ghost" data-pk="reset">Start again</button><button type="button" class="btn ghost" data-pk="close">Close</button><button type="button" class="btn" data-pk="scan">${SCANICON} Scan</button></div></div>`;
+    <div class="mact sdact"><button type="button" class="btn full" data-pk="scan">${SCANICON} Scan</button><button type="button" class="btn ghost" data-pk="reset">Start again</button><button type="button" class="btn ghost" data-pk="close">Close</button></div></div>`;
 }
 document.addEventListener('click', e => {
   const p = e.target.closest('[data-pack]'); if (p) return openPack(p.dataset.pack);
