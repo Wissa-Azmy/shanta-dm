@@ -132,8 +132,12 @@ const Cloud = {
   async disconnect() {
     this.stopListen();
     /* forget the login first, so the sign-out isn't mistaken for an expired login */
-    this.cfg = null; this.base = null; this.ready = false; this.started = false;
-    localStorage.removeItem('shanta-cloud'); localStorage.removeItem('shanta-cloud-base');
+    /* on the live ledger, keep what the cloud last confirmed: signing in again then only sends real
+       unsent changes, with no question. A backup ledger's base must never meet the live one */
+    if (this.isBackup()) { this.base = null; localStorage.removeItem('shanta-cloud-base'); }
+    else if (this.ready && this.base) localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base));
+    this.cfg = null; this.ready = false; this.started = false;
+    localStorage.removeItem('shanta-cloud');
     try { if (F) await F.U.signOut(F.auth); } catch (e) { }
     this.set('off'); toast('Signed out. Your data stays on this device.'); localStorage.removeItem('shanta-offline'); showGate();
   },
@@ -243,15 +247,19 @@ const Cloud = {
     const remote = this.remote, local = snapLocal(db);
     let pending = {};
     if (!this.switching) {
-      let base0 = this.base0;
-      if (!base0) {
-        base0 = emptySnap();
-        if (snapHasData(remote) && snapHasData(local) && !confirm('The shared ledger in the cloud already has data.\n\nOK = also add the entries from this browser to it\nCancel = use only the cloud data on this device')) base0 = cloneSnap(remote);
-        /* the cloud's settings win on a device's first sign-in */
-        if (Object.keys(remote.settings).length) base0.settings = Object.assign({}, local.settings);
+      const base0 = this.base0;
+      if (base0) pending = snapDiff(local, fixBase(base0, remote), remote);
+      else {
+        /* nothing known about this device: the cloud is the shared ledger and wins. Only entries the
+           cloud has never seen (e.g. made without signing in) can be added, and only when asked */
+        const own = [];
+        COLLS.forEach(c => Object.keys(local[c]).forEach(id => { if (!(id in remote[c])) own.push(c + '/' + id); }));
+        const n = own.length;
+        if (n && (!snapHasData(remote) || confirm(`This device has ${n} entr${n === 1 ? 'y' : 'ies'} that ${n === 1 ? 'is' : 'are'} not in the shared ledger.\n\nOK = add ${n === 1 ? 'it' : 'them'} to the shared ledger\nCancel = use only the shared ledger on this device`)))
+          own.forEach(k => { const [c, id] = k.split('/'); pending[k] = JSON.parse(local[c][id]); });
+        /* an empty cloud gets this device's settings; otherwise the cloud's settings win */
+        if (!Object.keys(remote.settings).length) Object.entries(local.settings).forEach(([k, v]) => pending['settings/' + k] = JSON.parse(v));
       }
-      fixBase(base0, remote);
-      pending = snapDiff(local, base0, remote);
     }
     this.switching = false; this.base0 = null; this.ready = true;
     this.fromRemote(snapApply(cloneSnap(remote), pending));

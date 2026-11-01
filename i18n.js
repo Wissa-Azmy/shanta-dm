@@ -299,8 +299,6 @@ Object.assign(AR, {
   'Too many attempts. Wait a few minutes and try again.': 'محاولات كثيرة. انتظر بضع دقائق ثم حاول مجدداً.', 'This user is disabled in Firebase.': 'هذا المستخدم معطّل في Firebase.',
   'Couldn’t reach Firebase. Check your internet connection. If you’re using the preview inside Dia, it may block network access; use the hosted copy of the app instead.': 'تعذّر الوصول إلى Firebase. تحقق من اتصالك بالإنترنت. إذا كنت تستخدم المعاينة داخل Dia فقد تمنع الاتصال؛ استخدم النسخة المنشورة من التطبيق.',
   'Your cloud login expired. Please connect again.': 'انتهت صلاحية تسجيل الدخول. يرجى تسجيل الدخول مجدداً.', 'Database not found. Check the database URL.': 'قاعدة البيانات غير موجودة. تحقق من رابطها.',
-  'The shared ledger in the cloud already has data.': 'السجل المشترك في السحابة يحتوي على بيانات بالفعل.',
-  'OK = also add the entries from this browser to it': 'موافق = أضف إليه أيضاً القيود الموجودة في هذا المتصفح', 'Cancel = use only the cloud data on this device': 'إلغاء = استخدم بيانات السحابة فقط على هذا الجهاز',
   'Signed out. Your data stays on this device.': 'تم تسجيل الخروج. بياناتك تبقى على هذا الجهاز.',
   'The backup could not be verified, so nothing was deleted.': 'تعذّر التحقق من النسخة الاحتياطية، لذا لم يُحذف شيء.', 'Manual backup': 'نسخة يدوية',
   'The live ledger is empty, so there is nothing to back up.': 'السجل المباشر فارغ، فلا يوجد ما يُنسخ.', 'That backup is empty, so nothing was restored.': 'هذه النسخة فارغة، لذا لم تتم الاستعادة.',
@@ -435,6 +433,9 @@ Object.assign(AR, {
   'Checking the shared ledger…': 'جارٍ التحقق من السجل المشترك…'
 });
 rx(/^(\d+) of (\d+)$/, (m, a, b) => `${a} من ${b}`);
+rx(/^This device has (\d+) entr(?:y|ies) that (?:is|are) not in the shared ledger\.$/, (m, n) => `يوجد على هذا الجهاز ${n} قيد غير موجود في السجل المشترك.`);
+rx(/^OK = add (?:it|them) to the shared ledger$/, () => 'موافق = أضفها إلى السجل المشترك');
+rx(/^Cancel = use only the shared ledger on this device$/, () => 'إلغاء = استخدم السجل المشترك فقط على هذا الجهاز');
 rx(/^(\d+) products? still missing$/, (m, n) => `${n} منتج ما زال ناقصاً`);
 rx(/^(\d+) don’t belong here$/, (m, n) => `${n} لا تنتمي إلى هنا`);
 rx(/^⚠ (.+): (\d+) scanned, only (\d+) bought for this box$/, (m, p, a, b) => `⚠ ${p}: تم مسح ${a}، والمشترى لهذا الصندوق ${b} فقط`);
