@@ -186,7 +186,16 @@ function fxHint() {
       document.body.appendChild(b);
     } catch (e) { }
   };
-  document.addEventListener('click', e => { if (e.target.closest('[data-act="reload"]')) location.reload(); });
+  /* a plain reload takes the scripts from the browser's cache (GitHub Pages lets it keep them for
+     10 minutes), so the old version would come back: fetch every file of the app fresh first */
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-act="reload"]'); if (!b) return;
+    b.disabled = true; b.textContent = 'Updating…';
+    const files = [location.href.split('#')[0], ...[...document.querySelectorAll('script[src],link[rel=stylesheet][href]')].map(x => x.src || x.href)]
+      .filter(u => u.startsWith(location.origin));
+    await Promise.all(files.map(u => fetch(u, { cache: 'reload' }).catch(() => { })));
+    location.reload();
+  });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   setTimeout(check, 3000);
 })();

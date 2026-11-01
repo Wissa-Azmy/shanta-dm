@@ -456,3 +456,7 @@ td.paycell .sub{white-space:nowrap}
   .totbar span{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .totbar b{font-size:14.5px;display:block;overflow:hidden;text-overflow:ellipsis}
 }
+@media (max-width:820px){
+  /* exactly two buttons: side by side on one row, as before */
+  .top .topact .btn:first-child:nth-last-child(2),.top .topact .btn:nth-child(2):last-child{grid-column:auto}
+}
