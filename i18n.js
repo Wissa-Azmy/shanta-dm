@@ -404,6 +404,19 @@ Object.assign(AR, {
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
+Object.assign(AR, {
+  'Check box': 'فحص الصندوق', 'Packing check': 'فحص التعبئة', 'Not bought for this box': 'لم يُشترَ لهذا الصندوق', 'Start again': 'البدء من جديد', 'Scan': 'مسح',
+  'No barcode: count by hand or link it': 'بلا باركود: عُدّ يدوياً أو اربطه', 'One less': 'واحد أقل', 'One more': 'واحد أكثر',
+  'Scan what goes in the box': 'امسح ما يدخل الصندوق', 'Clear all counts for this box?': 'مسح كل العدّ لهذا الصندوق؟', 'No products in this box.': 'لا توجد منتجات في هذا الصندوق.',
+  'units checked': 'وحدة تم فحصها', 'everything is in the box': 'كل شيء في الصندوق',
+  'Open Beauty Facts knows this barcode:': 'Open Beauty Facts يعرف هذا الباركود:', 'Search for it': 'ابحث عنه',
+  'Filled in from Open Beauty Facts. Check it.': 'تم الملء من Open Beauty Facts. راجعه.'
+});
+rx(/^(\d+) of (\d+)$/, (m, a, b) => `${a} من ${b}`);
+rx(/^(\d+) products? still missing$/, (m, n) => `${n} منتج ما زال ناقصاً`);
+rx(/^(\d+) don’t belong here$/, (m, n) => `${n} لا تنتمي إلى هنا`);
+rx(/^⚠ (.+): (\d+) scanned, only (\d+) bought for this box$/, (m, p, a, b) => `⚠ ${p}: تم مسح ${a}، والمشترى لهذا الصندوق ${b} فقط`);
+rx(/^⚠ (.+) doesn’t belong in this box( \((.+)\))?$/, (m, p, x, b) => `⚠ ${p} لا ينتمي إلى هذا الصندوق${b ? ' (' + tr(b) + ')' : ''}`);
 rx(/^✓ (.+) · (\d+) in this sale$/, (m, p, n) => `✓ ${p} · ${n} في هذا البيع`);
 rx(/^No “(.+)” left in stock$/, (m, p) => `لم يتبقَّ «${p}» في المخزون`);
 rx(/^Scan the barcode of (.+)$/, (m, p) => `امسح باركود ${p}`);

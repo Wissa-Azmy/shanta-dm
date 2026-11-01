@@ -380,3 +380,21 @@ td.paycell .sub{white-space:nowrap}
    16px inputs stop iPhone from zooming in when one is tapped */
 .scanbox:focus,.sdbody:focus{outline:none}
 .sdialog input{font-size:16px}
+
+/* ---------- packing check ---------- */
+.pkbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:4px 0 14px}
+.pkbar i{display:block;height:100%;background:var(--nile);transition:width .3s}
+.sdbody h3{margin:14px 0 6px;font-size:15px}
+.pklist{max-height:50vh}
+.pklist li.pk{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-left:4px solid transparent}
+.pklist li.pk.ok{border-left-color:#3b8f5f;background:rgba(59,143,95,.07)}
+.pklist li.pk.warn{border-left-color:#d49a2a}
+.pklist li.pk.bad{border-left-color:#c0392b;background:rgba(192,57,43,.06)}
+.pkn{display:flex;align-items:center;gap:6px;white-space:nowrap;font-family:var(--mono)}
+.pkn b{min-width:44px;text-align:center}
+.obfhint:not(:empty){display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;padding:9px 12px;border-radius:10px;background:rgba(0,0,0,.04);font-size:13.5px}
+[dir=rtl] .pklist li.pk{border-left:0;border-right:4px solid transparent}
+[dir=rtl] .pklist li.pk.ok{border-right-color:#3b8f5f}
+[dir=rtl] .pklist li.pk.warn{border-right-color:#d49a2a}
+[dir=rtl] .pklist li.pk.bad{border-right-color:#c0392b}
+[dir=rtl] .pkn{direction:ltr}

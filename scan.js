@@ -146,6 +146,7 @@ function linkEan(ids, code, noCommit) {
   const keys = new Set(db.purchases.filter(p => ids.includes(p.id)).map(grpKey));
   db.purchases.forEach(p => { if (ids.includes(p.id) || (!p.ean && keys.has(grpKey(p)))) p.ean = code; });
   if (!noCommit) commit();
+  document.dispatchEvent(new CustomEvent("shanta-linked", { detail: { ids, code } }));
 }
 function showCode(code, after) {
   Object.assign(SX, { code, q: '', box: '', after: after || null });
@@ -169,6 +170,10 @@ function drawKnown() {
 }
 function drawLink() {
   SX.groups = unlinkedGroups();
+  const code = SX.code;
+  obfLookup(code).then(o => { const h = $("#obfhint"); if (!o || !h || SX.code !== code) return;
+    const q = o.brand || o.product.split(" ")[0];
+    h.innerHTML = `<span>Open Beauty Facts knows this barcode: <b>${esc(o.product)}</b>${o.brand ? " · " + esc(o.brand) : ""}</span><button type="button" class="btn sm ghost" data-lx="obfq" data-q="${esc(q)}">Search for it</button>`; });
   const known = eanLines(SX.code).length, boxes = db.shipments.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const o = (v, l) => `<option value="${v}"${SX.box === v ? ' selected' : ''}>${esc(l)}</option>`;
   scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
@@ -176,6 +181,7 @@ function drawLink() {
     <p class="lead">${known ? 'Pick another product line that has this barcode, e.g. the same product named differently on another receipt.' : 'This barcode isn’t linked to a product yet. Pick the product it belongs to; all its lines get the barcode, so the next scan finds it.'}</p>
     <div class="toolbar"><input type="search" data-lxq placeholder="Search product or brand" value="${esc(SX.q)}" autocomplete="off">
     <select data-lxbox>${o('', 'All boxes')}${boxes.map(s => o(s.id, s.name)).join('')}${o('none', 'Not in a box')}</select></div>
+    <div class="obfhint" id="obfhint"></div>
     <ul class="linklist" id="lxlist">${linkListHTML()}</ul>
     <div class="mact"><button type="button" class="btn ghost" data-lx="${known ? 'back' : 'close'}">${known ? 'Back' : 'Cancel'}</button>${SX.after ? '' : '<button type="button" class="btn ghost" data-lx="new">+ Add as a new purchase</button>'}</div></div>`;
 }
@@ -217,7 +223,13 @@ document.addEventListener('click', e => {
   else if (a === 'again') scanNext();
   else if (a === 'more') drawLink();
   else if (a === 'back') drawKnown();
-  else if (a === 'new') { d.close(); openForm('purchases', null, { ean: SX.code }); }
+  else if (a === 'new') {
+    d.close();
+    obfLookup(SX.code).then(o => {
+      const v = { ean: SX.code }; if (o) Object.keys(o).forEach(k => { if (o[k]) v[k] = o[k]; });
+      openForm('purchases', null, v); if (o) toast('Filled in from Open Beauty Facts. Check it.');
+    });
+  } else if (a === 'obfq') { SX.q = s.dataset.q; const i = $('[data-lxq]'); if (i) i.value = SX.q; $('#lxlist').innerHTML = linkListHTML(); }
   else if (a === 'sell') { d.close(); sellCode(SX.code); }
   else if (a === 'buy') {
     const p = eanLines(SX.code).sort((x, y) => (y.date || '').localeCompare(x.date || ''))[0]; d.close();
@@ -230,3 +242,98 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => { if (e.target.matches('[data-lxq]')) { SX.q = e.target.value; $('#lxlist').innerHTML = linkListHTML(); } });
 document.addEventListener('change', e => { if (e.target.matches('[data-lxbox]')) { SX.box = e.target.value; $('#lxlist').innerHTML = linkListHTML(); } });
+
+/* ---------- box packing check ----------
+   Scan everything going into a box and compare with what was bought for it.
+   Counts are kept on this device only (they are a packing aid, not ledger data). */
+const PK = { id: '', n: {}, extra: {} };
+const packKey = id => 'shanta-pack-' + id;
+/* one row per product: lines with the same barcode count together, lines without one stay separate */
+function packRows() {
+  const rows = {};
+  db.purchases.filter(p => p.shipmentId === PK.id).forEach(p => {
+    const k = p.ean || 'id:' + p.id, r = rows[k] || (rows[k] = { k, ean: p.ean || '', product: p.product, brand: p.brand || '', want: 0, ids: [] });
+    r.want += num(p.qty); r.ids.push(p.id);
+  });
+  return Object.values(rows).sort((a, b) => (a.ean ? 0 : 1) - (b.ean ? 0 : 1) || a.product.localeCompare(b.product));
+}
+function packSave() { localStorage.setItem(packKey(PK.id), JSON.stringify({ n: PK.n, extra: PK.extra })); }
+function openPack(id) {
+  let s = {}; try { s = JSON.parse(localStorage.getItem(packKey(id)) || '{}'); } catch (e) { }
+  Object.assign(PK, { id, n: s.n || {}, extra: s.extra || {} });
+  const d = scanDlg('packdlg'); drawPack(); if (!d.open) d.showModal();
+}
+function packScan(code) {
+  const r = packRows().find(x => x.ean === code);
+  if (r) {
+    PK.n[r.k] = (PK.n[r.k] || 0) + 1; packSave(); drawPack();
+    const n = PK.n[r.k];
+    return n > r.want ? `⚠ ${r.product}: ${n} scanned, only ${r.want} bought for this box` : `✓ ${r.product} · ${n}/${r.want}`;
+  }
+  const other = eanLines(code)[0];
+  if (!other) return null;
+  const e = PK.extra[code] || (PK.extra[code] = { product: other.product, box: other.shipmentId || '', n: 0 });
+  e.n++; packSave(); drawPack();
+  return `⚠ ${other.product} doesn’t belong in this box${e.box ? ' (' + shipName(e.box) + ')' : ''}`;
+}
+function packAfterLink(code) { const m = packScan(code); if (m) toast(m); drawPack(); }
+function packScanLoop() {
+  let unknown = '';
+  Scan.read('Scan what goes in the box', code => { const m = packScan(code); if (m === null) { unknown = code; return null; } return m; })
+    .then(() => { if (unknown) showCode(unknown, packAfterLink); });
+}
+function drawPack() {
+  const rows = packRows(), s = db.shipments.find(x => x.id === PK.id) || {};
+  const got = r => PK.n[r.k] || 0;
+  const want = rows.reduce((a, r) => a + r.want, 0), have = rows.reduce((a, r) => a + Math.min(got(r), r.want), 0);
+  const missing = rows.filter(r => got(r) < r.want), extras = Object.entries(PK.extra);
+  const row = r => { const g = got(r), st = g === r.want ? 'ok' : g > r.want ? 'bad' : g ? 'warn' : '';
+    return `<li class="pk ${st}"><span><b>${esc(r.product)}</b><span class="sub">${[r.brand && esc(r.brand), r.ean ? `<span class="mono notr">${r.ean}</span>` : 'No barcode: count by hand or link it'].filter(Boolean).join(' · ')}</span></span>
+      <span class="pkn"><button type="button" class="ib" data-pk="minus:${r.k}" title="One less">−</button><b>${g}/${r.want}</b><button type="button" class="ib" data-pk="plus:${r.k}" title="One more">+</button>
+      ${r.ean ? '' : `<button type="button" class="btn sm ghost" data-scanrow="${r.ids[0]}">Link</button>`}</span></li>`; };
+  scanDlg('packdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Packing check</div><h2>${esc(s.name || '')}</h2>
+    <p class="lead"><b>${have} of ${want}</b> units checked${missing.length ? ` · ${missing.length} products still missing` : want ? ' · everything is in the box' : ''}${extras.length ? ` · ${extras.length} don’t belong here` : ''}</p>
+    <div class="pkbar"><i style="width:${want ? Math.round(have / want * 100) : 0}%"></i></div>
+    ${extras.length ? `<h3>Not bought for this box</h3><ul class="linklist pklist">${extras.map(([c, e]) => `<li class="pk bad"><span><b>${esc(e.product)}</b><span class="sub">${e.box ? esc(shipName(e.box)) : 'Not shipped'}</span></span><span class="pkn"><b>${e.n}</b><button type="button" class="ib" data-pk="noextra:${c}" title="Remove">×</button></span></li>`).join('')}</ul>` : ''}
+    <ul class="linklist pklist">${rows.map(row).join('') || '<li class="empty">No products in this box.</li>'}</ul>
+    <div class="mact"><button type="button" class="btn ghost" data-pk="reset">Start again</button><button type="button" class="btn ghost" data-pk="close">Close</button><button type="button" class="btn" data-pk="scan">${SCANICON} Scan</button></div></div>`;
+}
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-pack]'); if (p) return openPack(p.dataset.pack);
+  const b = e.target.closest('[data-pk]'); if (!b) return;
+  const [a, k] = b.dataset.pk.split(/:(.*)/);
+  if (a === 'close') return $('#packdlg').close();
+  if (a === 'scan') return packScanLoop();
+  if (a === 'reset') { if (!confirm('Clear all counts for this box?')) return; PK.n = {}; PK.extra = {}; }
+  if (a === 'plus') PK.n[k] = (PK.n[k] || 0) + 1;
+  if (a === 'minus') PK.n[k] = Math.max(0, (PK.n[k] || 0) - 1);
+  if (a === 'noextra') delete PK.extra[k];
+  packSave(); drawPack();
+});
+/* a barcode linked from the packing list moves that row's count over to its barcode row */
+document.addEventListener('shanta-linked', e => {
+  if (!PK.id) return;
+  e.detail.ids.forEach(id => { const k = 'id:' + id; if (PK.n[k]) { PK.n[e.detail.code] = (PK.n[e.detail.code] || 0) + PK.n[k]; delete PK.n[k]; } });
+  packSave();
+  if ($('#packdlg') && $('#packdlg').open) drawPack();
+});
+
+/* ---------- Open Beauty Facts: name, brand and size for an unknown barcode ---------- */
+const OBF = {};
+function obfCategory(tags) {
+  const t = (tags || []).join(' ');
+  return /make-?up|lipstick|mascara|nail|foundation/.test(t) ? 'Make-up' : /hair|shampoo|conditioner/.test(t) ? 'Hair care'
+    : /perfume|fragrance|eau-de/.test(t) ? 'Fragrance' : /face|skin|serum|cream/.test(t) ? 'Skin care'
+    : /body|shower|soap|deodorant|lotion/.test(t) ? 'Body care' : /baby/.test(t) ? 'Baby' : '';
+}
+function obfLookup(code) {
+  if (OBF[code] !== undefined) return Promise.resolve(OBF[code]);
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+  return fetch(`https://world.openbeautyfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_de,brands,quantity,categories_tags`, { signal: ctl.signal })
+    .then(r => r.json()).then(j => {
+      const p = j && j.status === 1 && j.product;
+      const name = p && (p.product_name_de || p.product_name || '').trim();
+      return OBF[code] = name ? { product: name + (p.quantity && !parseWeightG(name) ? ' ' + p.quantity : ''), brand: (p.brands || '').split(',')[0].trim(),
+        netG: parseWeightG(p.quantity || '') || parseWeightG(name) || '', category: obfCategory(p.categories_tags) } : null;
+    }).catch(() => null).finally(() => clearTimeout(t));
+}

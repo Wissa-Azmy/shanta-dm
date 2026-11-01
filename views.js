@@ -110,6 +110,7 @@ V.shipments = R => {
       <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
       <button class="btn sm ghost" data-receipt="${s.id}">⇪ dm receipt</button>
       <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
+      ${db.purchases.some(p => p.shipmentId === s.id) ? `<button class="btn sm ghost" data-pack="${s.id}">${SCANICON} Check box</button>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 };
