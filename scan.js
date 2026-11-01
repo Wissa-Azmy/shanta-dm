@@ -27,19 +27,21 @@ function scanDlg(id) {
 }
 
 const Scan = {
-  /* opens the camera and resolves with the barcode, or null when cancelled */
-  read(title) {
+  /* opens the camera and resolves with the barcode, or null when cancelled.
+     With onEach the camera stays on: every code is passed to onEach, which returns a message to show,
+     or null to stop scanning */
+  read(title, onEach) {
     try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { this.ac = this.ac || new AC(); this.ac.resume(); } } catch (e) { }
     if (this.res) this.finish(null);
     return new Promise(res => {
-      this.res = res; this.last = '';
+      this.res = res; this.last = ""; this.each = onEach || null; this.pause = 0;
       const d = scanDlg('scandlg');
       d.innerHTML = `<div class="scanbox"><h2>${esc(title || 'Scan a barcode')}</h2>
         <div class="scanview"><video playsinline muted autoplay></video><div class="scanframe"></div>
         <button type="button" class="btn sm scantorch" data-sc="torch" hidden>Torch</button></div>
         <p class="scanmsg">Starting the camera…</p>
         <form class="scantype" data-sc="type"><input inputmode="numeric" autocomplete="off" placeholder="…or type the number under the barcode"><button class="btn sm">Use</button></form>
-        <div class="mact"><button type="button" class="btn ghost" data-sc="cancel">Cancel</button></div></div>`;
+        <div class="mact"><button type="button" class="btn ghost" data-sc="cancel">${onEach ? "Done" : "Cancel"}</button></div></div>`;
       if (!d.dataset.wired) {
         d.dataset.wired = 1;
         /* the close event arrives a moment later: ignore it if the next scan has already opened */
@@ -88,19 +90,22 @@ const Scan = {
   },
   /* accept a code once it is read twice in a row with a valid check digit */
   hit(raw) {
-    const c = normEan(raw); if (!eanOK(c)) return;
+    const c = normEan(raw); if (!eanOK(c) || Date.now() < this.pause) return;
     if (this.last === c) this.done(c); else this.last = c;
   },
   done(code) {
     try { navigator.vibrate && navigator.vibrate(60); } catch (e) { }
     try { const a = this.ac, o = a.createOscillator(), g = a.createGain(); o.frequency.value = 1100; g.gain.value = .08; o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .09); } catch (e) { }
-    this.finish(code);
+    if (!this.each) return this.finish(code);
+    const r = this.each(code); if (r === null) return this.finish(null);
+    this.msg(r); this.last = ""; this.pause = Date.now() + 1500;
+    const i = $("#scandlg .scantype input"); if (i) i.value = "";
   },
   finish(code) {
     clearTimeout(this.timer);
     if (this.ctl) { try { this.ctl.stop(); } catch (e) { } this.ctl = null; }
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
-    this.torchOn = false;
+    this.torchOn = false; this.each = null;
     const res = this.res; this.res = null;
     const d = $('#scandlg'); if (d && d.open) d.close();
     res && res(code);
@@ -112,7 +117,8 @@ const Scan = {
 };
 /* ---------- what a scan finds, and linking unknown barcodes ---------- */
 const SCANICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M7 8v8M10 8v8M13 8v8M16.5 8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-const SX = { code: '', q: '', box: '', groups: [] };
+/* after: set while selling, so a newly linked barcode goes straight into the sale */
+const SX = { code: '', q: '', box: '', groups: [], after: null };
 const grpKey = p => (p.product || '').trim().toLowerCase() + '|' + (p.brand || '').trim().toLowerCase();
 /* purchase lines without a barcode, one entry per product (same name and brand) */
 function unlinkedGroups() {
@@ -132,8 +138,8 @@ function linkEan(ids, code, noCommit) {
   db.purchases.forEach(p => { if (ids.includes(p.id) || (!p.ean && keys.has(grpKey(p)))) p.ean = code; });
   if (!noCommit) commit();
 }
-function showCode(code) {
-  Object.assign(SX, { code, q: '', box: '' });
+function showCode(code, after) {
+  Object.assign(SX, { code, q: '', box: '', after: after || null });
   const d = scanDlg('lookdlg');
   eanLines(code).length ? drawKnown() : drawLink();
   if (!d.open) d.showModal();
@@ -150,7 +156,7 @@ function drawKnown() {
       <td>${fDate(x.date)}</td><td class="num">${x.qty}</td><td class="num"><b>${Math.max(0, l.left || 0)}</b></td><td class="num">${l.landed ? fEGP(eur2egp(l.landed)) : '—'}</td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="mact"><button type="button" class="btn ghost" data-lx="close">Close</button><button type="button" class="btn ghost" data-lx="more">Link more lines</button>
-    <button type="button" class="btn ghost" data-lx="buy">+ Add purchase</button><button type="button" class="btn" data-lx="again">${SCANICON} Scan another</button></div></div>`;
+    <button type="button" class="btn ghost" data-lx="buy">+ Add purchase</button>${left ? '<button type="button" class="btn ghost" data-lx="sell">Sell</button>' : ''}<button type="button" class="btn" data-lx="again">${SCANICON} Scan another</button></div></div>`;
 }
 function drawLink() {
   SX.groups = unlinkedGroups();
@@ -162,7 +168,7 @@ function drawLink() {
     <div class="toolbar"><input type="search" data-lxq placeholder="Search product or brand" value="${esc(SX.q)}" autocomplete="off">
     <select data-lxbox>${o('', 'All boxes')}${boxes.map(s => o(s.id, s.name)).join('')}${o('none', 'Not in a box')}</select></div>
     <ul class="linklist" id="lxlist">${linkListHTML()}</ul>
-    <div class="mact"><button type="button" class="btn ghost" data-lx="${known ? 'back' : 'close'}">${known ? 'Back' : 'Cancel'}</button><button type="button" class="btn ghost" data-lx="new">+ Add as a new purchase</button></div></div>`;
+    <div class="mact"><button type="button" class="btn ghost" data-lx="${known ? 'back' : 'close'}">${known ? 'Back' : 'Cancel'}</button>${SX.after ? '' : '<button type="button" class="btn ghost" data-lx="new">+ Add as a new purchase</button>'}</div></div>`;
 }
 function linkListHTML() {
   const q = SX.q.trim().toLowerCase();
@@ -194,12 +200,14 @@ document.addEventListener('click', e => {
   else if (a === 'more') drawLink();
   else if (a === 'back') drawKnown();
   else if (a === 'new') { d.close(); openForm('purchases', null, { ean: SX.code }); }
+  else if (a === 'sell') { d.close(); sellCode(SX.code); }
   else if (a === 'buy') {
     const p = eanLines(SX.code).sort((x, y) => (y.date || '').localeCompare(x.date || ''))[0]; d.close();
     openForm('purchases', null, { product: p.product, brand: p.brand, category: p.category, netG: p.netG, ean: SX.code });
   } else if (a.startsWith('link:')) {
     const g = SX.groups[+a.slice(5)]; if (!g) return;
-    linkEan(g.ids, SX.code); toast(`Barcode linked to “${g.product}”`); drawKnown();
+    linkEan(g.ids, SX.code); toast(`Barcode linked to “${g.product}”`);
+    if (SX.after) { const f = SX.after; SX.after = null; d.close(); f(SX.code); } else drawKnown();
   }
 });
 document.addEventListener('input', e => { if (e.target.matches('[data-lxq]')) { SX.q = e.target.value; $('#lxlist').innerHTML = linkListHTML(); } });

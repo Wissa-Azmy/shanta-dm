@@ -100,7 +100,7 @@ function drawOrder(err) {
         <td class="num" id="ol_t_${i}">${fAmt(num(x.qty) * num(x.unitPrice), cur)}</td>` : ''}
         <td class="acts">${OR.lines.length > 1 ? `<button type="button" class="ib del" data-o="del-line:${i}" title="Remove">${TRASH}</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
-    <button type="button" class="btn sm ghost" data-o="add-line" style="margin-top:8px">+ Add product</button>
+    <div class="topact" style="margin-top:8px"><button type="button" class="btn sm" data-o="scan">${SCANICON} Scan products</button><button type="button" class="btn sm ghost" data-o="add-line">+ Add product</button></div>
 
     <h3 class="osec">Extra costs</h3>
     ${OR.extras.length ? `<div class="tablewrap rx-table"><table class="t"><thead><tr><th>What</th><th>Description</th><th class="num">We pay (${cur})</th><th>Paid by</th>${sale ? `<th class="num">Customer pays (${cur})</th>` : ''}<th></th></tr></thead><tbody>
@@ -200,7 +200,48 @@ V.sales = R => {
   <p class="note">Profit = what the customer pays, minus the products’ cost including shipping from Germany, minus extra costs like delivery and packaging.</p>`;
 };
 
+/* ---------- selling by scan ----------
+   One unit per scan, taken from the oldest purchase of that product that still has stock;
+   when that one runs out the next scan starts a line from the next box.
+   Returns the message to show, or null when the barcode isn't linked to a product. */
+function addScanned(code) {
+  const R = calc(), lots = eanLines(code).map(p => R.lots[p.id]).filter(Boolean);
+  if (!lots.length) return null;
+  const ids = lots.map(l => l.p.id), name = lots[0].p.product;
+  const used = id => OR.lines.filter(x => x.purchaseId === id).reduce((a, x) => a + num(x.qty), 0);
+  const free = l => l.left + (OR.orig[l.p.id] || 0) - used(l.p.id);
+  lots.sort((a, b) => (a.p.date || '').localeCompare(b.p.date || ''));
+  const l = lots.find(x => free(x) > 0);
+  if (!l) return `No “${name}” left in stock`;
+  const line = OR.lines.find(x => x.purchaseId === l.p.id);
+  if (line) line.qty = num(line.qty) + 1;
+  else {
+    const same = OR.lines.find(x => ids.includes(x.purchaseId) && x.unitPrice !== '');
+    const price = OR.h.kind !== 'sale' ? '' : same ? same.unitPrice : OR.h.currency === 'EGP' ? suggestEGP(l) : '';
+    const empty = OR.lines.find(x => !x.purchaseId), nl = { purchaseId: l.p.id, qty: 1, unitPrice: price };
+    if (empty) Object.assign(empty, nl); else OR.lines.push(nl);
+  }
+  const n = OR.lines.filter(x => ids.includes(x.purchaseId)).reduce((a, x) => a + num(x.qty), 0);
+  return `✓ ${name} · ${n} in this sale`;
+}
+function scanIntoOrder() {
+  let unknown = '';
+  Scan.read('Scan the products', code => {
+    if (!OR || !odlg().open) return null;
+    const r = addScanned(code);
+    if (r === null) { unknown = code; return null; }
+    drawOrder(); return r;
+  }).then(() => {
+    if (unknown && OR) showCode(unknown, c => { const r = addScanned(c); drawOrder(); if (r) toast(r); });
+  });
+}
+function sellCode(code) { openOrder(null); const r = addScanned(code); drawOrder(); if (r) toast(r); }
+
 /* ---------- events ---------- */
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-scansell]')) return;
+  openOrder(null); scanIntoOrder();
+});
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-new="sales"],[data-edit^="sales:"],[data-del^="sales:"],[data-act^="paid:"]');
   if (!t) return;
@@ -216,6 +257,7 @@ document.addEventListener('click', e => {
   const [a, arg] = b.dataset.o.split(':');
   if (a === 'close') return odlg().close();
   if (a === 'save') return saveOrder();
+  if (a === 'scan') return scanIntoOrder();
   if (a === 'delete') { if (deleteOrder(OR.id)) odlg().close(); return; }
   if (a === 'add-line') OR.lines.push({ purchaseId: '', qty: 1, unitPrice: '' });
   if (a === 'del-line') OR.lines.splice(+arg, 1);
