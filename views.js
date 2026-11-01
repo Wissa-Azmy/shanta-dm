@@ -115,14 +115,14 @@ V.shipments = R => {
 };
 
 V.purchases = R => {
-  const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && match(p.product, p.brand, p.category, p.place, p.receipt, shipName(p.shipmentId)));
+  const rows = db.purchases.slice().sort(byDate).filter(p => (!UI.person || p.paidBy === UI.person) && match(p.product, p.brand, p.category, p.place, p.receipt, p.ean, shipName(p.shipmentId)));
   const tot = rows.reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0), units = rows.reduce((a, p) => a + num(p.qty), 0);
   return `<div class="toolbar">${search('Search product, brand, receipt…')}${personFilter()}</div>
-  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
-  ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')}${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th>Barcode</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
+  ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')}${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td><td>${p.ean ? `<span class="mono">${esc(p.ean)}</span>` : `<button class="btn sm ghost" data-scanrow="${p.id}" title="Scan to link this product">${SCANICON} Link</button>`}</td>
     <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
-    <td>${esc(p.place || '')}<span class="sub">${esc(p.method || '')}</span></td><td>${p.shipmentId ? esc(shipName(p.shipmentId)) : '<span class="pill warn">Not shipped</span>'}</td>${actions('purchases', p.id)}</tr>`).join('') || '<tr><td colspan="10" class="empty">No purchases yet.</td></tr>'}
-  </tbody><tfoot><tr><td colspan="3">${rows.length} lines</td><td class="num">${units}</td><td></td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
+    <td>${esc(p.place || '')}<span class="sub">${esc(p.method || '')}</span></td><td>${p.shipmentId ? esc(shipName(p.shipmentId)) : '<span class="pill warn">Not shipped</span>'}</td>${actions('purchases', p.id)}</tr>`).join('') || '<tr><td colspan="11" class="empty">No purchases yet.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="4">${rows.length} lines</td><td class="num">${units}</td><td></td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
 };
 
 V.stock = R => {

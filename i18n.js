@@ -380,6 +380,30 @@ rx(/^(\d+) products imported( into (.+))?$/, (m, n, x, b) => `تم استيرا�
 rx(/^Lines found add up to (.+), but the receipt says (.+)\. Some lines may be missing\.$/, (m, a, b) => `مجموع الأسطر ${a} بينما الفاتورة تقول ${b}. قد تكون بعض الأسطر ناقصة.`);
 rx(/^(\d+) lines? with quantity 0 \(not delivered\) skipped\.$/, (m, n) => `تم تخطي ${n} سطر بكمية 0 (لم يُسلَّم).`);
 rx(/^(\d+) lines? could not be read reliably\. Compare with the receipt\.$/, (m, n) => `تعذّرت قراءة ${n} سطر بدقة. قارن مع الفاتورة.`);
+/* ---- barcode scanning ---- */
+Object.assign(AR, {
+  'Scan barcode': 'مسح الباركود', 'Scan a barcode': 'امسح باركود', 'Barcode': 'الباركود', 'Barcode (EAN)': 'الباركود (EAN)', 'Torch': 'الفلاش', 'Use': 'استخدام',
+  'Starting the camera…': 'جارٍ تشغيل الكاميرا…', '…or type the number under the barcode': '…أو اكتب الرقم المكتوب تحت الباركود',
+  'Hold the barcode inside the frame.': 'ضع الباركود داخل الإطار.', 'That number doesn’t look like a barcode. Check the digits.': 'هذا الرقم لا يبدو باركوداً. راجع الأرقام.',
+  'This browser can’t use the camera. Type the number instead.': 'هذا المتصفح لا يستطيع استخدام الكاميرا. اكتب الرقم بدلاً من ذلك.',
+  'The camera only works in the hosted app (https). Type the number instead.': 'الكاميرا تعمل فقط في النسخة المنشورة من التطبيق (https). اكتب الرقم بدلاً من ذلك.',
+  'Camera access was blocked. Allow it in the browser settings, or type the number.': 'تم منع الوصول إلى الكاميرا. اسمح به من إعدادات المتصفح، أو اكتب الرقم.',
+  'No camera found. Type the number instead.': 'لم يتم العثور على كاميرا. اكتب الرقم بدلاً من ذلك.',
+  'The scanner couldn’t load (it needs an internet connection). Type the number instead.': 'تعذّر تحميل الماسح (يحتاج إلى اتصال بالإنترنت). اكتب الرقم بدلاً من ذلك.',
+  'The scanner couldn’t start. Type the number instead.': 'تعذّر تشغيل الماسح. اكتب الرقم بدلاً من ذلك.',
+  'in stock': 'في المخزون', 'Link more lines': 'ربط أسطر أخرى', 'Scan another': 'امسح منتجاً آخر', 'New barcode': 'باركود جديد', 'Back': 'رجوع',
+  'Pick another product line that has this barcode, e.g. the same product named differently on another receipt.': 'اختر سطر منتج آخر يحمل هذا الباركود، مثل نفس المنتج باسم مختلف في فاتورة أخرى.',
+  'This barcode isn’t linked to a product yet. Pick the product it belongs to; all its lines get the barcode, so the next scan finds it.': 'هذا الباركود غير مرتبط بمنتج بعد. اختر المنتج الذي ينتمي إليه؛ ستحصل كل أسطره على الباركود، فيجده المسح التالي.',
+  'Search product or brand': 'ابحث عن منتج أو ماركة', 'Add as a new purchase': 'إضافة كمشتريات جديدة',
+  'No product without a barcode matches.': 'لا يوجد منتج بلا باركود يطابق البحث.', 'Every product already has a barcode.': 'كل المنتجات لها باركود بالفعل.',
+  'Optional. Scan or type it once; other lines of the same product get it too, so scanning finds the product later.': 'اختياري. امسحه أو اكتبه مرة واحدة؛ تحصل عليه أسطر نفس المنتج الأخرى أيضاً، فيجد المسح المنتج لاحقاً.',
+  'That barcode doesn’t look right. Check the digits (8 or 13 numbers).': 'هذا الباركود لا يبدو صحيحاً. راجع الأرقام (8 أو 13 رقماً).',
+  'Scan with the camera': 'امسح بالكاميرا', 'Scan to link this product': 'امسح لربط هذا المنتج', 'Link': 'ربط', 'Link it to this product too?': 'ربطه بهذا المنتج أيضاً؟'
+});
+rx(/^Scan the barcode of (.+)$/, (m, p) => `امسح باركود ${p}`);
+rx(/^Barcode linked to “(.+)”$/, (m, p) => `تم ربط الباركود بـ«${p}»`);
+rx(/^This barcode is already linked to “(.+)”\.$/, (m, p) => `هذا الباركود مرتبط بالفعل بـ«${p}».`);
+
 /* ---------- engine ---------- */
 /* applied to every translated piece: amounts as "1,250 ج.م", "+2 more" */
 const arFix = s => s.replace(/(−?)EGP (\d[\d,.]*)/g, '$1$2 ج.م').replace(/\(EGP\)/g, '(ج.م)').replace(/\(EUR\)/g, '(€)').replace(/ \+(\d+) more\b/g, ' و$1 أخرى');

@@ -348,3 +348,30 @@ td.paycell .sub{white-space:nowrap}
 [dir=rtl] [data-o="delete"]{margin-right:0!important;margin-left:auto!important}
 [dir=rtl] [data-act="cloud-backup"]{margin-left:0!important;margin-right:auto!important}
 [dir=rtl] .langsw{direction:ltr}
+
+/* ---------- barcode scanning ---------- */
+.mono{font-family:var(--mono);font-size:.92em}
+.btn .ico{display:inline-block;vertical-align:-3px;margin-right:2px}
+.scanin{display:flex;gap:6px}.scanin input{flex:1;min-width:0}.scanin .btn{padding:0 12px;flex:none}.scanin .btn .ico{width:20px;height:20px;margin:0}
+.sdialog{border:0;border-radius:18px;padding:0;background:var(--card);color:var(--ink);width:min(560px,96vw);max-height:92vh;box-shadow:0 30px 80px rgba(29,42,37,.35)}
+.sdialog::backdrop{background:rgba(29,42,37,.45);backdrop-filter:blur(2px)}
+.scanbox,.sdbody{padding:20px 22px}.scanbox h2,.sdbody h2{margin:2px 0 6px}
+.scanview{position:relative;background:#111;border-radius:12px;overflow:hidden;aspect-ratio:4/3}
+.scanview video{width:100%;height:100%;object-fit:cover;display:block}
+.scanframe{position:absolute;left:10%;right:10%;top:32%;bottom:32%;border:2px solid #fff;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.scanframe:after{content:"";position:absolute;left:6%;right:6%;top:50%;border-top:2px solid #e2483d;animation:scanline 1.6s ease-in-out infinite alternate}
+@keyframes scanline{from{transform:translateY(-38px)}to{transform:translateY(38px)}}
+.scantorch{position:absolute;right:10px;bottom:10px}
+.scanmsg{color:var(--muted);font-size:13.5px;margin:10px 0}
+.scantype{display:flex;gap:6px}.scantype input{flex:1;min-width:0}
+.sdbody .toolbar{margin:10px 0}.sdbody .toolbar input{flex:1;min-width:0}
+.linklist{list-style:none;margin:0;padding:0;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.linklist li+li{border-top:1px dotted var(--line)}
+.linklist button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 12px;cursor:pointer}
+.linklist button:hover,.linklist button:focus-visible{background:rgba(0,0,0,.04)}
+.linklist .empty{padding:14px 12px}
+.sdbody .tablewrap{max-height:40vh;overflow:auto}
+[dir=rtl] .btn .ico{margin-right:0;margin-left:2px}
+[dir=rtl] .scantorch{right:auto;left:10px}
+[dir=rtl] .scantype input,[dir=rtl] .scanin input{direction:ltr;text-align:right}
+.scantorch[hidden]{display:none!important}

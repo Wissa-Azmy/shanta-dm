@@ -67,6 +67,7 @@ const SCHEMAS = {
       { k: 'qty', l: 'Quantity', t: 'number', step: '1', def: 1, req: true },
       { k: 'unitCost', l: 'Price per unit (€)', t: 'number', step: '0.01', req: true },
       { k: 'netG', l: 'Content per unit (g or ml)', t: 'number', step: '1', hint: 'Net weight from the label (1 ml counts as 1 g). Used to split shipping; packaging is added automatically. Leave empty to read it from the product name.' },
+      { k: 'ean', l: 'Barcode (EAN)', t: 'text', scan: true, hint: 'Optional. Scan or type it once; other lines of the same product get it too, so scanning finds the product later.' },
       { k: 'paidBy', l: 'Paid by', t: 'person', def: 'me' },
       { k: 'method', l: 'Paid with', t: 'select', opts: OPT.payDE, def: 'Card' },
       { k: 'shipmentId', l: 'Shipment', t: 'select', opts: shipOpts, def: '' },
@@ -76,8 +77,10 @@ const SCHEMAS = {
     validate(v, old) {
       if (num(v.qty) <= 0) return 'Quantity must be at least 1.';
       if (old) { const used = db.sales.filter(s => s.purchaseId === old.id).reduce((a, s) => a + num(s.qty), 0); if (num(v.qty) < used) return `${used} of these are already sold or given away, so quantity can’t be lower than that.`; }
+      if (v.ean && !eanOK(normEan(v.ean))) return 'That barcode doesn’t look right. Check the digits (8 or 13 numbers).';
     },
-    beforeSave(v) { if (!num(v.netG)) v.netG = parseWeightG(v.product) || ''; },
+    beforeSave(v) { if (!num(v.netG)) v.netG = parseWeightG(v.product) || ''; v.ean = v.ean ? normEan(v.ean) : ''; },
+    afterSave(rec) { if (rec.ean) linkEan([rec.id], rec.ean, true); },
     canDelete: rec => db.sales.some(s => s.purchaseId === rec.id) ? 'This product has sales recorded. Delete those sales first.' : null
   },
   sales: {
@@ -172,6 +175,7 @@ function fieldHTML(f, v, i) {
     const list = f.list ? (typeof f.list === 'function' ? f.list() : f.list) : null;
     input = `<input id="${id}" name="${f.k}" type="${f.t === 'number' ? 'text' : f.t}" value="${esc(val)}"${f.t === 'number' ? ' inputmode="decimal" data-num="1"' : ''}${list ? ` list="dl_${f.k}"` : ''} autocomplete="off">` +
       (list ? `<datalist id="dl_${f.k}">${list.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : '');
+    if (f.scan) input = `<div class="scanin">${input.replace('autocomplete="off"', 'autocomplete="off" inputmode="numeric"')}<button type="button" class="btn ghost" data-scanfield="${f.k}" title="Scan with the camera">${SCANICON}</button></div>`;
   }
   return `<div class="${cls}"><label for="${id}">${esc(f.l)}${f.req ? ' *' : ''}</label>${input}${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ''}</div>`;
 }
