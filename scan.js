@@ -59,12 +59,12 @@ const Scan = {
   },
   msg(t) { const m = $('#scandlg .scanmsg'); if (m) m.textContent = t; },
   /* a scan result under the camera: { kind: 'ok'|'warn', name, brand, box, note, n, unit }.
-     The newest is shown as a card, the three before it as a short list */
-  log(r) {
+     The newest is shown as a card, the three before it as a short list; scanning a product again moves its one line to the top */
+  log(r, code) {
     const l = $('#scandlg .scanlog'); if (!l) return;
-    const old = l.querySelector('.slog'); if (old) old.classList.remove('new');
+    l.querySelectorAll('.slog').forEach(x => { x.classList.remove('new'); if (code && x.dataset.code === code) x.remove(); });
     const meta = [r.brand && `<span class="notr">${esc(r.brand)}</span>`, r.box && `<span>${esc(r.box)}</span>`].filter(Boolean).join('<i>·</i>');
-    l.insertAdjacentHTML('afterbegin', `<div class="slog ${r.kind === 'warn' ? 'warn' : 'ok'} new">
+    l.insertAdjacentHTML('afterbegin', `<div class="slog ${r.kind === 'warn' ? 'warn' : 'ok'} new" data-code="${esc(code || '')}">
       <span class="sic">${r.kind === 'warn' ? '!' : '✓'}</span>
       <span class="sx"><b class="notr">${esc(r.name)}</b>${meta ? `<span class="sm">${meta}</span>` : ''}${r.note ? `<span class="snote">${esc(r.note)}</span>` : ''}</span>
       ${r.n !== undefined ? `<span class="sn"><b>${r.n}</b>${r.unit ? `<small>${esc(r.unit)}</small>` : ''}</span>` : ''}</div>`);
@@ -111,7 +111,7 @@ const Scan = {
     try { const a = this.ac, o = a.createOscillator(), g = a.createGain(); o.frequency.value = 1100; g.gain.value = .08; o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .09); } catch (e) { }
     if (!this.each) return this.finish(code);
     const r = this.each(code); if (r === null) return this.finish(null);
-    if (typeof r === 'object') { this.log(r); this.msg('Hold the barcode inside the frame.'); } else this.msg(r);
+    if (typeof r === 'object') { this.log(r, code); this.msg('Hold the barcode inside the frame.'); } else this.msg(r);
     this.last = ""; this.pause = Date.now() + 1500;
     const i = $("#scandlg .scantype input"); if (i) { i.value = ""; i.blur(); }
   },
