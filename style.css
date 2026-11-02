@@ -361,7 +361,10 @@ td.paycell .sub{white-space:nowrap}
 .scanframe{position:absolute;left:10%;right:10%;top:32%;bottom:32%;border:2px solid #fff;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
 .scanframe:after{content:"";position:absolute;left:6%;right:6%;top:50%;border-top:2px solid #e2483d;animation:scanline 1.6s ease-in-out infinite alternate}
 @keyframes scanline{from{transform:translateY(-38px)}to{transform:translateY(38px)}}
-.scantorch{position:absolute;right:10px;bottom:10px}
+.scantorch{all:unset;box-sizing:border-box;position:absolute;right:10px;bottom:10px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);transition:background .15s,color .15s}
+.scantorch svg{width:22px;height:22px}
+.scantorch.on{background:#ffd75e;color:#1d2a25;box-shadow:0 0 18px rgba(255,215,94,.7)}
+.scantorch:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .scanmsg{color:var(--muted);font-size:13.5px;margin:10px 0}
 .scantype{display:flex;gap:6px}.scantype input{flex:1;min-width:0}
 .sdbody .toolbar{margin:10px 0}.sdbody .toolbar input{flex:1;min-width:0}
@@ -494,3 +497,27 @@ td.paycell .sub{white-space:nowrap}
 .sk-tile i:last-child{height:22px}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
 @media (prefers-reduced-motion:reduce){.spin,.skel i{animation:none}}
+
+/* ---------- scan results under the camera ---------- */
+.scanlog{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.scanlog:empty{display:none}
+.slog{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:10px;background:rgba(0,0,0,.035);font-size:13px;opacity:.75}
+.slog .sic{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;background:#3b8f5f}
+.slog.warn .sic{background:#d49a2a}
+.slog .sx{flex:1;min-width:0;display:flex;flex-direction:column}
+.slog .sx b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slog .sm,.slog .snote{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slog .sm i{font-style:normal;margin:0 5px;opacity:.6}
+.slog .sm,.slog .snote{display:none}
+.slog .sn{flex:none;display:flex;flex-direction:column;align-items:flex-end;font-family:var(--mono);line-height:1.15}
+.slog .sn small{font:11px var(--body);color:var(--muted)}
+/* newest scan: a full card */
+.slog.new{opacity:1;padding:12px 14px;font-size:15px;background:rgba(59,143,95,.09);box-shadow:inset 0 0 0 1px rgba(59,143,95,.35);animation:slogin .3s ease-out}
+.slog.new.warn{background:rgba(212,154,42,.1);box-shadow:inset 0 0 0 1px rgba(212,154,42,.45)}
+.slog.new .sic{width:34px;height:34px;font-size:17px}
+.slog.new .sm{display:block}
+.slog.new .snote{display:block;color:#a06d10;font-weight:600}
+.slog.new .sn b{font-size:22px}
+@keyframes slogin{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+[dir=rtl] .slog .sn{align-items:flex-start}
+[dir=rtl] .slog .sn b{direction:ltr}

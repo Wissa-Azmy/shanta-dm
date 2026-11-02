@@ -207,12 +207,12 @@ V.sales = R => {
 function addScanned(code) {
   const R = calc(), lots = eanLines(code).map(p => R.lots[p.id]).filter(Boolean);
   if (!lots.length) return null;
-  const ids = lots.map(l => l.p.id), name = lots[0].p.product;
+  const ids = lots.map(l => l.p.id), name = lots[0].p.product, brand = lots[0].p.brand || '';
   const used = id => OR.lines.filter(x => x.purchaseId === id).reduce((a, x) => a + num(x.qty), 0);
   const free = l => l.left + (OR.orig[l.p.id] || 0) - used(l.p.id);
   lots.sort((a, b) => (a.p.date || '').localeCompare(b.p.date || ''));
   const l = lots.find(x => free(x) > 0);
-  if (!l) return `No “${name}” left in stock`;
+  if (!l) return { kind: 'warn', name, brand, note: 'None left in stock' };
   const line = OR.lines.find(x => x.purchaseId === l.p.id);
   if (line) line.qty = num(line.qty) + 1;
   else {
@@ -222,7 +222,7 @@ function addScanned(code) {
     if (empty) Object.assign(empty, nl); else OR.lines.push(nl);
   }
   const n = OR.lines.filter(x => ids.includes(x.purchaseId)).reduce((a, x) => a + num(x.qty), 0);
-  return `✓ ${name} · ${n} in this sale`;
+  return { kind: 'ok', name, brand, box: shipName(l.p.shipmentId), n, unit: 'in this sale' };
 }
 function scanIntoOrder() {
   let unknown = '';
@@ -232,10 +232,10 @@ function scanIntoOrder() {
     if (r === null) { unknown = code; return null; }
     drawOrder(); return r;
   }).then(() => {
-    if (unknown && OR) showCode(unknown, c => { const r = addScanned(c); drawOrder(); if (r) toast(r); });
+    if (unknown && OR) showCode(unknown, c => { const r = addScanned(c); drawOrder(); if (r) toast(scanText(r)); });
   });
 }
-function sellCode(code) { openOrder(null); const r = addScanned(code); drawOrder(); if (r) toast(r); }
+function sellCode(code) { openOrder(null); const r = addScanned(code); drawOrder(); if (r) toast(scanText(r)); }
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
