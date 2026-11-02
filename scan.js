@@ -38,7 +38,8 @@ const Scan = {
       const d = scanDlg('scandlg');
       d.innerHTML = `<div class="scanbox" tabindex="-1" autofocus><h2>${esc(title || 'Scan a barcode')}</h2>
         <div class="scanview"><video playsinline muted autoplay></video><div class="scanframe"></div>
-        <button type="button" class="btn sm scantorch" data-sc="torch" hidden>Torch</button></div>
+        <button type="button" class="scantorch" data-sc="torch" title="Flashlight" aria-label="Flashlight" aria-pressed="false" hidden>${TORCHICON}</button></div>
+        <div class="scanlog"></div>
         <p class="scanmsg">Starting the camera…</p>
         <form class="scantype" data-sc="type"><input inputmode="numeric" autocomplete="off" placeholder="…or type the number under the barcode"><button class="btn sm">Use</button></form>
         <div class="mact"><button type="button" class="btn ghost" data-sc="cancel">${onEach ? "Done" : "Cancel"}</button></div></div>`;
@@ -57,6 +58,18 @@ const Scan = {
     });
   },
   msg(t) { const m = $('#scandlg .scanmsg'); if (m) m.textContent = t; },
+  /* a scan result under the camera: { kind: 'ok'|'warn', name, brand, box, note, n, unit }.
+     The newest is shown as a card, the three before it as a short list */
+  log(r) {
+    const l = $('#scandlg .scanlog'); if (!l) return;
+    const old = l.querySelector('.slog'); if (old) old.classList.remove('new');
+    const meta = [r.brand && `<span class="notr">${esc(r.brand)}</span>`, r.box && `<span>${esc(r.box)}</span>`].filter(Boolean).join('<i>·</i>');
+    l.insertAdjacentHTML('afterbegin', `<div class="slog ${r.kind === 'warn' ? 'warn' : 'ok'} new">
+      <span class="sic">${r.kind === 'warn' ? '!' : '✓'}</span>
+      <span class="sx"><b class="notr">${esc(r.name)}</b>${meta ? `<span class="sm">${meta}</span>` : ''}${r.note ? `<span class="snote">${esc(r.note)}</span>` : ''}</span>
+      ${r.n !== undefined ? `<span class="sn"><b>${r.n}</b>${r.unit ? `<small>${esc(r.unit)}</small>` : ''}</span>` : ''}</div>`);
+    [...l.querySelectorAll('.slog')].slice(4).forEach(x => x.remove());
+  },
   async start(d) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
       return this.msg(window.isSecureContext ? 'This browser can’t use the camera. Type the number instead.' : 'The camera only works in the hosted app (https). Type the number instead.');
@@ -98,7 +111,8 @@ const Scan = {
     try { const a = this.ac, o = a.createOscillator(), g = a.createGain(); o.frequency.value = 1100; g.gain.value = .08; o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .09); } catch (e) { }
     if (!this.each) return this.finish(code);
     const r = this.each(code); if (r === null) return this.finish(null);
-    this.msg(r); this.last = ""; this.pause = Date.now() + 1500;
+    if (typeof r === 'object') { this.log(r); this.msg('Hold the barcode inside the frame.'); } else this.msg(r);
+    this.last = ""; this.pause = Date.now() + 1500;
     const i = $("#scandlg .scantype input"); if (i) { i.value = ""; i.blur(); }
   },
   finish(code) {
@@ -113,8 +127,12 @@ const Scan = {
   torch() {
     const t = this.stream && this.stream.getVideoTracks()[0]; if (!t) return;
     this.torchOn = !this.torchOn; t.applyConstraints({ advanced: [{ torch: this.torchOn }] }).catch(() => { });
+    const b = $('#scandlg .scantorch'); if (b) { b.classList.toggle('on', this.torchOn); b.setAttribute('aria-pressed', this.torchOn); }
   }
 };
+/* a scan result as one line, for toasts */
+const scanText = r => typeof r !== 'object' ? r : `${r.kind === 'warn' ? '⚠' : '✓'} ${r.name} · ${r.note || r.n + (r.unit ? ' ' + r.unit : '')}`;
+const TORCHICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4l-3 4v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-9L7 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 7h10M12 13v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 /* ---------- what a scan finds, and linking unknown barcodes ---------- */
 const SCANICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M7 8v8M10 8v8M13 8v8M16.5 8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 /* after: set while selling, so a newly linked barcode goes straight into the sale */
@@ -151,8 +169,7 @@ function linkEan(ids, code, noCommit) {
 async function showCode(code, after) {
   /* the other phone may have linked it moments ago: get the latest data before calling it new */
   if (!eanLines(code).length && typeof Cloud !== 'undefined' && Cloud.on()) {
-    toast('Checking the shared ledger…'); await Cloud.sync();
-    for (let i = 0; Cloud.busy && i < 50; i++) await new Promise(r => setTimeout(r, 200));
+    if (!Cloud.ready) { toast('Checking the shared ledger…'); await Cloud.whenReady(6000); }
     if (eanLines(code).length && after) return after(code);
   }
   Object.assign(SX, { code, q: '', box: '', after: after || null });
@@ -275,15 +292,16 @@ function packScan(code) {
   if (r) {
     PK.n[r.k] = (PK.n[r.k] || 0) + 1; packSave(); drawPack();
     const n = PK.n[r.k];
-    return n > r.want ? `⚠ ${r.product}: ${n} scanned, only ${r.want} bought for this box` : `✓ ${r.product} · ${n}/${r.want}`;
+    return { kind: n > r.want ? 'warn' : 'ok', name: r.product, brand: r.brand, n: `${n}/${r.want}`, unit: 'packed',
+      note: n > r.want ? `Only ${r.want} bought for this box` : '' };
   }
   const other = eanLines(code)[0];
   if (!other) return null;
   const e = PK.extra[code] || (PK.extra[code] = { product: other.product, box: other.shipmentId || '', n: 0 });
   e.n++; packSave(); drawPack();
-  return `⚠ ${other.product} doesn’t belong in this box${e.box ? ' (' + shipName(e.box) + ')' : ''}`;
+  return { kind: 'warn', name: other.product, brand: other.brand || '', box: e.box ? shipName(e.box) : 'Not shipped', note: 'Doesn’t belong in this box' };
 }
-function packAfterLink(code) { const m = packScan(code); if (m) toast(m); drawPack(); }
+function packAfterLink(code) { const m = packScan(code); if (m) toast(scanText(m)); drawPack(); }
 function packScanLoop() {
   let unknown = '';
   Scan.read('Scan what goes in the box', code => { const m = packScan(code); if (m === null) { unknown = code; return null; } return m; })

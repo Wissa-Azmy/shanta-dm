@@ -193,7 +193,7 @@ V.sales = R => {
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
-  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}</div>
   ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof)], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
   </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>
@@ -207,12 +207,12 @@ V.sales = R => {
 function addScanned(code) {
   const R = calc(), lots = eanLines(code).map(p => R.lots[p.id]).filter(Boolean);
   if (!lots.length) return null;
-  const ids = lots.map(l => l.p.id), name = lots[0].p.product;
+  const ids = lots.map(l => l.p.id), name = lots[0].p.product, brand = lots[0].p.brand || '';
   const used = id => OR.lines.filter(x => x.purchaseId === id).reduce((a, x) => a + num(x.qty), 0);
   const free = l => l.left + (OR.orig[l.p.id] || 0) - used(l.p.id);
   lots.sort((a, b) => (a.p.date || '').localeCompare(b.p.date || ''));
   const l = lots.find(x => free(x) > 0);
-  if (!l) return `No “${name}” left in stock`;
+  if (!l) return { kind: 'warn', name, brand, note: 'None left in stock' };
   const line = OR.lines.find(x => x.purchaseId === l.p.id);
   if (line) line.qty = num(line.qty) + 1;
   else {
@@ -222,7 +222,7 @@ function addScanned(code) {
     if (empty) Object.assign(empty, nl); else OR.lines.push(nl);
   }
   const n = OR.lines.filter(x => ids.includes(x.purchaseId)).reduce((a, x) => a + num(x.qty), 0);
-  return `✓ ${name} · ${n} in this sale`;
+  return { kind: 'ok', name, brand, box: shipName(l.p.shipmentId), n, unit: 'in this sale' };
 }
 function scanIntoOrder() {
   let unknown = '';
@@ -232,10 +232,10 @@ function scanIntoOrder() {
     if (r === null) { unknown = code; return null; }
     drawOrder(); return r;
   }).then(() => {
-    if (unknown && OR) showCode(unknown, c => { const r = addScanned(c); drawOrder(); if (r) toast(r); });
+    if (unknown && OR) showCode(unknown, c => { const r = addScanned(c); drawOrder(); if (r) toast(scanText(r)); });
   });
 }
-function sellCode(code) { openOrder(null); const r = addScanned(code); drawOrder(); if (r) toast(r); }
+function sellCode(code) { openOrder(null); const r = addScanned(code); drawOrder(); if (r) toast(scanText(r)); }
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
@@ -327,7 +327,7 @@ V.customers = R => {
     <div class="stamp ${overdue ? 't' : 'n'}"><div class="in"><div class="k">Overdue</div><div class="v">${fEGP(overdue)}</div><div class="s">past the due date</div></div></div>
     <div class="stamp n"><div class="in"><div class="k">Credit payments</div><div class="v">${fEGP(db.payments.reduce((a, p) => a + toEGP(p.amount, p.currency, p.rate), 0))}</div><div class="s">${db.payments.length} recorded</div></div></div>
   </div>
-  <div class="toolbar">${search('Search customer')}</div>
+  <div class="toolbar">${search('Search customer')}${resetBtn('q')}</div>
   <div class="tablewrap"><table class="t"><thead><tr><th>Customer</th><th class="num">Bought</th><th class="num">Still owes</th><th>Due</th><th>Open sales</th><th></th></tr></thead><tbody>
   ${list.map(c => { const open = c.orders.filter(o => o.balance > 0.005);
     return `<tr><td><b>${esc(c.name)}</b></td><td class="num">${fEGP(c.billEGP)}</td>

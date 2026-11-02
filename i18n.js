@@ -299,8 +299,6 @@ Object.assign(AR, {
   'Too many attempts. Wait a few minutes and try again.': 'محاولات كثيرة. انتظر بضع دقائق ثم حاول مجدداً.', 'This user is disabled in Firebase.': 'هذا المستخدم معطّل في Firebase.',
   'Couldn’t reach Firebase. Check your internet connection. If you’re using the preview inside Dia, it may block network access; use the hosted copy of the app instead.': 'تعذّر الوصول إلى Firebase. تحقق من اتصالك بالإنترنت. إذا كنت تستخدم المعاينة داخل Dia فقد تمنع الاتصال؛ استخدم النسخة المنشورة من التطبيق.',
   'Your cloud login expired. Please connect again.': 'انتهت صلاحية تسجيل الدخول. يرجى تسجيل الدخول مجدداً.', 'Database not found. Check the database URL.': 'قاعدة البيانات غير موجودة. تحقق من رابطها.',
-  'The shared ledger in the cloud already has data.': 'السجل المشترك في السحابة يحتوي على بيانات بالفعل.',
-  'OK = also add the entries from this browser to it': 'موافق = أضف إليه أيضاً القيود الموجودة في هذا المتصفح', 'Cancel = use only the cloud data on this device': 'إلغاء = استخدم بيانات السحابة فقط على هذا الجهاز',
   'Signed out. Your data stays on this device.': 'تم تسجيل الخروج. بياناتك تبقى على هذا الجهاز.',
   'The backup could not be verified, so nothing was deleted.': 'تعذّر التحقق من النسخة الاحتياطية، لذا لم يُحذف شيء.', 'Manual backup': 'نسخة يدوية',
   'The live ledger is empty, so there is nothing to back up.': 'السجل المباشر فارغ، فلا يوجد ما يُنسخ.', 'That backup is empty, so nothing was restored.': 'هذه النسخة فارغة، لذا لم تتم الاستعادة.',
@@ -403,7 +401,26 @@ Object.assign(AR, {
   'Find by scan': 'ابحث بالمسح', 'Find a product': 'ابحث عن منتج', 'barcode known': 'الباركود معروف',
   'This product was scanned before; the import links its barcode': 'تم مسح هذا المنتج من قبل؛ سيربط الاستيراد الباركود الخاص به'
 });
-Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
+Object.assign(AR, { 'Units': 'الوحدات', 'Lines': 'الأسطر', 'Back to top': 'العودة للأعلى', 'Version': 'الإصدار', 'A new version is available (': 'يتوفر إصدار جديد (', ').': ').', 'Reload': 'إعادة التحميل', 'Updating…': 'جارٍ التحديث…', 'Loading the shared ledger…': 'جارٍ تحميل السجل المشترك…', 'Getting your shipments, purchases and sales from the cloud.': 'جارٍ جلب الشحنات والمشتريات والمبيعات من السحابة.', 'This is taking longer than usual. Check the internet connection.': 'يستغرق هذا وقتاً أطول من المعتاد. تحقق من اتصال الإنترنت.', 'Try again': 'حاول مجدداً', 'In EGP': 'بالجنيه', 'Units left': 'الوحدات المتبقية', 'Entries': 'القيود' });
+/* ---- Firestore ---- */
+Object.assign(AR, {
+  'Offline: changes are saved on this device and sent when the connection is back.': 'غير متصل: التغييرات محفوظة على هذا الجهاز وتُرسل عند عودة الاتصال.',
+  'Offline, saved on this device': 'غير متصل، محفوظ على هذا الجهاز',
+  'Moving the shared ledger to the new database…': 'جارٍ نقل السجل المشترك إلى قاعدة البيانات الجديدة…',
+  'The shared ledger was moved to the new database': 'تم نقل السجل المشترك إلى قاعدة البيانات الجديدة',
+  'The move to the new database could not be verified. It will be tried again.': 'تعذّر التحقق من النقل إلى قاعدة البيانات الجديدة. ستتم المحاولة مجدداً.',
+  'Couldn’t load the cloud library. Check your internet connection.': 'تعذّر تحميل مكتبة السحابة. تحقق من اتصالك بالإنترنت.',
+  'Please sign in again.': 'يرجى تسجيل الدخول مجدداً.',
+  'The app now uses a new, faster database. Please sign in once more; nothing is lost.': 'يستخدم التطبيق الآن قاعدة بيانات جديدة وأسرع. يرجى تسجيل الدخول مرة أخرى؛ لن يُفقد شيء.',
+  'Can’t reach Firestore. If this stays, check that the Firestore database was created (see “Admin” in Settings).': 'تعذّر الوصول إلى Firestore. إذا استمر ذلك، تأكد من إنشاء قاعدة بيانات Firestore (انظر «للمسؤول» في الإعدادات).',
+  'The Firestore database hasn’t been created yet. See “Admin” below.': 'لم يتم إنشاء قاعدة بيانات Firestore بعد. انظر «للمسؤول» أدناه.',
+  'Type both email addresses below and copy the rules. In': 'اكتب البريدين أدناه وانسخ القواعد. في', ', paste them and press': '، الصقها ثم اضغط',
+  '. (First time only:': '. (أول مرة فقط:', ', a location in Europe, production mode.)': '، موقع في أوروبا، وضع الإنتاج.)'
+});
+rx(/^Firestore refused access\. Check that the Firestore database exists and its rules list your email \((.*)\)\. See “Admin” below\.$/, (m, e) => `رفض Firestore الوصول. تأكد من وجود قاعدة بيانات Firestore وأن قواعدها تتضمن بريدك (${e}). انظر «للمسؤول» أدناه.`);
+rx(/^\. Changes appear on (.+)’s phone within seconds\. Without internet everything keeps working: changes are saved on this device and sent when the connection is back\. The file on disk still works as an extra backup\.$/,
+  (m, n) => `. تظهر التغييرات على هاتف ${n} خلال ثوانٍ. بدون إنترنت يستمر كل شيء في العمل: تُحفظ التغييرات على هذا الجهاز وتُرسل عند عودة الاتصال. ويبقى الملف على الجهاز نسخة احتياطية إضافية.`);
+rx(/^Couldn’t read the old database \((\d+)\)\.$/, (m, n) => `تعذّرت قراءة قاعدة البيانات القديمة (${n}).`);
 rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 Object.assign(AR, {
@@ -416,11 +433,18 @@ Object.assign(AR, {
   'Checking the shared ledger…': 'جارٍ التحقق من السجل المشترك…'
 });
 rx(/^(\d+) of (\d+)$/, (m, a, b) => `${a} من ${b}`);
+rx(/^This device has (\d+) entr(?:y|ies) that (?:is|are) not in the shared ledger\.$/, (m, n) => `يوجد على هذا الجهاز ${n} قيد غير موجود في السجل المشترك.`);
+rx(/^OK = add (?:it|them) to the shared ledger$/, () => 'موافق = أضفها إلى السجل المشترك');
+rx(/^Cancel = use only the shared ledger on this device$/, () => 'إلغاء = استخدم السجل المشترك فقط على هذا الجهاز');
 rx(/^(\d+) products? still missing$/, (m, n) => `${n} منتج ما زال ناقصاً`);
 rx(/^(\d+) don’t belong here$/, (m, n) => `${n} لا تنتمي إلى هنا`);
 rx(/^⚠ (.+): (\d+) scanned, only (\d+) bought for this box$/, (m, p, a, b) => `⚠ ${p}: تم مسح ${a}، والمشترى لهذا الصندوق ${b} فقط`);
 rx(/^⚠ (.+) doesn’t belong in this box( \((.+)\))?$/, (m, p, x, b) => `⚠ ${p} لا ينتمي إلى هذا الصندوق${b ? ' (' + tr(b) + ')' : ''}`);
 rx(/^✓ (.+) · (\d+) in this sale$/, (m, p, n) => `✓ ${p} · ${n} في هذا البيع`);
+rx(/^✓ (.+) · (\d+\/\d+) packed$/, (m, p, n) => `✓ ${p} · ${n} في الصندوق`);
+rx(/^(⚠|✓) (.+) · (Doesn’t belong in this box|None left in stock|Only \d+ bought for this box)$/, (m, k, p, x) => `${k} ${p} · ${tr(x)}`);
+rx(/^Only (\d+) bought for this box$/, (m, n) => `المشترى لهذا الصندوق ${n} فقط`);
+Object.assign(AR, { 'Flashlight': 'الكشاف', 'in this sale': 'في هذا البيع', 'packed': 'في الصندوق', 'None left in stock': 'لم يتبقَّ في المخزون', 'Doesn’t belong in this box': 'لا ينتمي إلى هذا الصندوق' });
 rx(/^No “(.+)” left in stock$/, (m, p) => `لم يتبقَّ «${p}» في المخزون`);
 rx(/^Scan the barcode of (.+)$/, (m, p) => `امسح باركود ${p}`);
 rx(/^Barcode linked to “(.+)”$/, (m, p) => `تم ربط الباركود بـ«${p}»`);

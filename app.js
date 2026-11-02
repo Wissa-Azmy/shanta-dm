@@ -40,7 +40,7 @@ function render() {
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
-  $("#view").innerHTML = Cloud.bannerHTML() + V[view](R);
+  $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : V[view](R));
   V[view].after && V[view].after();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
@@ -63,7 +63,7 @@ document.addEventListener('click', e => {
   if (a === 'download') downloadJSON();
   if (a === 'import') $('#fileInput').click();
   if (a === 'csv') V.ledger.csv();
-  if (a === 'stockreset') { UI.box = ''; UI.stockStatus = 'left'; UI.q = ''; render(); }
+  if (a === 'filtersreset') { t.dataset.keys.split(',').forEach(k => UI[k] = FILTER_DEFAULT[k]); render(); }
   if (a === 'setpack') { db.settings.packagingPct = num(arg); commit(); toast('Packaging set to ' + num(arg) + '%'); }
   if (a === 'fillw') { const m = missingW(); m.forEach(p => p.netG = parseWeightG(p.product)); commit(); toast(m.length + ' weights filled in'); }
   if (a === 'fx') { t.textContent = 'Fetching…'; updateRate(true); }
@@ -152,7 +152,7 @@ function fxHint() {
 (async () => {
   render();
   const h = await IDB.get('handle');
-  if (Cloud.on()) { Cloud.sync(); Cloud.startPolling(); }
+  if (Cloud.on()) Cloud.start();
   if (h && h.queryPermission) { fileHandle = h; fileName = h.name; filePerm = await verifyPerm(h, false); renderFile(); }
   setTimeout(() => { const s = db.settings; if (s.rateAuto !== false && (s.rateAt || '').slice(0, 10) !== today() && s.rateManual !== today()) updateRate(false); }, 4000);
 })();
@@ -166,4 +166,36 @@ function fxHint() {
   document.body.appendChild(b);
   const upd = () => b.classList.toggle('on', window.scrollY > Math.max(500, window.innerHeight * 0.8));
   window.addEventListener('scroll', upd, { passive: true }); upd();
+})();
+
+/* ---------- app version, and a notice when a newer one has been pushed ---------- */
+(() => {
+  const r = $('.rail'); if (!r) return;
+  const v = document.createElement('div'); v.className = 'ver';
+  v.innerHTML = `<span>Version</span> <b class="notr">${APP_VERSION}</b>`;
+  r.appendChild(v);
+  let lastCheck = 0;
+  const check = async () => {
+    if (Date.now() - lastCheck < 60000) return; lastCheck = Date.now();
+    try {
+      const t = await (await fetch('core.js?check=' + Date.now(), { cache: 'no-store' })).text();
+      const m = t.match(/const APP_VERSION = "([^"]+)"/);
+      if (!m || m[1] === APP_VERSION || $('#newver')) return;
+      const b = document.createElement('div'); b.id = 'newver';
+      b.innerHTML = `<span>A new version is available (<b class="notr">${esc(m[1])}</b>).</span><button type="button" class="btn sm" data-act="reload">Reload</button>`;
+      document.body.appendChild(b); document.body.classList.add('hasnew');
+    } catch (e) { }
+  };
+  /* a plain reload takes the scripts from the browser's cache (GitHub Pages lets it keep them for
+     10 minutes), so the old version would come back: fetch every file of the app fresh first */
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-act="reload"]'); if (!b) return;
+    b.disabled = true; b.textContent = 'Updating…';
+    const files = [location.href.split('#')[0], ...[...document.querySelectorAll('script[src],link[rel=stylesheet][href]')].map(x => x.src || x.href)]
+      .filter(u => u.startsWith(location.origin));
+    await Promise.all(files.map(u => fetch(u, { cache: 'reload' }).catch(() => { })));
+    location.reload();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  setTimeout(check, 3000);
 })();
