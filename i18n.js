@@ -424,6 +424,8 @@ rx(/^Couldn’t read the old database \((\d+)\)\.$/, (m, n) => `تعذّرت ق�
 rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
 /* Rossmann eBons and the store of a purchase */
+rx(/^(\d+) selected$/, (m, n) => `${n} محدد`);
+Object.assign(AR, { 'Select all': 'تحديد الكل', 'Select': 'تحديد', 'Sell selected': 'بيع المحدد', 'Clear selection': 'إلغاء التحديد' });
 rx(/^(\d+) with a barcode$/, (m, n) => `${n} بباركود`);
 rx(/^Rossmann eBon (.+)$/, (m, d) => `إيصال Rossmann ‎${d}`);
 Object.assign(AR, {

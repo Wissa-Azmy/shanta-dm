@@ -44,6 +44,12 @@ function openOrder(id, preset) {
     OR = { id: null, isNew: true,
       h: { date: today(), customer: '', place: db.settings.cityEG, receivedBy: 'friend', method: 'Cash', paid: true, payMode: 'full', downPayment: '', dueDate: '', currency: 'EGP', rate: db.settings.rate, kind: 'sale', notes: '' },
       lines: [{ purchaseId: (preset && preset.purchaseId) || '', qty: 1, unitPrice: '' }], extras: [], old: { sales: [], exps: [] }, orig: {} };
+    /* several products picked on Stock: one line each, 1 unit at the suggested price */
+    if (preset && preset.purchaseIds) {
+      const R = calc();
+      OR.lines = preset.purchaseIds.map(id => R.lots[id]).filter(l => l && l.left > 0).map(l => ({ purchaseId: l.p.id, qty: 1, unitPrice: suggestEGP(l) }));
+      if (!OR.lines.length) OR.lines = [{ purchaseId: '', qty: 1, unitPrice: '' }];
+    }
   }
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
 }

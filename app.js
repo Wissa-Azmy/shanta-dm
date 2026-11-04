@@ -41,6 +41,8 @@ function render() {
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
   $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : V[view](R));
+  document.querySelectorAll("[data-mixed]").forEach(c => c.indeterminate = true);
+  document.body.classList.toggle("hassel", !!$("#view .selbar"));
   V[view].after && V[view].after();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
@@ -67,6 +69,14 @@ document.addEventListener('click', e => {
   if (a === 'setpack') { db.settings.packagingPct = num(arg); commit(); toast('Packaging set to ' + num(arg) + '%'); }
   if (a === 'fillw') { const m = missingW(); m.forEach(p => p.netG = parseWeightG(p.product)); commit(); toast(m.length + ' weights filled in'); }
   if (a === 'fx') { t.textContent = 'Fetching…'; updateRate(true); }
+  if (a === 'selclear') { SEL.clear(); render(); }
+  if (a === 'sellsel') { const ids = [...SEL]; SEL.clear(); render(); openOrder(null, { purchaseIds: ids }); }
+});
+/* Stock: pick products to sell together */
+document.addEventListener('change', e => {
+  const c = e.target;
+  if (c.dataset.sel) { c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel); render(); }
+  else if (c.dataset.selall) { const ids = [...document.querySelectorAll('[data-sel]')].map(x => x.dataset.sel); ids.forEach(id => c.checked ? SEL.add(id) : SEL.delete(id)); render(); }
 });
 document.addEventListener('input', e => {
   const u = e.target.dataset.ui;

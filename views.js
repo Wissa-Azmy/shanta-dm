@@ -140,6 +140,8 @@ V.purchases = R => {
   </tbody><tfoot><tr><td colspan="4">${rows.length} lines</td><td class="num">${units}</td><td></td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
 };
 
+/* products picked on Stock to sell together (purchase ids); only lots with units left can be picked */
+const SEL = new Set();
 V.stock = R => {
   const tm = num(db.settings.targetMargin) / 100;
   const loc = l => { const s = db.shipments.find(x => x.id === l.p.shipmentId); if (!s || s.status === 'Packing') return ['In Germany', 'me']; if (s.status === 'Delivered') return ['In Egypt', 'friend']; return [s.status, '']; };
@@ -152,17 +154,21 @@ V.stock = R => {
     <select data-ui="stockStatus" title="Status">${opt('stockStatus', 'left', 'Still in stock (' + cnt(l => l.left > 0) + ')')}${opt('stockStatus', 'sold', 'Sold out (' + cnt(l => l.left <= 0) + ')')}${opt('stockStatus', 'all', 'All bought (' + cnt(() => true) + ')')}</select>
     ${resetBtn('q', 'box', 'store', 'stockStatus')}`;
   const leftU = rows.reduce((a, l) => a + Math.max(0, l.left), 0), leftV = rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0);
+  [...SEL].forEach(id => { const l = R.lots[id]; if (!l || l.left <= 0) SEL.delete(id); });
+  const pickable = rows.filter(l => l.left > 0), allOn = pickable.length > 0 && pickable.every(l => SEL.has(l.p.id));
+  const someOn = !allOn && pickable.some(l => SEL.has(l.p.id));
+  const selBar = SEL.size ? `<div class="selbar"><b>${SEL.size} selected</b><span class="sp"></span><button class="btn ghost sm" data-act="selclear">Clear selection</button><button class="btn" data-act="sellsel">Sell selected</button></div>` : '';
   return `<div class="toolbar">${search('Search stock')}${filters}</div>
-  ${totBar([['Stock value at cost', fEUR(leftV)], ['In EGP', fEGP(eur2egp(leftV))], ['Units left', leftU], ['Products', rows.length]], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
+  ${totBar([['Stock value at cost', fEUR(leftV)], ['In EGP', fEGP(eur2egp(leftV))], ['Units left', leftU], ['Products', rows.length]], rows.length)}${selBar}<div class="tablewrap"><table class="t"><thead><tr><th class="ck"><input type="checkbox" class="selck" data-selall="1" title="Select all" aria-label="Select all"${allOn ? ' checked' : ''}${someOn ? ' data-mixed="1"' : ''}${pickable.length ? '' : ' disabled'}></th><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
-    return `<tr><td><b>${esc(l.p.product)}</b><span class="sub">${storeTag(l.p)}${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
+    return `<tr${SEL.has(l.p.id) ? ' class="picked"' : ''}><td class="ck">${l.left > 0 ? `<input type="checkbox" class="selck" data-sel="${l.p.id}" aria-label="Select"${SEL.has(l.p.id) ? ' checked' : ''}>` : ''}</td><td><b>${esc(l.p.product)}</b><span class="sub">${storeTag(l.p)}${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
     <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid > 0.05 ? `<span class="sub">${Math.round(l.unpaid * 10) / 10} not paid yet</span>` : ""}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
     <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ' <span class="pill warn" title="Estimated from price">est.</span>' : l.boxG ? ' <span class="pill" title="Share of the weighed box after the products with a known weight">from box</span>' : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
     <td class="num">${fEGP(cEGP)}<span class="sub">${fEUR(l.unit)} + ${fEUR(l.shipShare || 0)} shipping</span></td><td class="num">${avg ? fEGP(avg) : '—'}</td>
     <td class="num">${mk === null ? '—' : `<span class="pill ${mk >= num(db.settings.targetMargin) ? 'ok' : mk >= 0 ? 'warn' : 'bad'}">${Math.round(mk)}%</span>`}</td>
     <td class="num">${fEGP(Math.ceil(cEGP * (1 + tm) / 5) * 5)}</td>
-    <td class="acts">${l.left > 0 ? `<button class="btn sm" data-new="sales" ${pre({ purchaseId: l.p.id })}>Sell</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="12" class="empty">Nothing here.</td></tr>'}
-  </tbody><tfoot><tr><td colspan="5">Stock value at cost</td><td class="num">${rows.reduce((a, l) => a + Math.max(0, l.left), 0)}</td><td></td><td class="num">${fEUR(rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0))}</td><td colspan="4"></td></tr></tfoot></table></div>
+    <td class="acts">${l.left > 0 ? `<button class="btn sm" data-new="sales" ${pre({ purchaseId: l.p.id })}>Sell</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="13" class="empty">Nothing here.</td></tr>'}
+  </tbody><tfoot><tr><td colspan="6">Stock value at cost</td><td class="num">${rows.reduce((a, l) => a + Math.max(0, l.left), 0)}</td><td></td><td class="num">${fEUR(rows.reduce((a, l) => a + Math.max(0, l.left) * l.landed, 0))}</td><td colspan="4"></td></tr></tfoot></table></div>
   <p class="note">EGP amounts use today’s rate (${db.settings.rate} EGP/€).</p>`;
 };
 
