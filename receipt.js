@@ -172,7 +172,7 @@ async function pdfToText(file) {
 /* ---------- dialog ---------- */
 function rdlg() {
   let d = $('#rdlg');
-  if (!d) { d = document.createElement('dialog'); d.id = 'rdlg'; d.innerHTML = '<div id="rbody"></div>'; document.body.appendChild(d); }
+  if (!d) { d = document.createElement('dialog'); d.id = 'rdlg'; d.innerHTML = '<div id="rbody" tabindex="-1" autofocus></div>'; document.body.appendChild(d); }
   return d;
 }
 function openReceipt(shipmentId) {

@@ -25,7 +25,7 @@ function orderMoney(o, R) {
 /* ---------- editor ---------- */
 function odlg() {
   let d = $('#odlg');
-  if (!d) { d = document.createElement('dialog'); d.id = 'odlg'; d.innerHTML = '<div id="obody"></div>'; document.body.appendChild(d); }
+  if (!d) { d = document.createElement('dialog'); d.id = 'odlg'; d.innerHTML = '<div id="obody" tabindex="-1" autofocus></div>'; document.body.appendChild(d); }
   return d;
 }
 function openOrder(id, preset) {

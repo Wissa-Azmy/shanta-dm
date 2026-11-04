@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.04-3";
+const APP_VERSION = "2026.11.04-4";
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -30,8 +30,21 @@ function parseWeightG(t) {
 const fG = g => g >= 1000 ? (g / 1000).toLocaleString("en-US", { maximumFractionDigits: 2 }) + " kg" : Math.round(g) + " g";
 
 function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2800);
+  const t = $('#toast'), warn = /^\s*(⚠|!)/.test(msg), ok = /^\s*✓/.test(msg);
+  t.className = warn ? 'warn' : ok ? 'ok' : '';
+  t.innerHTML = `<span class="tic">${warn ? '!' : ok ? '✓' : 'i'}</span><span class="tx"></span>`;
+  t.querySelector('.tx').textContent = String(msg).replace(/^\s*(⚠|!|✓)\s*/, '');
+  void t.offsetWidth; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), warn ? 4200 : 3000);
+}
+/* touch devices: opening a dialog must never focus a field, or iOS pops up the keyboard or the date picker */
+if (!matchMedia('(hover: hover) and (pointer: fine)').matches && window.HTMLDialogElement) {
+  const sm = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () {
+    sm.call(this);
+    const a = document.activeElement;
+    if (a && this.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) a.blur();
+  };
 }
 
 /* ---------- data ---------- */

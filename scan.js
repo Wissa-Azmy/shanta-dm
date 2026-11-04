@@ -135,7 +135,7 @@ const scanText = r => typeof r !== 'object' ? r : `${r.kind === 'warn' ? '⚠' :
 const TORCHICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4l-3 4v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-9L7 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 7h10M12 13v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 /* ---------- what a scan finds, and linking unknown barcodes ---------- */
 const SCANICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M7 8v8M10 8v8M13 8v8M16.5 8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-const RCPTICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14.5 3v4.5H19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 17.5v-7M9 13l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const RCPTICON = '<span class="upic" aria-hidden="true">⇪</span>';
 /* after: set while selling, so a newly linked barcode goes straight into the sale */
 const SX = { code: '', q: '', box: '', groups: [], after: null };
 const grpKey = p => (p.product || '').trim().toLowerCase() + '|' + (p.brand || '').trim().toLowerCase();

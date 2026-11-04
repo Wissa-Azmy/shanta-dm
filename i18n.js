@@ -453,9 +453,9 @@ rx(/^(\d+) products? still missing$/, (m, n) => `${n} منتج ما زال نا�
 rx(/^(\d+) don’t belong here$/, (m, n) => `${n} لا تنتمي إلى هنا`);
 rx(/^⚠ (.+): (\d+) scanned, only (\d+) bought for this box$/, (m, p, a, b) => `⚠ ${p}: تم مسح ${a}، والمشترى لهذا الصندوق ${b} فقط`);
 rx(/^⚠ (.+) doesn’t belong in this box( \((.+)\))?$/, (m, p, x, b) => `⚠ ${p} لا ينتمي إلى هذا الصندوق${b ? ' (' + tr(b) + ')' : ''}`);
-rx(/^✓ (.+) · (\d+) in this sale$/, (m, p, n) => `✓ ${p} · ${n} في هذا البيع`);
-rx(/^✓ (.+) · (\d+\/\d+) packed$/, (m, p, n) => `✓ ${p} · ${n} في الصندوق`);
-rx(/^(⚠|✓) (.+) · (Doesn’t belong in this box|None left in stock|Only \d+ bought for this box)$/, (m, k, p, x) => `${k} ${p} · ${tr(x)}`);
+rx(/^(?:✓ )?(.+) · (\d+) in this sale$/, (m, p, n) => `${p} · ${n} في هذا البيع`);
+rx(/^(?:✓ )?(.+) · (\d+\/\d+) packed$/, (m, p, n) => `${p} · ${n} في الصندوق`);
+rx(/^(?:[⚠✓] )?(.+) · (Doesn’t belong in this box|None left in stock|Only \d+ bought for this box)$/, (m, p, x) => `${p} · ${tr(x)}`);
 rx(/^Only (\d+) bought for this box$/, (m, n) => `المشترى لهذا الصندوق ${n} فقط`);
 Object.assign(AR, { 'Flashlight': 'الكشاف', 'in this sale': 'في هذا البيع', 'packed': 'في الصندوق', 'None left in stock': 'لم يتبقَّ في المخزون', 'Doesn’t belong in this box': 'لا ينتمي إلى هذا الصندوق' });
 rx(/^No “(.+)” left in stock$/, (m, p) => `لم يتبقَّ «${p}» في المخزون`);
