@@ -423,6 +423,17 @@ rx(/^\. Changes appear on (.+)’s phone within seconds\. Without internet every
 rx(/^Couldn’t read the old database \((\d+)\)\.$/, (m, n) => `تعذّرت قراءة قاعدة البيانات القديمة (${n}).`);
 rx(/^of (\d+)$/, (m, n) => `من ${n}`);
 rx(/^(\d+) with a known barcode$/, (m, n) => `${n} بباركود معروف`);
+/* Rossmann eBons and the store of a purchase */
+rx(/^(\d+) with a barcode$/, (m, n) => `${n} بباركود`);
+rx(/^Rossmann eBon (.+)$/, (m, d) => `إيصال Rossmann ‎${d}`);
+Object.assign(AR, {
+  'Import receipt': 'استيراد فاتورة', 'Receipt': 'فاتورة', 'Drop the receipt': 'أفلت الفاتورة', 'Store': 'المتجر', 'All stores': 'كل المتاجر',
+  'One product line from a receipt. Use “Save & add another” to enter a whole receipt.': 'سطر منتج واحد من فاتورة. استخدم «حفظ وإضافة آخر» لإدخال فاتورة كاملة.',
+  'dm.de online invoices (“Rechnung”) and dm or Rossmann eBons, as PDF. The file stays on your device.': 'فواتير dm.de الإلكترونية («Rechnung») وإيصالات eBon من dm أو Rossmann بصيغة PDF. يبقى الملف على جهازك.',
+  'No product lines were found. Try pasting the receipt text instead. Photos or scans of paper receipts can’t be read; use the eBon PDF from the dm or Rossmann app.': 'لم يُعثر على أسطر منتجات. جرّب لصق نص الفاتورة. لا يمكن قراءة صور الإيصالات الورقية؛ استخدم ملف eBon من تطبيق dm أو Rossmann.',
+  'The receipt date wasn’t found. Check “Date bought”.': 'لم يُعثر على تاريخ الفاتورة. تحقق من «تاريخ الشراء».',
+  'known product': 'منتج معروف', 'This barcode is already in the ledger; the product name was taken from there': 'هذا الباركود موجود في السجل بالفعل؛ أُخذ اسم المنتج من هناك'
+});
 Object.assign(AR, {
   'Check box': 'فحص الصندوق', 'Packing check': 'فحص التعبئة', 'Not bought for this box': 'لم يُشترَ لهذا الصندوق', 'Start again': 'البدء من جديد', 'Scan': 'مسح',
   'No barcode: count by hand or link it': 'بلا باركود: عُدّ يدوياً أو اربطه', 'One less': 'واحد أقل', 'One more': 'واحد أكثر',

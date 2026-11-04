@@ -2,6 +2,7 @@
 const OPT = {
   category: ['Skin care', 'Make-up', 'Hair care', 'Body care', 'Fragrance', 'Health & vitamins', 'Baby', 'Other'],
   payDE: ['Card', 'Cash', 'PayPal', 'Bank transfer', 'Other'],
+  store: ['dm', 'Rossmann', 'Other'],
   payEG: ['Cash', 'InstaPay', 'Vodafone Cash', 'Bank transfer', 'Other'],
   expCat: ['Shipping', 'Customs & duties', 'Packaging', 'Transfer fees', 'Delivery to customer', 'Marketing', 'Other'],
   tMethod: ['InstaPay', 'Bank transfer', 'Western Union', 'Cash hand-over', 'PayPal', 'Other'],
@@ -56,10 +57,11 @@ const SCHEMAS = {
     delMsg: 'Delete this shipment? Its products and costs stay, they just become unassigned.'
   },
   purchases: {
-    title: 'purchase', lead: 'One product line from a dm receipt. Use “Save & add another” to enter a whole receipt.',
-    again: ['date', 'place', 'paidBy', 'method', 'shipmentId', 'receipt'],
+    title: 'purchase', lead: 'One product line from a receipt. Use “Save & add another” to enter a whole receipt.',
+    again: ['date', 'store', 'place', 'paidBy', 'method', 'shipmentId', 'receipt'],
     fields: [
       { k: 'date', l: 'Date bought', t: 'date', def: today, req: true },
+      { k: 'store', l: 'Store', t: 'select', opts: OPT.store, def: 'dm' },
       { k: 'place', l: 'Where', t: 'text', def: () => db.settings.cityDE, list: () => uniq(db.purchases.map(p => p.place)) },
       { k: 'product', l: 'Product', t: 'text', req: true, span: true, list: () => uniq(db.purchases.map(p => p.product)) },
       { k: 'brand', l: 'Brand', t: 'text', list: () => uniq(db.purchases.map(p => p.brand)) },

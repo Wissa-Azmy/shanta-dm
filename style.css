@@ -521,3 +521,10 @@ td.paycell .sub{white-space:nowrap}
 @keyframes slogin{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 [dir=rtl] .slog .sn{align-items:flex-start}
 [dir=rtl] .slog .sn b{direction:ltr}
+
+/* ---------- store tag (dm / Rossmann) ---------- */
+.stag{display:inline-block;font:700 10px/1 var(--body);letter-spacing:.02em;padding:3px 6px;border-radius:4px;margin-right:6px;vertical-align:1px;background:var(--paper2);color:var(--ink)}
+.stag.dm{background:#ffd200;color:#1c2868}
+.stag.ross{background:#c3002d;color:#fff}
+[dir=rtl] .stag{margin-right:0;margin-left:6px}
+.rxcode{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11.5px;color:var(--muted)}

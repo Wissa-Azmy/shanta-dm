@@ -1,6 +1,7 @@
-/* ---------- import a dm invoice (PDF or pasted text) into a shipment ---------- */
+/* ---------- import a dm or Rossmann receipt (PDF or pasted text) into a shipment ---------- */
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/';
-const BRANDS = ['Balea PROFESSIONAL', 'Balea MEN', 'Balea med', 'Balea', 'alverde NATURKOSMETIK', 'alverde', 'Denkmit', 'CATRICE', 'essence', 'ebelin', 'Mivolis', 'Dontodent', 'LANGHAARMÄDCHEN', 'Sundance', 'SEINZ', 'S-quitofree', 'babylove', 'Jessa', 'profissimo', 'trend !t up', 'Maybelline', 'L\'Oréal Paris', 'NIVEA', 'Garnier', 'CeraVe', 'The Ordinary', 'Mixa', 'Neutrogena', 'Eucerin', 'La Roche-Posay', 'Bebe', 'Isana', 'Dove', 'Schwarzkopf', 'Gliss', 'Syoss', 'Guhl', 'Lavera', 'Weleda', 'Sebamed', 'Kneipp', 'Tetesept', 'Doppelherz', 'Abtei'];
+const BRANDS = ['Balea PROFESSIONAL', 'Balea MEN', 'Balea med', 'Balea', 'alverde NATURKOSMETIK', 'alverde', 'Denkmit', 'CATRICE', 'essence', 'ebelin', 'Mivolis', 'Dontodent', 'LANGHAARMÄDCHEN', 'Sundance', 'SEINZ', 'S-quitofree', 'babylove', 'Jessa', 'profissimo', 'trend !t up', 'Maybelline', 'L\'Oréal Paris', 'NIVEA', 'Garnier', 'CeraVe', 'The Ordinary', 'Mixa', 'Neutrogena', 'Eucerin', 'La Roche-Posay', 'Bebe', 'Isana', 'Dove', 'Schwarzkopf', 'Gliss', 'Syoss', 'Guhl', 'Lavera', 'Weleda', 'Sebamed', 'Kneipp', 'Tetesept', 'Doppelherz', 'Abtei',
+  'Rival de Loop', 'Rival loves me', 'alterra', 'babydream', 'Domol', 'altapharma', 'Sunozon', 'Prokudent', 'enerBiO', 'Jean&Len'];
 const RX = { items: [], meta: {}, warn: [], o: {} };
 const deNum = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
 
@@ -8,10 +9,10 @@ function guessCategory(t) {
   t = t.toLowerCase();
   if (/mivolis|vitamin|tablett|kapsel|brause|kollagen|omega|zink|calcium|magnesium|biotin|salbe|kopfschmerz|fett ?blocker|fettstoffwechsel/.test(t)) return 'Health & vitamins';
   if (/haar|shampoo|conditioner|leichtkämm|kopfhaut|keratin|plex|hitzeschutz|styling/.test(t)) return 'Hair care';
-  if (/mascara|make-up|makeup|lippen|lipstick|eyeliner|nagel|puder|concealer|catrice|essence|rouge|lidschatten/.test(t)) return 'Make-up';
+  if (/mascara|make-up|makeup|lippen|lipstick|\blip|eyeliner|nagel|puder|concealer|catrice|essence|rouge|lidschatten|blush|brow|lash|kajal|highlighter|bronzer/.test(t)) return 'Make-up';
   if (/parfum|parfüm|eau de|duft/.test(t) && !/raum/.test(t)) return 'Fragrance';
   if (/baby|windel|kinder/.test(t)) return 'Baby';
-  if (/gesicht|serum|tagescreme|nachtcreme|bb creme|toner|augen|maske|peel-off|aufheller|q10|hyaluron|niacinamid|retinol|lsf|ceramid|cica|niac|panthenol|pflegecreme/.test(t)) return 'Skin care';
+  if (/gesicht|serum|tagescreme|nachtcreme|bb creme|toner|augen|maske|peel-off|aufheller|q10|hyaluron|niacinamid|retinol|lsf|ceramid|cica|niac|panthenol|pflegecreme|waschgel|reinigung|mizellen/.test(t)) return 'Skin care';
   if (/deo|antitranspirant|dusch|körper|fuß|fuss|hand|bodylotion|pflegemilch|pflegeöl|massage|peeling|hornhaut|urea/.test(t)) return 'Body care';
   return 'Other';
 }
@@ -62,10 +63,54 @@ function parseBon(text) {
   return { items, meta, warn };
 }
 
-function parseReceipt(raw) {
+function parseReceipt(raw, fileName) {
   const t = String(raw).replace(/\r/g, '');
   if (/SUMME\s+EUR/.test(t) && !/Rechnungsnummer|Artikelbezeichnung/.test(t)) return parseBon(t.replace(/[ \t ]+/g, ' '));
+  if (/ROSSMANN/i.test(fileName || '') || /ROSSMANN/i.test(t) || /Zwischensumme/.test(t) && /€/.test(t)) return parseRossmann(t, fileName);
   return parseInvoice(raw);
+}
+
+/* Rossmann eBon: "2X 3600551068749 MIXA CICA REPAIR €7,95 €15,90 A" or "4059729381033 BLUSH €2,95 A"
+   (quantity, barcode, name, unit price when more than one, line total, VAT group). Coupons come after
+   "Zwischensumme" and lower "Summe". The date is in the file name: ROSSMANN-Bon-2026-11-04-T180349-… */
+const SPACES = /[\s\u00A0\u2000-\u200B\u202F\uFE0E\uFE0F]+/g;
+const titleCase = s => s.toLowerCase().replace(/(^|[\s.\-\/&])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+function rossBrand(s) {
+  const b = BRANDS.find(b => s.toLowerCase() === b.toLowerCase() || s.toLowerCase().startsWith(b.toLowerCase() + ' '));
+  return b ? [b, titleCase(s.slice(b.length).trim())] : ['', titleCase(s)];
+}
+function parseRossmann(text, fileName) {
+  const lines = text.split('\n').map(s => s.replace(SPACES, ' ').trim()).filter(Boolean), all = lines.join('\n');
+  const meta = { store: 'Rossmann', online: false }, items = [], warn = [];
+  const f = String(fileName || '').match(/(\d{4})-(\d{2})-(\d{2})-T(\d{2})(\d{2})/), d = all.match(/(\d{2})\.(\d{2})\.(\d{4})(?: (\d{2}):(\d{2}))?/);
+  if (f) { meta.date = `${f[1]}-${f[2]}-${f[3]}`; meta.time = f[4] + ':' + f[5]; }
+  else if (d) { meta.date = `${d[3]}-${d[2]}-${d[1]}`; if (d[4]) meta.time = d[4] + ':' + d[5]; }
+  if (meta.date) meta.invoice = `Rossmann eBon ${meta.date}${meta.time ? ' ' + meta.time : ''}`;
+  const sub = all.match(/Zwischensumme:? ?€ ?([\d.]+,\d{2})/), sum = all.match(/(?:^|\n)Summe:? ?€ ?([\d.]+,\d{2})/);
+  meta.sum = sub ? deNum(sub[1]) : sum ? deNum(sum[1]) : 0; meta.paid = sum ? deNum(sum[1]) : meta.sum;
+  meta.method = /(?:^|\n)Bar\b/.test(all) && !/girocard|Kreditkarte|Mastercard|VISA|Maestro|EC-Karte/i.test(all) ? 'Cash' : /PayPal/i.test(all) ? 'PayPal' : 'Card';
+  const end = lines.findIndex(l => /^(Zwischensumme|Summe)\b/.test(l));
+  const P = '(-? ?€ ?-?[\\d.]*\\d,\\d{2})';
+  const re = new RegExp(`^(?:(\\d+) ?[xX] )?(?:(\\d{8}|\\d{12,14}) )?(.+?) (?:${P} )?${P}(?: [A-Z])?$`);
+  let discount = 0;
+  for (const l of lines.slice(0, end < 0 ? lines.length : end)) {
+    const m = l.match(re); if (!m) continue;
+    const total = deNum(m[5].replace(/[-€ ]/g, ''));
+    if (m[5].includes('-')) { discount += total; continue; }
+    const qty = +m[1] || 1, unit = m[4] ? deNum(m[4].replace(/[-€ ]/g, '')) : total / qty;
+    const code = m[2] ? normEan(m[2]) : '', ean = code && eanOK(code) ? code : '';
+    const same = ean && items.find(x => x.ean === ean && Math.abs(x.unit - unit) < 0.005);
+    if (same) { same.qty += qty; same.total += total; continue; }
+    const [brand, product] = rossBrand(m[3]);
+    items.push({ on: true, brand, product: product || brand, qty, unit, total, ean, netG: parseWeightG(m[3]), category: guessCategory(brand + ' ' + m[3]) });
+  }
+  const parsed = items.reduce((a, x) => a + x.total, 0);
+  if (meta.sum && Math.abs(parsed - meta.sum) > 0.02) {
+    if (discount && Math.abs(parsed - discount - meta.sum) < 0.02) meta.sum = parsed;
+    else warn.push(`Lines found add up to ${fEUR(parsed)}, but the receipt says ${fEUR(meta.sum)}. Some lines may be missing.`);
+  }
+  if (!meta.date) warn.push('The receipt date wasn’t found. Check “Date bought”.');
+  return { items, meta, warn };
 }
 function parseInvoice(raw) {
   const text = String(raw).replace(/\r/g, '').replace(/[ \t ]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{2,}/g, '\n');
@@ -130,7 +175,7 @@ function rdlg() {
 }
 function openReceipt(shipmentId) {
   RX.items = []; RX.meta = {}; RX.warn = []; RX.err = ''; RX.busy = false;
-  RX.o = { shipmentId: shipmentId || '', paidBy: 'me', method: 'Card', date: today(), receipt: '', place: 'dm.de', spread: true };
+  RX.o = { shipmentId: shipmentId || '', paidBy: 'me', method: 'Card', date: today(), receipt: '', place: 'dm.de', store: 'dm', spread: true };
   const d = rdlg(); drawReceipt(); if (!d.open) d.showModal();
 }
 function factor() {
@@ -145,12 +190,12 @@ function drawReceipt() {
   const o = RX.o, m = RX.meta, f = factor(), t = rTotals();
   const dup = m.invoice && db.purchases.some(p => p.receipt === m.invoice || p.receipt === m.order);
   const sel = (k, opts) => `<select data-ro="${k}">${opts.map(x => Array.isArray(x) ? x : [x, x]).map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(o[k]) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
-  $('#rbody').innerHTML = `<div class="rhead"><div><h2>Import dm receipt</h2><p class="lead">Every product line on the receipt becomes a purchase in the chosen box. Check the list, fix anything that looks off, then import.</p></div>
+  $('#rbody').innerHTML = `<div class="rhead"><div><h2>Import receipt</h2><p class="lead">Every product line on the receipt becomes a purchase in the chosen box. Check the list, fix anything that looks off, then import.</p></div>
     <button type="button" class="ib" data-rx="close" title="Close">✕</button></div>
     ${!RX.items.length ? `<div class="rdrop">
         <b class="rdrop-t">${RX.busy ? "Reading the receipt…" : "Drag &amp; drop the PDF here"}</b><span class="note">or</span>
         <label class="btn" for="rx_file">Choose PDF receipt</label><input type="file" id="rx_file" accept="application/pdf,.pdf" hidden>
-        <p class="note">dm.de online invoices (“Rechnung”) and dm store eBons, as PDF. The file stays on your device.</p>
+        <p class="note">dm.de online invoices (“Rechnung”) and dm or Rossmann eBons, as PDF. The file stays on your device.</p>
         <details${RX.err ? ' open' : ''}><summary>Or paste the receipt text</summary>
           <p class="note">Open the PDF, press ⌘A (Ctrl+A) then ⌘C (Ctrl+C), and paste here.</p>
           <textarea id="rx_text" rows="7" placeholder="Paste the receipt text…"></textarea>
@@ -158,6 +203,7 @@ function drawReceipt() {
         ${RX.err ? `<div class="err">${esc(RX.err)}</div>` : ''}</div>` : `
     <div class="fgrid rx-opts">
       <div class="f"><label>Shipment</label>${sel('shipmentId', shipOpts())}</div>
+      <div class="f"><label>Store</label>${sel('store', OPT.store)}</div>
       <div class="f"><label>Date bought</label><input type="date" data-ro="date" value="${esc(o.date)}"></div>
       <div class="f"><label>Paid by</label>${sel('paidBy', PEOPLE.map(p => [p, pname(p)]))}</div>
       <div class="f"><label>Paid with</label>${sel('method', OPT.payDE)}</div>
@@ -170,7 +216,7 @@ function drawReceipt() {
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th><input type="checkbox" data-rx="all"${RX.items.every(x => x.on) ? ' checked' : ''}></th><th>Brand</th><th>Product</th><th>Category</th><th class="num" title="Net content per unit from the receipt; packaging is added when splitting shipping">Content (g/ml)</th><th class="num">Qty</th><th class="num">Per unit${f < 1 ? ' (after coupons)' : ''}</th><th class="num">Total</th></tr></thead><tbody>
     ${RX.items.map((x, i) => `<tr class="${x.on ? '' : 'off'}"><td><input type="checkbox" data-ri="${i}" data-rk="on"${x.on ? ' checked' : ''}></td>
       <td><input class="cell" data-ri="${i}" data-rk="brand" value="${esc(x.brand)}"></td>
-      <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}">${eanFor(x.product.trim(), x.brand.trim()) ? '<span class="pill ok rxean" title="This product was scanned before; the import links its barcode">barcode known</span>' : ''}</td>
+      <td><input class="cell wide" data-ri="${i}" data-rk="product" value="${esc(x.product)}">${x.ean ? `<span class="rxcode"><span class="mono notr">${esc(x.ean)}</span>${x.known ? '<span class="pill ok" title="This barcode is already in the ledger; the product name was taken from there">known product</span>' : ''}</span>` : eanFor(x.product.trim(), x.brand.trim()) ? '<span class="pill ok rxean" title="This product was scanned before; the import links its barcode">barcode known</span>' : ''}</td>
       <td><select class="cell" data-ri="${i}" data-rk="category">${OPT.category.map(c => `<option value="${esc(c)}"${c === x.category ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
       <td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="1" data-ri="${i}" data-rk="netG" value="${x.netG || ''}" placeholder="?"></td>
       <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ri="${i}" data-rk="qty" value="${x.qty}"></td>
@@ -180,23 +226,25 @@ function drawReceipt() {
     <div class="mact"><button type="button" class="btn ghost" data-rx="reset">Use another receipt</button><button type="button" class="btn ghost" data-rx="close">Cancel</button>
       <button type="button" class="btn" data-rx="import" id="rx_go">Import ${t.lines} products</button></div>`}`;
 }
-function loadText(text) {
-  const r = parseReceipt(text);
-  if (!r.items.length) { RX.err = 'No product lines were found. Try pasting the receipt text instead. Photos or scans of paper receipts can’t be read; use the eBon PDF from the dm app.'; RX.busy = false; drawReceipt(); return; }
+function loadText(text, fileName) {
+  const r = parseReceipt(text, fileName);
+  /* a barcode from the receipt that is already in the ledger: use that product's name, so stock and scanning see one product */
+  r.items.forEach(x => { const k = x.ean && db.purchases.find(p => p.ean === x.ean); if (k) Object.assign(x, { brand: k.brand || '', product: k.product, category: k.category || x.category, netG: num(k.netG) || x.netG, known: true }); });
+  if (!r.items.length) { RX.err = 'No product lines were found. Try pasting the receipt text instead. Photos or scans of paper receipts can’t be read; use the eBon PDF from the dm or Rossmann app.'; RX.busy = false; drawReceipt(); return; }
   Object.assign(RX, r, { err: '', busy: false });
-  Object.assign(RX.o, { date: r.meta.date || RX.o.date, receipt: r.meta.invoice || r.meta.order || '', method: r.meta.method || RX.o.method, place: r.meta.online ? 'dm.de (online)' : db.settings.cityDE });
+  Object.assign(RX.o, { date: r.meta.date || RX.o.date, receipt: r.meta.invoice || r.meta.order || '', method: r.meta.method || RX.o.method, store: r.meta.store || 'dm', place: r.meta.online ? 'dm.de (online)' : db.settings.cityDE });
   drawReceipt();
 }
 function doImport() {
   const f = factor(), o = RX.o, on = RX.items.filter(x => x.on && num(x.qty) > 0 && x.product.trim());
   if (!on.length) return toast('Nothing selected to import');
   let linked = 0;
-  on.forEach(x => { const ean = eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
-    db.purchases.push({ id: uid(), date: o.date, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
+  on.forEach(x => { const ean = x.ean || eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
+    db.purchases.push({ id: uid(), date: o.date, store: o.store, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
     qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean,
     notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }); });
   commit(); rdlg().close();
-  toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}${linked ? ` · ${linked} with a known barcode` : ''}`);
+  toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}${linked ? ` · ${linked} with a barcode` : ''}`);
 }
 
 document.addEventListener('click', e => {
@@ -231,9 +279,9 @@ document.addEventListener('input', e => {
 /* ---------- drag and drop ---------- */
 async function readReceiptFile(file) {
   const pdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name), txt = /^text\//.test(file.type) || /\.txt$/i.test(file.name);
-  if (!pdf && !txt) { RX.err = `“${file.name}” is not a PDF. Drop the dm invoice or eBon PDF.`; drawReceipt(); return; }
+  if (!pdf && !txt) { RX.err = `“${file.name}” is not a PDF. Drop the invoice or eBon PDF.`; drawReceipt(); return; }
   RX.busy = true; RX.err = ''; drawReceipt();
-  try { loadText(pdf ? await pdfToText(file) : await file.text()); }
+  try { loadText(pdf ? await pdfToText(file) : await file.text(), file.name); }
   catch (x) { console.warn(x); RX.busy = false; RX.err = 'This PDF could not be read here (the PDF reader needs an internet connection and may be blocked in previews). Use “paste the receipt text” below instead.'; drawReceipt(); }
 }
 let dragDepth = 0;
@@ -241,7 +289,7 @@ const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).i
 const otherDialogOpen = () => ['#modal', '#odlg'].some(s => { const d = $(s); return d && d.open; });
 function dropHint(on) {
   let h = $('#dropHint');
-  if (!h) { h = document.createElement('div'); h.id = 'dropHint'; h.innerHTML = '<div><b>Drop the dm receipt</b><span>PDF invoice or eBon · drop it on a shipment card to add it to that box</span></div>'; document.body.appendChild(h); }
+  if (!h) { h = document.createElement('div'); h.id = 'dropHint'; h.innerHTML = '<div><b>Drop the receipt</b><span>PDF invoice or eBon · drop it on a shipment card to add it to that box</span></div>'; document.body.appendChild(h); }
   h.classList.toggle('on', on);
 }
 function clearDrag() { dragDepth = 0; dropHint(false); document.querySelectorAll('.over').forEach(x => x.classList.remove('over')); }
