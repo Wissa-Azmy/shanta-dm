@@ -73,12 +73,12 @@ document.addEventListener('click', e => {
   if (a === 'sellsel') { const ids = [...SEL]; SEL.clear(); render(); openOrder(null, { purchaseIds: ids }); }
 });
 /* Stock: pick products to sell together */
-/* a tap anywhere on a picked row unpicks it; its buttons, links and fields keep working as usual */
+/* a tap anywhere on a row with units left picks or unpicks it; its buttons, links and fields keep working as usual */
 document.addEventListener('click', e => {
   const r = e.target.closest('tr[data-pickrow]');
   if (!r || e.target.closest('button,a,input,select,textarea,label,[data-act],[data-edit],[data-del]')) return;
   if (String(getSelection && getSelection()).trim()) return;
-  SEL.delete(r.dataset.pickrow); render();
+  const id = r.dataset.pickrow; SEL.has(id) ? SEL.delete(id) : SEL.add(id); render();
 });
 document.addEventListener('change', e => {
   const c = e.target;
