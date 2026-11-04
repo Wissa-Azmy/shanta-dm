@@ -65,8 +65,10 @@ function parseBon(text) {
 
 function parseReceipt(raw, fileName) {
   const t = String(raw).replace(/\r/g, '');
-  if (/SUMME\s+EUR/.test(t) && !/Rechnungsnummer|Artikelbezeichnung/.test(t)) return parseBon(t.replace(/[ \t ]+/g, ' '));
-  if (/ROSSMANN/i.test(fileName || '') || /ROSSMANN/i.test(t) || /Zwischensumme/.test(t) && /€/.test(t)) return parseRossmann(t, fileName);
+  /* dm online invoices also say "Zwischensumme" and use €, so they are told apart first by their own fields */
+  const dmInvoice = /Rechnungsnummer|Artikelbezeichnung|Bestellnummer|dm-drogerie markt/i.test(t);
+  if (/SUMME\s+EUR/.test(t) && !dmInvoice) return parseBon(t.replace(/[ \t ]+/g, ' '));
+  if (!dmInvoice && (/ROSSMANN/i.test(fileName || '') || /ROSSMANN/i.test(t))) return parseRossmann(t, fileName);
   return parseInvoice(raw);
 }
 

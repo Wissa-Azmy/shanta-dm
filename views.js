@@ -108,7 +108,7 @@ V.shipments = R => {
       ${s.notes ? `<p class="note">${esc(s.notes)}</p>` : ''}
       <div class="row">${idx < OPT.status.length - 1 ? `<button class="btn sm" data-act="advance:${s.id}">Mark ${OPT.status[idx + 1]}</button>` : ''}
       <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
-      <button class="btn sm ghost" data-receipt="${s.id}">⇪ Receipt</button>
+      <button class="btn sm ghost" data-receipt="${s.id}">${RCPTICON} Receipt</button>
       <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
       ${db.purchases.some(p => p.shipmentId === s.id) ? `<button class="btn sm ghost" data-pack="${s.id}">${SCANICON} Check box</button>` : ''}
       </div></div>`;
