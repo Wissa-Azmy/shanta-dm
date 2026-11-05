@@ -247,7 +247,7 @@ function paidView() {
   const boxes = db.shipments.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const rateOf = (cur, r) => (num(r) || rate()).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const line = (l) => `<tr><td>${l.date ? fDate(l.date) : '<span class="note">' + esc(l.when || '') + '</span>'}</td><td><b>${esc(l.what)}</b>${l.sub ? `<span class="sub">${esc(l.sub)}</span>` : ''}</td>
-    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' && !num(l.rate) ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td><td class="num">${fEGP(l.egp)}${l.cur === "EUR" && !num(l.rate) && l.at ? `<span class="sub">${l.at}</span>` : ""}</td>
+    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' && !num(l.rate) ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">${l.dayRate ? "rate of the day" : "EGP per €1"}</span>`}</td><td class="num">${fEUR(l.eur)}</td><td class="num">${fEGP(l.egp)}</td>
     <td class="acts">${l.edit ? `<button class="ib" data-edit="${l.edit}">${PENCIL}</button>` : ''}</td></tr>`;
   const group = (title, sub, lines) => { if (!lines.length) return '';
     const t = sum(lines, l => l.eur), te = sum(lines, l => l.egp);
@@ -255,11 +255,11 @@ function paidView() {
       <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Cost</th><th class="num">Paid</th><th class="num">Rate</th><th class="num">In €</th><th class="num">In EGP</th><th></th></tr></thead><tbody>${lines.map(line).join('')}</tbody></table></div></details>`; };
   const products = (k, inBox) => {
     const ps = db.purchases.filter(p => p.paidBy === k && inBox(p)), by = {};
-    ps.forEach(p => { const s = storeOf(p), g = by[s] || (by[s] = { units: 0, eur: 0, egp: 0, rc: new Set(), from: p.date, to: p.date });
+    ps.forEach(p => { const s = storeOf(p), g = by[s] || (by[s] = { units: 0, eur: 0, egp: 0, rc: new Set(), from: p.date, to: p.date, saved: false }); if (num(p.rate)) g.saved = true;
       g.units += num(p.qty); g.eur += pEUR(p); g.egp += pEGP(p); if (p.receipt) g.rc.add(p.receipt);
       if (p.date && (!g.from || p.date < g.from)) g.from = p.date; if (p.date && (!g.to || p.date > g.to)) g.to = p.date; });
     return Object.entries(by).map(([s, g]) => ({ when: !g.from ? "" : g.from === g.to ? fDate(g.from) : `${fDate(g.from)} – ${fDate(g.to)}`, what: `Products · ${s}`,
-      sub: `${g.units} units${g.rc.size ? ` · ${g.rc.size} receipt${g.rc.size === 1 ? '' : 's'}` : ''}`, amt: g.eur, cur: 'EUR', eur: g.eur, egp: g.egp, from: g.from, at: g.eur ? 'at ' + (Math.round(g.egp / g.eur * 100) / 100).toLocaleString('en-US') : '' }));
+      sub: `${g.units} units${g.rc.size ? ` · ${g.rc.size} receipt${g.rc.size === 1 ? '' : 's'}` : ''}`, amt: g.eur, cur: 'EUR', eur: g.eur, egp: g.egp, from: g.from, rate: g.eur ? Math.round(g.egp / g.eur * 100) / 100 : 0, dayRate: !g.saved }));
   };
   const exp = e => ({ date: e.date, what: e.category, sub: [e.description, e.method, e.onDelivery ? 'on delivery' : ''].filter(Boolean).join(' · '), amt: num(e.amount), cur: e.currency || 'EUR', rate: e.rate, eur: toEUR(e.amount, e.currency, e.rate), egp: eEGP(e), edit: 'expenses:' + e.id });
   const known = id => boxes.some(s => s.id === id);

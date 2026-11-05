@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-17";
+const APP_VERSION = "2026.11.05-18";
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
