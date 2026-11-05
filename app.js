@@ -239,16 +239,19 @@ document.addEventListener('input', e => {
   const w = e.target.closest && e.target.closest('.srch'); if (!w) return;
   const x = w.querySelector('[data-srchx]'); if (x) x.hidden = !e.target.value;
 }, true);
-/* the barcode finder lives in find.js: if this copy of index.html doesn't load it yet (an older
-   index.html still cached or not replaced), load it on the first tap on Find instead of doing nothing */
+/* the barcode finder lives in find.js: if it isn't running (index.html doesn't load it, the file is
+   missing on the site, or it stopped on an error), load a fresh copy on the tap on Find, and say what
+   went wrong instead of doing nothing */
+let findLoading = false;
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-obffind]'); if (!o || typeof openFind === 'function') return;
-  e.preventDefault();
+  e.preventDefault(); if (findLoading) return;
   const ids = o.dataset.obffind ? [o.dataset.obffind] : null;
-  if (!document.querySelector('script[src^="find.js"]')) {
-    const s = document.createElement('script'); s.src = 'find.js?v=' + APP_VERSION;
-    s.onload = () => { render(); openFind(ids); };
-    s.onerror = () => { s.remove(); toast('⚠ The barcode finder couldn’t be loaded. Check the connection and try again.'); };
-    document.body.appendChild(s);
-  }
+  findLoading = true; toast('Loading the barcode finder…');
+  const s = document.createElement('script'); s.src = 'find.js?v=' + APP_VERSION + '&t=' + Date.now();
+  s.onload = () => { findLoading = false;
+    if (typeof openFind !== 'function') return toast('⚠ The barcode finder has an error. Send a screenshot of this message.');
+    render(); openFind(ids); };
+  s.onerror = () => { findLoading = false; s.remove(); toast('⚠ find.js couldn’t be loaded. Check it is uploaded to the site, next to index.html.'); };
+  document.body.appendChild(s);
 });

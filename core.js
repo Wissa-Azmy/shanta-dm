@@ -1,6 +1,14 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-25";
+const APP_VERSION = "2026.11.05-26";
 /* ---------- helpers ---------- */
+/* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
+window.addEventListener('error', e => {
+  if (!e.filename || !e.filename.startsWith(location.origin)) return;
+  try { toast(`⚠ Error: ${e.message} (${e.filename.split('/').pop().split('?')[0]}:${e.lineno})`); } catch (x) { }
+});
+window.addEventListener('unhandledrejection', e => {
+  try { const m = e.reason && e.reason.message; if (m && !/abort|fetch|network|load failed/i.test(m)) toast('⚠ Error: ' + m); } catch (x) { }
+});
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const today = () => new Date().toISOString().slice(0, 10);

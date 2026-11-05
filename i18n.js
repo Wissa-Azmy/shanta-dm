@@ -627,3 +627,9 @@ Object.assign(AR, {
   'dm’s search isn’t available from this site, so only the open databases are used.': 'بحث dm غير متاح من هذا الموقع، لذلك تُستخدم قواعد البيانات المفتوحة فقط.'
 });
 Object.assign(AR, { 'The barcode finder couldn’t be loaded. Check the connection and try again.': 'تعذّر تحميل أداة البحث عن الباركود. تحقق من الاتصال وحاول مجددًا.' });
+rx(/^Error: (.+)$/, (m, x) => `خطأ: ${x}`);
+Object.assign(AR, {
+  'Loading the barcode finder…': 'جارٍ تحميل أداة البحث عن الباركود…',
+  'The barcode finder has an error. Send a screenshot of this message.': 'في أداة البحث عن الباركود خطأ. أرسل لقطة شاشة لهذه الرسالة.',
+  'find.js couldn’t be loaded. Check it is uploaded to the site, next to index.html.': 'تعذّر تحميل find.js. تأكد من رفعه إلى الموقع بجوار index.html.'
+});
