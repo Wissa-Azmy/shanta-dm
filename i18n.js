@@ -668,3 +668,5 @@ Object.assign(AR, {
   'This barcode isn’t linked to a product': 'هذا الباركود غير مرتبط بمنتج'
 });
 Object.assign(AR, { 'View this product on dm.de': 'اعرض هذا المنتج على dm.de' });
+rx(/^(\d+) doesn’t look like a valid barcode \(the last digit doesn’t match\)\.$/, (m, c) => `${c} لا يبدو باركودًا صحيحًا (الرقم الأخير غير مطابق).`);
+Object.assign(AR, { 'Or type the barcode': 'أو اكتب الباركود', 'Type the barcode first.': 'اكتب الباركود أولًا.', 'A barcode has 8 to 14 digits.': 'الباركود من 8 إلى 14 رقمًا.', 'Link it anyway?': 'هل تربطه على أي حال؟' });

@@ -771,3 +771,7 @@ a.eanlink:hover{background:#fdf3cf}
 .dmic{display:inline-block;margin-inline-start:6px;font-size:10.5px;font-weight:700;line-height:1;color:#5b4300;background:#fde9a8;padding:3px 6px;border-radius:999px;text-decoration:none;white-space:nowrap;vertical-align:2px}
 .dmic:hover{background:#fbdc76}
 .cntr .cname{display:flex;align-items:center;min-width:0}.cntr .cname b{min-width:0}.cntr .cname .dmic{flex:none;vertical-align:0}
+/* barcode finder: type the barcode by hand */
+.obfman{margin:12px 0 4px;padding-top:10px;border-top:1px dashed var(--line)}
+.obfman label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.obfman .toolbar{margin:0;display:flex;gap:8px}.obfman input{flex:1;min-width:0;font-family:var(--mono);letter-spacing:.5px}

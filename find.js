@@ -83,7 +83,7 @@ function openFind(only) {
 }
 function findStep() {
   const g = FINDER.groups[FINDER.i]; if (!g) return findDone();
-  FINDER.noBrand = false; FINDER.q = obfQuery(g.p); FINDER.res = null; FINDER.tried = null; FINDER.errs = {};
+  FINDER.noBrand = false; FINDER.man = ''; FINDER.q = obfQuery(g.p); FINDER.res = null; FINDER.tried = null; FINDER.errs = {};
   drawFind(); runFind();
 }
 const srcOrder = p => (storeOf(p) === 'dm' ? ['dm', 'obf', 'off'] : ['obf', 'dm', 'off']).filter(k => k !== 'dm' || !DMOFF || dmRelay());
@@ -144,6 +144,7 @@ function drawFind() {
       ${FINDER.busy ? `<p class="note" id="obfwait">Searching ${esc(FSRC[FINDER.cur] ? FSRC[FINDER.cur].name : '')}…</p>`
       : FINDER.tried && !res.length && !errs ? '<p class="note">No matches found. Shorten the search (e.g. brand + two words) or skip this product.</p>' : ''}
       ${errs}${dmNote}${moreBtn}</div>
+    <div class="obfman"><label for="fbman">Or type the barcode</label><div class="toolbar"><input id="fbman" type="text" inputmode="numeric" data-fbman value="${esc(FINDER.man || '')}" autocomplete="off" dir="ltr" placeholder="e.g. 4066447985290" maxlength="20"><button type="button" class="btn" data-fb="manual">Link</button></div></div>
     <p class="note">Check the picture and size before linking. The barcode goes on every line of this product.</p>
     <div class="mact sdact obfnav"><button type="button" class="btn ghost" data-fb="back"${FINDER.i ? '' : ' disabled'}>Back</button><button type="button" class="btn ghost" data-fb="skip">Skip</button><button type="button" class="btn ghost full" data-fb="done">Done</button></div></div>`;
 }
@@ -155,14 +156,21 @@ document.addEventListener('click', e => {
   const o = e.target.closest('[data-obffind]');
   if (o) { e.preventDefault(); return openFind(o.dataset.obffind ? [o.dataset.obffind] : null); }
   const b = e.target.closest('[data-fb]'); if (!b || !FINDER || b.disabled) return;
-  const [a, code] = b.dataset.fb.split(':'), g = FINDER.groups[FINDER.i];
+  let [a, code] = b.dataset.fb.split(':'); const g = FINDER.groups[FINDER.i];
   if (a === 'search') { const i = $('#obfdlg [data-fbq]'); FINDER.q = i ? i.value : FINDER.q; runFind(); }
   else if (a === 'more') runFind(true);
   else if (a === 'nobrand') { FINDER.noBrand = true; FINDER.q = obfQuery(g.p, true); runFind(); }
   else if (a === 'skip') { FINDER.i++; findStep(); }
   else if (a === 'back') { FINDER.i = Math.max(0, FINDER.i - 1); findStep(); }
   else if (a === 'done') findDone();
-  else if (a === 'link') {
+  else if (a === 'manual' || a === 'link') {
+    if (a === 'manual') {
+      const i = $('#obfdlg [data-fbman]'), raw = i ? i.value : (FINDER.man || '');
+      code = normEan(raw);
+      if (!code) { toast('⚠ Type the barcode first.'); if (i) i.focus(); return; }
+      if (!/^\d{8,14}$/.test(code)) { toast('⚠ A barcode has 8 to 14 digits.'); if (i) i.focus(); return; }
+      if (!eanOK(code) && !confirm(`${code} doesn’t look like a valid barcode (the last digit doesn’t match).\n\nLink it anyway?`)) return;
+    }
     const other = db.purchases.find(x => x.ean === code && grpKey(x) !== g.key);
     if (other && !confirm(`Barcode ${code} is already on “${other.product}”.\n\nLink it to “${g.p.product}” as well?`)) return;
     linkEan(g.ids, code); FINDER.linked++;
@@ -188,3 +196,6 @@ document.addEventListener('click', e => {
     .catch(e => toast(e.message === 'site' ? '⚠ The relay doesn’t accept this site. Add the site to ALLOWED in the Worker.' : e.name === 'AbortError' ? '⚠ The relay didn’t answer in time.' : '⚠ The relay didn’t answer. Check the address and that the Worker is deployed.'))
     .finally(() => { clearTimeout(t); b.disabled = false; b.textContent = 'Test'; });
 });
+/* typed barcode: kept while the results redraw, Enter links it */
+document.addEventListener('input', e => { if (FINDER && e.target.matches && e.target.matches('[data-fbman]')) FINDER.man = e.target.value; });
+document.addEventListener('keydown', e => { if (FINDER && e.key === 'Enter' && e.target.matches && e.target.matches('[data-fbman]')) { e.preventDefault(); const b = $('#obfdlg [data-fb="manual"]'); if (b) b.click(); } });
