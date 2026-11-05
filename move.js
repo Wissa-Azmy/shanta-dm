@@ -27,7 +27,7 @@ function drawMove() {
     ${MV.to === '__new' ? `<div class="f"><label>New box name</label><input data-mvk="name" value="${esc(MV.name)}"></div>` : ''}</div>
     <p class="note">Sold units stay in their box. Shipping costs are split again by weight in both boxes.</p>
     ${MV.err ? `<p class="err">${esc(MV.err)}</p>` : ''}
-    <div class="mact sdact"><button type="button" class="btn full" data-mv="go">Move</button><button type="button" class="btn ghost" data-mv="cancel">Cancel</button></div></div>`;
+    <div class="mact sdact"><button type="button" class="btn" data-mv="go">Move</button><button type="button" class="btn ghost" data-mv="cancel">Cancel</button></div></div>`;
 }
 function doMove() {
   let to = MV.to;
@@ -63,12 +63,3 @@ document.addEventListener('change', e => {
   MV[k] = e.target.value; MV.err = ''; if (k === 'to') drawMove();
 });
 document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.mvk === 'name' && MV) MV.name = e.target.value; });
-/* "Move products" on a box card: Stock filtered to that box, everything in it ticked, ready to untick */
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-moveof]'); if (!b) return;
-  const id = b.dataset.moveof, R = calc();
-  Object.assign(UI, { q: '', box: id, store: '', stockStatus: 'left' }); SEL.clear();
-  db.purchases.forEach(p => { if (p.shipmentId === id && R.lots[p.id].left > 0) SEL.add(p.id); });
-  if (!SEL.size) return toast('Nothing left in this box to move.');
-  go('stock'); toast(`Untick what stays, then tap “Move to box”.`);
-});

@@ -598,3 +598,20 @@ table.t tr[data-pickrow]{cursor:pointer;-webkit-tap-highlight-color:transparent;
 .mvto .f select,.mvto .f input{width:100%}
 @media (max-width:520px){.mvto{grid-template-columns:1fr}}
 [dir=rtl] .mvn small{margin-right:0;margin-left:4px}
+
+/* ---------- phones: selection bar in two rows, everything above the home indicator ---------- */
+:root{--sab:max(14px,calc(env(safe-area-inset-bottom) + 8px))}
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+@media (max-width:820px),(pointer:coarse){
+  .selbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;bottom:var(--sab)}
+  .selbar>b{grid-column:1/-1;padding:0 4px;font-size:14.5px}
+  .selbar .sp{display:none}
+  .selbar .btn{width:100%;min-height:44px;margin:0;padding:6px 8px;justify-content:center;text-align:center;white-space:normal;line-height:1.15;font-size:13.5px}
+  #toast,#newver{bottom:var(--sab)}
+  #totop{bottom:calc(var(--sab) + 4px)}
+  body.hasnew #toast,body.hasnew #totop{bottom:calc(var(--sab) + 70px)}
+  body.hassel #view{padding-bottom:130px}
+  body.hassel #toast,body.hassel #totop{bottom:calc(var(--sab) + 112px)}
+  body.hassel.hasnew .selbar{bottom:calc(var(--sab) + 70px)}
+  body.hassel.hasnew #toast,body.hassel.hasnew #totop{bottom:calc(var(--sab) + 182px)}
+}
