@@ -30,8 +30,8 @@ Object.assign(AR, {
   'This browser can’t write files directly. Download a backup after changes.': 'هذا المتصفح لا يستطيع الكتابة في الملفات مباشرة. نزّل نسخة احتياطية بعد كل تغيير.',
   'Download': 'تنزيل', 'Restore from file': 'استعادة من ملف', 'Fetching…': 'جارٍ الجلب…',
   'Edit': 'تعديل', 'Delete': 'حذف', 'Close': 'إغلاق', 'Remove': 'إزالة', 'Cancel': 'إلغاء', 'Everyone': 'الجميع', '→': '←',
-  'Couldn’t get the live rate. Check your internet connection; you can still type the rate yourself.': 'تعذّر جلب السعر المباشر. تحقق من اتصالك بالإنترنت؛ ويمكنك كتابة السعر بنفسك.',
-  'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.': 'يُستخدم افتراضياً للقيود الجديدة ولعرض مبالغ اليورو بالجنيه. القيود القديمة تحتفظ بسعرها.'
+  'Couldn’t get the live rate. Check your internet connection; you can still type the rate yourself.': 'تعذّر جلب سعر الصرف المباشر. تحقق من اتصالك بالإنترنت؛ ويمكنك كتابة سعر الصرف بنفسك.',
+  'Used as the default for new entries and to show € amounts in EGP. Old entries keep their own rate.': 'يُستخدم افتراضياً للقيود الجديدة ولعرض مبالغ اليورو بالجنيه. القيود القديمة تحتفظ بسعر صرفها.'
 });
 
 /* ---- overview ---- */
@@ -44,7 +44,7 @@ Object.assign(AR, {
   'Welcome. Let’s set up your ledger.': 'أهلاً بك. لنجهّز سجلك.',
   'Choose where the data lives:': 'اختر مكان حفظ البيانات:', 'click': 'اضغط', 'on the left to create a': 'في القائمة الجانبية لإنشاء ملف',
   'file on your disk. After that every change is written to it automatically. Share that file (e.g. via Google Drive or WhatsApp) so you both see the same numbers.': 'على جهازك. بعدها يُحفظ كل تغيير فيه تلقائياً. شارك هذا الملف (مثلاً عبر Google Drive أو واتساب) لتريا نفس الأرقام.',
-  'Put your names, the profit split and today’s EGP rate in': 'ضع أسماءكما وتقسيم الربح وسعر الجنيه اليوم في',
+  'Put your names, the profit split and today’s EGP rate in': 'ضع أسماءكما وتقسيم الربح وسعر صرف الجنيه اليوم في',
   'Create a': 'أنشئ', 'Shipment': 'الشحنة', ', add your dm': '، ثم أضف إليها', 'to it, then record': 'من dm، ثم سجّل', 'and': 'و', 'as they happen.': 'أولاً بأول.',
   'Create first shipment': 'أنشئ أول شحنة', 'Load sample data to explore': 'حمّل بيانات تجريبية للاستكشاف',
   'Collected from sales': 'المحصّل من المبيعات', 'Profit so far': 'الربح حتى الآن', 'on goods sold': 'على البضاعة المباعة',
@@ -62,7 +62,7 @@ rx(/^(\d+(?:\.\d+)?) left$/, (m, n) => `متبقٍ ${n}`);
 rx(/^due (.+)$/, (m, d) => `مستحق ${d}`);
 rx(/^Counts only money customers have actually paid\. .* split (\d+)% (.+) \/ (\d+)% (.+)\. Money for unsold stock comes back as it sells\.$/,
   (m, a, n1, b, n2) => `يُحتسب فقط ما دفعه العملاء فعلاً. يسترد كل منكما أولاً ما دفعه في البضاعة التي خرجت من المخزون (تكلفة المنتج مع شحن وجمارك صندوقه)، ثم يُقسَّم الربح ${a}% ${n1} / ${b}% ${n2}. أموال المخزون غير المباع تعود مع بيعه.`);
-rx(/^All amounts in € using each entry’s own exchange rate\. EGP shown at today’s rate of (.+)\.$/, (m, r) => `كل المبالغ باليورو بسعر صرف كل قيد. الجنيه معروض بسعر اليوم ${r}.`);
+rx(/^All amounts in € using each entry’s own exchange rate\. EGP shown at today’s rate of (.+)\.$/, (m, r) => `كل المبالغ باليورو بسعر صرف كل قيد. الجنيه معروض بسعر صرف اليوم ${r}.`);
 /* ---- shipments ---- */
 Object.assign(AR, {
   'No shipments yet': 'لا توجد شحنات بعد',
@@ -120,7 +120,7 @@ Object.assign(AR, {
   'Weighed box (kg)': 'وزن الصندوق (كجم)',
   'Optional: the packed box on the scale. Products without a known weight share what is left after the known ones; also used to check the packaging %.': 'اختياري: وزن الصندوق المعبأ على الميزان. المنتجات بلا وزن معروف تتقاسم ما يتبقى بعد المعروفة، ويُستخدم أيضاً للتحقق من نسبة التغليف.',
   'Delivered on': 'تاريخ التسليم', 'Notes': 'ملاحظات', 'Shipping cost (optional, saved as an expense on this shipment)': 'تكلفة الشحن (اختياري، تُحفظ كمصروف على هذه الشحنة)',
-  'Amount': 'المبلغ', 'Currency': 'العملة', 'Rate (EGP per €1)': 'سعر الصرف (جنيه لكل €1)', 'Rate on that day; used to convert to €': 'سعر ذلك اليوم؛ يُستخدم للتحويل إلى اليورو',
+  'Amount': 'المبلغ', 'Currency': 'العملة', 'Rate (EGP per €1)': 'سعر الصرف (جنيه لكل €1)', 'Rate on that day; used to convert to €': 'سعر الصرف في ذلك اليوم؛ يُستخدم للتحويل إلى اليورو',
   'Paid by': 'الدافع', 'Paid on delivery in Egypt': 'دُفع عند الاستلام في مصر', 'Type the name of the other carrier.': 'اكتب اسم شركة الشحن الأخرى.',
   'Delete this shipment? Its products and costs stay, they just become unassigned.': 'حذف هذه الشحنة؟ تبقى منتجاتها وتكاليفها لكن دون ربطها بصندوق.',
   'One product line from a dm receipt. Use “Save & add another” to enter a whole receipt.': 'سطر منتج واحد من فاتورة dm. استخدم «حفظ وإضافة آخر» لإدخال فاتورة كاملة.',
@@ -165,7 +165,7 @@ rx(/^Price for (.+)% markup$/, (m, p) => `السعر لهامش ${p}%`);
 rx(/^(.+) not paid yet$/, (m, n) => `${n} لم يُدفع بعد`);
 rx(/^(.+) \+ packaging$/, (m, g) => `${tr(g)} + تغليف`);
 rx(/^(.+) \+ (.+) shipping$/, (m, a, b) => `${a} + ${b} شحن`);
-rx(/^EGP amounts use today’s rate \((.+) EGP\/€\)\.$/, (m, r) => `مبالغ الجنيه بسعر اليوم (${r} جنيه/€).`);
+rx(/^EGP amounts use today’s rate \((.+) EGP\/€\)\.$/, (m, r) => `مبالغ الجنيه بسعر صرف اليوم (${r} جنيه/€).`);
 rx(/^Sale to (.+)$/, (m, c) => `بيع لـ ${c}`);
 rx(/^(\d+) products? to (.+)$/, (m, n, c) => `${n} منتج إلى ${c}`);
 rx(/^(.+), on delivery$/, (m, h) => `${tr(h)}، عند الاستلام`);
@@ -174,8 +174,8 @@ rx(/^(.+), on delivery$/, (m, h) => `${tr(h)}، عند الاستلام`);
 Object.assign(AR, {
   'The two of you': 'أنتما الاثنان', 'Your name (in Germany)': 'اسمك (في ألمانيا)', 'Friend’s name (in Egypt)': 'اسم صديقك (في مصر)',
   'Your share of the profit (%)': 'نصيبك من الربح (%)', 'Default place to buy': 'مكان الشراء الافتراضي', 'Default city for sales': 'مدينة البيع الافتراضية',
-  'Money & stock': 'المال والمخزون', 'Today’s rate: EGP for €1': 'سعر اليوم: جنيه لكل €1', 'Live rate': 'السعر المباشر',
-  'Update the rate from the internet once a day': 'حدّث السعر من الإنترنت مرة يومياً', 'Target markup on cost (%)': 'هامش الربح المستهدف على التكلفة (%)',
+  'Money & stock': 'المال والمخزون', 'Today’s rate: EGP for €1': 'سعر الصرف اليوم: جنيه لكل €1', 'Live rate': 'سعر الصرف المباشر',
+  'Update the rate from the internet once a day': 'حدّث سعر الصرف من الإنترنت مرة يومياً', 'Target markup on cost (%)': 'هامش الربح المستهدف على التكلفة (%)',
   'Used for the suggested selling price.': 'يُستخدم لسعر البيع المقترح.', 'Packaging added to content weight (%)': 'التغليف المضاف إلى وزن المحتوى (%)',
   'Receipts only show the net content. This much is added for bottle, jar and box when splitting shipping by weight.': 'الفواتير تُظهر المحتوى الصافي فقط. تُضاف هذه النسبة للزجاجة والعلبة والكرتونة عند تقسيم الشحن حسب الوزن.',
   'Warn when stock is at or below': 'نبّه عندما يصل المخزون إلى أو أقل من', 'Backup & sync': 'النسخ الاحتياطي والمزامنة',
@@ -199,9 +199,9 @@ Object.assign(AR, {
   'Whoever paid the box costs gets them back in the same proportion as its products are sold.': 'من دفع تكاليف الصندوق يستردها بنفس نسبة بيع منتجاته.'
 });
 rx(/^(.+) gets (\d+(?:\.\d+)?)%$/, (m, n, p) => `نصيب ${n}: ${p}%`);
-rx(/^Typed in by hand on (.+)\. Used as the default for new entries; old entries keep their own rate\.$/, (m, d) => `أُدخل يدوياً في ${d}. يُستخدم افتراضياً للقيود الجديدة، والقيود القديمة تحتفظ بسعرها.`);
-rx(/^Live rate from (.+?), (.+)\. You can still type your own\. Used as the default for new entries; old entries keep their own rate\.$/, (m, s, d) => `سعر مباشر من ${s}، ${d}. يمكنك كتابة سعرك. يُستخدم افتراضياً للقيود الجديدة، والقيود القديمة تحتفظ بسعرها.`);
-rx(/^Live rate: €1 = (.+) EGP( \(unchanged\))?$/, (m, r, u) => `السعر المباشر: €1 = ${r} جنيه${u ? ' (بدون تغيير)' : ''}`);
+rx(/^Typed in by hand on (.+)\. Used as the default for new entries; old entries keep their own rate\.$/, (m, d) => `أُدخل يدوياً في ${d}. يُستخدم افتراضياً للقيود الجديدة، والقيود القديمة تحتفظ بسعر صرفها.`);
+rx(/^Live rate from (.+?), (.+)\. You can still type your own\. Used as the default for new entries; old entries keep their own rate\.$/, (m, s, d) => `سعر صرف مباشر من ${s}، ${d}. يمكنك كتابة سعر الصرف بنفسك. يُستخدم افتراضياً للقيود الجديدة، والقيود القديمة تحتفظ بسعر صرفها.`);
+rx(/^Live rate: €1 = (.+) EGP( \(unchanged\))?$/, (m, r, u) => `سعر الصرف المباشر: €1 = ${r} جنيه${u ? ' (بدون تغيير)' : ''}`);
 rx(/^= content weight × \(1 \+ (.+)% packaging\)$/, (m, p) => `= وزن المحتوى × (1 + ${p}% تغليف)`);
 rx(/^a (.+) cream ships as (.+) \((.+) \+ (.+)%\)\. In a box of (.+) with (.+) shipping it carries (.+) × (.+) ÷ (.+) =$/,
   (m, a, b, c, p, box, cost, c2, b2, box2) => `كريم ${tr(a)} يُشحن كـ ${tr(b)} (${tr(c)} + ${p}%). في صندوق ${tr(box)} بتكلفة شحن ${cost} يتحمل ${c2} × ${tr(b2)} ÷ ${tr(box2)} =`);
@@ -569,32 +569,32 @@ rx(/^· (\d+) products? without a receipt$/, (m, n) => `· ${n} منتج بدو�
 rx(/^(\d+) products? · (\d+) units?$/, (m, a, b) => `${a} منتج · ${b} وحدة`);
 Object.assign(AR, { 'Show its products': 'اعرض منتجاتها' });
 Object.assign(AR, { 'In EGP': 'بالجنيه' });
-rx(/^at ([\d.,]+)$/, (m, r) => `بسعر ${r}`);
+rx(/^at ([\d.,]+)$/, (m, r) => `بسعر صرف ${r}`);
 /* exchange rate of products */
-rx(/^(\d+) product lines?( · (.+?))?( · (\d+) with a saved rate)?$/, (m, n, a, eur, b, s) => `${n} سطر منتجات${eur ? ' · ' + eur : ''}${s ? ` · ${s} بسعر محفوظ` : ''}`);
+rx(/^(\d+) product lines?( · (.+?))?( · (\d+) with a saved rate)?$/, (m, n, a, eur, b, s) => `${n} سطر منتجات${eur ? ' · ' + eur : ''}${s ? ` · ${s} بسعر صرف محفوظ` : ''}`);
 rx(/^(\d+) selected products?$/, (m, n) => `${n} منتجات محددة`);
 rx(/^All products in (.+)$/, (m, b) => `كل المنتجات في ${b}`);
-rx(/^(?:✓ )?Rate ([\d.]+) saved on (\d+) product lines?$/, (m, r, n) => `تم حفظ السعر ${r} على ${n} سطر منتجات`);
-rx(/^(?:✓ )?Saved rate removed from (\d+) product lines?$/, (m, n) => `أُزيل السعر المحفوظ من ${n} سطر منتجات`);
-rx(/^today ([\d.,]+) · bought at ([\d.,]+)(\*?)$/, (m, a, b, s) => `اليوم ${a} · الشراء بسعر ${b}${s}`);
-rx(/^(.+) at purchase rates$/, (m, v) => `${v} بأسعار الشراء`);
+rx(/^(?:✓ )?Rate ([\d.]+) saved on (\d+) product lines?$/, (m, r, n) => `تم حفظ سعر الصرف ${r} على ${n} سطر منتجات`);
+rx(/^(?:✓ )?Saved rate removed from (\d+) product lines?$/, (m, n) => `أُزيل سعر الصرف المحفوظ من ${n} سطر منتجات`);
+rx(/^today ([\d.,]+) · bought at ([\d.,]+)(\*?)$/, (m, a, b, s) => `اليوم ${a} · سعر صرف الشراء ${b}${s}`);
+rx(/^(.+) at purchase rates$/, (m, v) => `${v} بأسعار صرف الشراء`);
 rx(/^(.+) · on goods sold, at the rates paid$/, (m, v) => `${v} · على البضاعة المباعة، بأسعار الدفع`);
-rx(/^(.+) · rate of (?:that|the) day$/, (m, v) => `${v} · سعر ذلك اليوم`);
-rx(/^EGP prices and markups use today’s rate \(([\d.,]+) EGP\/€\)\..*$/, (m, r) => `أسعار الجنيه ونسب الربح بسعر اليوم (${r} جنيه/€). «الشراء بسعر» هو السعر المحفوظ على المنتج؛ * تعني أنه لا يوجد سعر محفوظ فيُستخدم سعر يوم الشراء.`);
-rx(/^Used for what you paid in EGP and for stock and profit at purchase rates\. Suggested selling prices keep using today’s rate \(([\d.,]+)\)\..*$/, (m, r) => `يُستخدم لما دفعتماه بالجنيه وللمخزون والربح بأسعار الشراء. أسعار البيع المقترحة تبقى بسعر اليوم (${r}). اتركه فارغًا للعودة إلى سعر يوم الشراء.`);
+rx(/^(.+) · rate of (?:that|the) day$/, (m, v) => `${v} · سعر صرف ذلك اليوم`);
+rx(/^EGP prices and markups use today’s rate \(([\d.,]+) EGP\/€\)\..*$/, (m, r) => `أسعار الجنيه ونسب الربح بسعر صرف اليوم (${r} جنيه/€). «سعر صرف الشراء» هو سعر الصرف المحفوظ على المنتج؛ * تعني أنه لا يوجد سعر صرف محفوظ فيُستخدم سعر صرف يوم الشراء.`);
+rx(/^Used for what you paid in EGP and for stock and profit at purchase rates\. Suggested selling prices keep using today’s rate \(([\d.,]+)\)\..*$/, (m, r) => `يُستخدم لما دفعتماه بالجنيه وللمخزون والربح بأسعار صرف الشراء. أسعار البيع المقترحة تبقى بسعر صرف اليوم (${r}). اتركه فارغًا للعودة إلى سعر صرف يوم الشراء.`);
 Object.assign(AR, {
-  'Exchange rate': 'سعر الصرف', 'Set rate': 'تحديد السعر', 'Now': 'الآن', 'With this rate': 'بهذا السعر', 'Save': 'حفظ', 'Nothing changed.': 'لم يتغير شيء.',
-  '€→EGP Set rate for the whole box': '€→جنيه تحديد السعر للصندوق كله', 'Set the exchange rate of this receipt': 'حدد سعر الصرف لهذه الفاتورة',
-  'At purchase rate': 'بسعر الشراء', 'At today’s rate': 'بسعر اليوم',
-  'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر ذلك اليوم.',
-  '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعرًا أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعرًا أكبر من 0، أو اتركه فارغًا.'
+  'Exchange rate': 'سعر الصرف', 'Set rate': 'تحديد سعر الصرف', 'Now': 'الآن', 'With this rate': 'بسعر الصرف هذا', 'Save': 'حفظ', 'Nothing changed.': 'لم يتغير شيء.',
+  '€→EGP Set rate for the whole box': '€→جنيه تحديد سعر الصرف للصندوق كله', 'Set the exchange rate of this receipt': 'حدد سعر الصرف لهذه الفاتورة',
+  'At purchase rate': 'بسعر صرف الشراء', 'At today’s rate': 'بسعر صرف اليوم',
+  'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر صرف ذلك اليوم.',
+  '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعر صرف أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعر صرف أكبر من 0، أو اتركه فارغًا.'
 });
 rx(/^Rate ([\d.,]+) EGP per €1$/, (m, r) => `سعر الصرف ${r} جنيه لكل €1`);
-Object.assign(AR, { 'Rate': 'سعر الصرف', 'Rate of the purchase day': 'سعر يوم الشراء', 'Change rate': 'تغيير السعر', 'Rate for box': 'سعر الصندوق',
+Object.assign(AR, { 'Rate': 'سعر الصرف', 'Rate of the purchase day': 'سعر صرف يوم الشراء', 'Change rate': 'تغيير سعر الصرف', 'Rate for box': 'سعر صرف الصندوق',
   'Set the exchange rate of every product in this box': 'حدد سعر الصرف لكل منتجات هذا الصندوق' });
-rx(/^Rate of the purchase day ([\d.,]+)$/, (m, r) => `سعر يوم الشراء ${r}`);
-Object.assign(AR, { 'Different rates on its products': 'أسعار مختلفة على منتجاتها' });
-Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.': 'سعر ذلك اليوم. للتكاليف بالجنيه يحوّلها إلى €؛ وللتكاليف باليورو يعطي قيمتها بالجنيه.' });
-Object.assign(AR, { 'No rate saved: the rate of that day is used': 'لا يوجد سعر محفوظ: يُستخدم سعر ذلك اليوم' });
-Object.assign(AR, { 'rate of the day': 'سعر ذلك اليوم' });
+rx(/^Rate of the purchase day ([\d.,]+)$/, (m, r) => `سعر صرف يوم الشراء ${r}`);
+Object.assign(AR, { 'Different rates on its products': 'أسعار صرف مختلفة على منتجاتها' });
+Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.': 'سعر الصرف في ذلك اليوم. للتكاليف بالجنيه يحوّلها إلى €؛ وللتكاليف باليورو يعطي قيمتها بالجنيه.' });
+Object.assign(AR, { 'No rate saved: the rate of that day is used': 'لا يوجد سعر صرف محفوظ: يُستخدم سعر صرف ذلك اليوم' });
+Object.assign(AR, { 'rate of the day': 'سعر صرف ذلك اليوم' });
 Object.assign(AR, { 'Clear search': 'مسح البحث' });
