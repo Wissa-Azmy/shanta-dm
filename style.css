@@ -710,3 +710,4 @@ small.egp{display:block;font:500 12px var(--mono);color:var(--muted);white-space
 [dir=rtl] .srch input[type=search]{padding-right:11px;padding-left:34px}
 [dir=rtl] .srchx{right:auto;left:6px}
 @media (max-width:820px),(pointer:coarse){.srchx{width:28px;height:28px;font-size:18px}.srch input[type=search]{padding-right:40px}[dir=rtl] .srch input[type=search]{padding-left:40px}}
+.rcpt .rn .rdate{font-weight:600;font-size:13.5px}
