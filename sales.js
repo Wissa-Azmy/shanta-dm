@@ -50,6 +50,9 @@ function openOrder(id, preset) {
       OR.lines = preset.purchaseIds.map(id => R.lots[id]).filter(l => l && l.left > 0).map(l => ({ purchaseId: l.p.id, qty: 1, unitPrice: suggestEGP(l) }));
       if (!OR.lines.length) OR.lines = [{ purchaseId: '', qty: 1, unitPrice: '' }];
     }
+    /* lines worked out elsewhere (the Egypt stock count): purchase, quantity and price given */
+    if (preset && preset.lines && preset.lines.length) OR.lines = preset.lines.map(x => Object.assign({}, x));
+    if (preset && preset.notes) OR.h.notes = preset.notes;
   }
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
 }

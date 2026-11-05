@@ -740,3 +740,24 @@ small.egp{display:block;font:500 12px var(--mono);color:var(--muted);white-space
 .obfr .noimg{display:grid;place-items:center;font-size:9.5px;line-height:1.1;text-align:center;color:var(--muted);padding:2px;box-sizing:border-box}
 .obfr .chk{display:flex;gap:12px;margin-top:3px;font-size:12px}
 .obfr .chk a{color:var(--nile);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+/* Egypt stock count */
+.cntboxes{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.cntboxes .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;font-size:13px;background:var(--card);cursor:pointer}
+.cntsum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.cntsum>div{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.cntsum small{display:block;font-size:11.5px;color:var(--muted)}
+.cntsum b{font-size:20px}
+.cntsum .sell{border-color:var(--nile)}.cntsum .sell b{color:var(--nile)}
+.cntscan{width:100%;justify-content:center;margin:4px 0 6px;box-sizing:border-box}
+.cntlist{list-style:none;margin:6px 0 0;padding:0;max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.cntr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.cntr.kept{border-color:#3b8f5f;background:#f2f8f4}
+.cntr .cx{min-width:0;display:flex;flex-direction:column}
+.cntr .cx b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cntr .sub{font-size:12px;color:var(--muted)}
+.cntr .mono{font:11.5px var(--mono)}
+.cstep{display:inline-flex;align-items:center;gap:6px}
+.cstep b{min-width:44px;text-align:center;font-size:15px}.cstep small{color:var(--muted);font-weight:400}
+.cstep .ib{width:30px;height:30px;font-size:18px}
+.csell{font-size:12px;font-weight:600;color:var(--nile);min-width:52px;text-align:end}
+@media (max-width:520px){.cntr{grid-template-columns:minmax(0,1fr) auto}.csell{grid-column:1/-1;text-align:start}}

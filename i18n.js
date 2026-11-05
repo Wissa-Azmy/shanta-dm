@@ -648,3 +648,22 @@ Object.assign(AR, {
   'The dm search relay doesn’t accept this site. Add the site to ALLOWED in the Worker.': 'وسيط بحث dm لا يقبل هذا الموقع. أضف الموقع إلى ALLOWED في الـWorker.',
   'dm’s search needs the dm search relay. Set it up in Settings → Barcode search; until then only the open databases are used.': 'بحث dm يحتاج إلى وسيط بحث dm. اضبطه في الإعدادات ← البحث عن الباركود؛ وحتى ذلك الحين تُستخدم قواعد البيانات المفتوحة فقط.'
 });
+/* Egypt stock count */
+rx(/^sell (\d+)$/, (m, n) => `للبيع ${n}`);
+rx(/^Sell the rest \((\d+)\)$/, (m, n) => `بيع الباقي (${n})`);
+rx(/^All (\d+) already counted\. Check for a double scan\.$/, (m, n) => `تم عدّ الـ${n} كلها. تأكد من عدم المسح مرتين.`);
+rx(/^of (\d+) here$/, (m, n) => `من ${n} هنا`);
+rx(/^Put (\d+) units in one new sale\?$/, (m, n) => `إضافة ${n} قطعة إلى عملية بيع جديدة واحدة؟`);
+rx(/^Check the customer and the prices before saving it\. The (\d+) units you scanned stay in stock\.$/, (m, n) => `راجع العميل والأسعار قبل الحفظ. الـ${n} قطعة التي مسحتها تبقى في المخزون.`);
+rx(/^Sale of the rest after the stock count in Egypt on (.+)$/, (m, d) => `بيع الباقي بعد جرد المخزون في مصر يوم ${d}`);
+Object.assign(AR, {
+  'Count Egypt stock': 'جرد مخزون مصر', 'Stock count · Egypt': 'جرد المخزون · مصر', 'Scan what’s still in Egypt': 'امسح ما زال موجودًا في مصر',
+  'Scan every unit you still have. Everything you don’t scan is sold in one sale.': 'امسح كل قطعة ما زالت معك. كل ما لا تمسحه يُباع في عملية بيع واحدة.',
+  'In these boxes': 'في هذه الصناديق', 'Still here (scanned)': 'ما زال هنا (ممسوح)', 'To sell': 'للبيع', 'Scan what’s left': 'امسح الباقي',
+  'Find a product': 'ابحث عن منتج', 'No products match.': 'لا توجد منتجات مطابقة.', 'keep all': 'احتفظ بالكل',
+  'no barcode, count it by hand': 'بدون باركود، عدّه يدويًا', 'One less': 'واحد أقل', 'One more': 'واحد أكثر',
+  'Start the count over': 'ابدأ الجرد من جديد', 'Start the count over? The units you scanned go back to 0.': 'هل تبدأ الجرد من جديد؟ ستعود القطع الممسوحة إلى 0.',
+  'No delivered box has products left.': 'لا يوجد صندوق مُسلَّم فيه منتجات متبقية.', 'Nothing left to sell.': 'لا يوجد شيء للبيع.',
+  'Not in the selected delivered boxes, or none left': 'ليس في الصناديق المُسلَّمة المختارة، أو لم يتبقَّ منه شيء',
+  'This barcode isn’t linked to a product': 'هذا الباركود غير مرتبط بمنتج'
+});

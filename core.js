@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-29";
+const APP_VERSION = "2026.11.05-30";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
