@@ -585,7 +585,7 @@ rx(/^Used for what you paid in EGP and for stock and profit at purchase rates\. 
 Object.assign(AR, {
   'Exchange rate': 'سعر الصرف', 'Set rate': 'تحديد السعر', 'Now': 'الآن', 'With this rate': 'بهذا السعر', 'Save': 'حفظ', 'Nothing changed.': 'لم يتغير شيء.',
   '€→EGP Set rate for the whole box': '€→جنيه تحديد السعر للصندوق كله', 'Set the exchange rate of this receipt': 'حدد سعر الصرف لهذه الفاتورة',
-  'In EGP at purchase rates': 'بالجنيه بأسعار الشراء', 'In EGP at today’s rate': 'بالجنيه بسعر اليوم',
+  'At purchase rate': 'بسعر الشراء', 'At today’s rate': 'بسعر اليوم',
   'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر ذلك اليوم.',
   '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعرًا أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعرًا أكبر من 0، أو اتركه فارغًا.'
 });
