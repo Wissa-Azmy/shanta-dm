@@ -124,7 +124,8 @@ const SCHEMAS = {
       { k: 'description', l: 'Description', t: 'text', span: true },
       { k: 'amount', l: 'Amount', t: 'number', step: '0.01', req: true },
       { k: 'currency', l: 'Currency', t: 'select', opts: OPT.cur, def: 'EUR' },
-      rateField(),
+      /* shown for € costs too: their rate gives the EGP totals at the rate of the day you paid */
+      Object.assign(rateField(), { show: () => true, hint: 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.' }),
       { k: 'paidBy', l: 'Paid by', t: 'person', def: 'me' },
       { k: 'method', l: 'Paid with', t: 'select', opts: [...new Set([...OPT.payDE, ...OPT.payEG])], def: 'Card' },
       { k: 'place', l: 'Where', t: 'text', def: 'Germany' },

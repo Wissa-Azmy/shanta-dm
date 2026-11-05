@@ -594,3 +594,4 @@ Object.assign(AR, { 'Rate': 'السعر', 'Rate of the purchase day': 'سعر ي
   'Set the exchange rate of every product in this box': 'حدد سعر الصرف لكل منتجات هذا الصندوق' });
 rx(/^Rate of the purchase day ([\d.,]+)$/, (m, r) => `سعر يوم الشراء ${r}`);
 Object.assign(AR, { 'Different rates on its products': 'أسعار مختلفة على منتجاتها' });
+Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.': 'سعر ذلك اليوم. للتكاليف بالجنيه يحوّلها إلى €؛ وللتكاليف باليورو يعطي قيمتها بالجنيه.' });

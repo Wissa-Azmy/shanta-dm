@@ -245,9 +245,9 @@ function paidView() {
   const eEGP = e => toEGP(e.amount, e.currency || "EUR", e.rate, e.date);
   const two = (eur, egp) => `<b class="mono">${fEUR(eur)}</b><small class="egp">${fEGP(egp)}</small>`;
   const boxes = db.shipments.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  const rateOf = (cur, r) => cur === 'EUR' ? '' : (num(r) || rate()).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const rateOf = (cur, r) => (num(r) || rate()).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const line = (l) => `<tr><td>${l.date ? fDate(l.date) : '<span class="note">' + esc(l.when || '') + '</span>'}</td><td><b>${esc(l.what)}</b>${l.sub ? `<span class="sub">${esc(l.sub)}</span>` : ''}</td>
-    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td><td class="num">${fEGP(l.egp)}${l.cur === "EUR" && !num(l.rate) && l.at ? `<span class="sub">${l.at}</span>` : ""}</td>
+    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' && !num(l.rate) ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td><td class="num">${fEGP(l.egp)}${l.cur === "EUR" && !num(l.rate) && l.at ? `<span class="sub">${l.at}</span>` : ""}</td>
     <td class="acts">${l.edit ? `<button class="ib" data-edit="${l.edit}">${PENCIL}</button>` : ''}</td></tr>`;
   const group = (title, sub, lines) => { if (!lines.length) return '';
     const t = sum(lines, l => l.eur), te = sum(lines, l => l.egp);
