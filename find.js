@@ -5,9 +5,12 @@
    dm products try dm first; the others try Open Beauty Facts first. Sources are tried in order until a
    close match turns up; "Search more sources" tries the rest. The open databases allow about
    10 name searches a minute and ask apps not to search while typing, so searches only run on demand
-   and are spaced out. If the browser blocks dm's search from this site, it is skipped for the session. */
+   and are spaced out. dm's search doesn't answer other sites, so it goes through the relay whose
+   address is in Settings → Barcode search (dm-worker.js on Cloudflare). Without one, dm is tried
+   directly and, when the browser blocks it, skipped for the session. */
 const OBFS = {};            // search results per source + query, for this session
 let FINDER = null, DMOFF = false;
+const dmRelay = () => String(db.settings.dmProxy || '').trim().replace(/\/+$/, '');
 const OBF_GAP = 6500;       // ms between two searches on the same open database
 function offUrl(site, q) {
   return `https://world.${site}.org/cgi/search.pl?action=process&json=1&search_simple=1&page_size=12&sort_by=unique_scans_n`
@@ -17,7 +20,7 @@ const offMap = j => (j.products || []).map(x => ({ code: normEan(String(x.code |
   brand: (x.brands || '').split(',')[0].trim(), qty: x.quantity || '', img: x.image_front_small_url || x.image_small_url || x.image_front_url || x.image_url || '' }));
 const FSRC = {
   dm: { name: 'dm', gap: 0, last: 0,
-    url: q => 'https://product-search.services.dmtech.com/de/search?pageSize=12&query=' + encodeURIComponent(q),
+    url: q => (dmRelay() ? dmRelay() + '/search' : 'https://product-search.services.dmtech.com/de/search') + '?pageSize=12&query=' + encodeURIComponent(q),
     map: j => (j.products || j.results || []).map(x => { const t = x.tileData || {}, ti = String(x.title || (t.title && t.title.tileHeadline) || '');
       const sz = ti.match(/,\s*([\d.,]+\s*(?:ml|l|g|kg|stück|st\.?|blatt|paar))\s*$/i);
       return { code: normEan(String(x.gtin || t.gtin || x.ean || '')), name: (sz ? ti.slice(0, sz.index) : ti).trim(), qty: sz ? sz[1] : '',
@@ -53,9 +56,10 @@ function obfScore(p, r) {
   if (a && b) s += Math.abs(a - b) < 1 ? 0.15 : -0.15;
   return Math.max(0, Math.min(1, s));
 }
-/* one search on one source; errors: 'busy' (rate limit), 'blocked' (dm refused this site), 'net' */
+/* one search on one source; errors: 'busy' (rate limit), 'blocked' (dm refused this site, no relay),
+   'relaysite' (the relay doesn't accept this site), 'relay' (the relay didn't answer), 'net' */
 function srcSearch(k, q) {
-  const S = FSRC[k], ck = k + '|' + q;
+  const S = FSRC[k], ck = k + '|' + q, relay = k === 'dm' && dmRelay();
   if (OBFS[ck]) return Promise.resolve(OBFS[ck]);
   const wait = Math.max(0, S.last + S.gap - Date.now());
   FINDER && (FINDER.waitUntil = Date.now() + wait);
@@ -63,8 +67,8 @@ function srcSearch(k, q) {
     S.last = Date.now();
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), k === 'dm' ? 8000 : 12000);
     return fetch(S.url(q), { signal: ctl.signal, credentials: 'omit' })
-      .then(r => { if (!r.ok) throw new Error(r.status === 429 || r.status === 503 ? 'busy' : k === 'dm' && (r.status === 401 || r.status === 403) ? 'blocked' : 'net'); return r.json(); },
-        e => { throw new Error(k === 'dm' && e.name !== 'AbortError' && navigator.onLine !== false ? 'blocked' : 'net'); })
+      .then(r => { if (!r.ok) throw new Error(r.status === 429 || r.status === 503 ? 'busy' : relay ? (r.status === 403 ? 'relaysite' : 'relay') : k === 'dm' && (r.status === 401 || r.status === 403) ? 'blocked' : 'net'); return r.json(); },
+        e => { throw new Error(relay ? (e.name === 'AbortError' || navigator.onLine === false ? 'net' : 'relay') : k === 'dm' && e.name !== 'AbortError' && navigator.onLine !== false ? 'blocked' : 'net'); })
       .then(j => OBFS[ck] = S.map(j).filter(x => x.name && eanOK(x.code)).map(x => Object.assign(x, { src: k })))
       .finally(() => clearTimeout(t));
   });
@@ -82,7 +86,7 @@ function findStep() {
   FINDER.noBrand = false; FINDER.q = obfQuery(g.p); FINDER.res = null; FINDER.tried = null; FINDER.errs = {};
   drawFind(); runFind();
 }
-const srcOrder = p => (storeOf(p) === 'dm' ? ['dm', 'obf', 'off'] : ['obf', 'dm', 'off']).filter(k => k !== 'dm' || !DMOFF);
+const srcOrder = p => (storeOf(p) === 'dm' ? ['dm', 'obf', 'off'] : ['obf', 'dm', 'off']).filter(k => k !== 'dm' || !DMOFF || dmRelay());
 const srcLeft = () => srcOrder(FINDER.groups[FINDER.i].p).filter(k => !(FINDER.tried || []).includes(k));
 /* tries the sources in order, merging results, until a close match turns up (or all of them with more) */
 async function runFind(more) {
@@ -124,8 +128,12 @@ function drawFind() {
       <span class="srcline"><span class="mono notr">${esc(r.code)}</span>${[r.src, ...r.also].map(srcTag).join('')}</span><span class="chk"><a href="https://www.dm.de/search?query=${esc(r.code)}" target="_blank" rel="noopener">Check on dm</a>${r.src !== 'dm' ? `<a href="https://world.${r.src === 'off' ? 'openfoodfacts' : 'openbeautyfacts'}.org/product/${esc(r.code)}" target="_blank" rel="noopener">Open page</a>` : ''}</span>
       ${o ? `<span class="warnline">Already on “${esc(o.product)}”</span>` : ''}</span>
       <span class="oact"><span class="pill ${pc >= 75 ? 'ok' : pc >= 45 ? '' : 'warn'}">${pc}%</span><button type="button" class="btn sm" data-fb="link:${esc(r.code)}">Link</button></span></li>`; };
-  const errs = Object.keys(FINDER.errs || {}).map(k => `<p class="err">${esc(FINDER.errs[k] === 'busy' ? `${FSRC[k].name} is busy right now. Wait a minute and try again.` : `${FSRC[k].name} couldn’t be reached. Check the connection and try again.`)}</p>`).join('');
-  const dmNote = FINDER.dmNote ? '<p class="note">dm’s search isn’t available from this site, so only the open databases are used.</p>' : '';
+  const ERR = { busy: n => `${n} is busy right now. Wait a minute and try again.`,
+    relay: () => 'The dm search relay didn’t answer. Check its address in Settings → Barcode search.',
+    relaysite: () => 'The dm search relay doesn’t accept this site. Add the site to ALLOWED in the Worker.',
+    net: n => `${n} couldn’t be reached. Check the connection and try again.` };
+  const errs = Object.keys(FINDER.errs || {}).map(k => `<p class="err">${esc((ERR[FINDER.errs[k]] || ERR.net)(FSRC[k].name))}</p>`).join('');
+  const dmNote = FINDER.dmNote ? '<p class="note">dm’s search needs the dm search relay. Set it up in Settings → Barcode search; until then only the open databases are used.</p>' : '';
   const moreBtn = !FINDER.busy && FINDER.tried && left.length ? `<button type="button" class="rlink" data-fb="more">Search more sources: ${left.map(k => FSRC[k].name).join(', ')}</button>` : '';
   scanDlg('obfdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Find barcodes · ${FINDER.i + 1} of ${n}${FINDER.linked ? ` · ${FINDER.linked} linked` : ''}</div>
     <h2 class="notr">${esc(p.product)}</h2>
@@ -165,3 +173,18 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (FINDER && e.key === 'Enter' && e.target.matches && e.target.matches('[data-fbq]')) { e.preventDefault(); FINDER.q = e.target.value; runFind(); } });
 document.addEventListener('input', e => { if (FINDER && e.target.matches && e.target.matches('[data-fbq]')) FINDER.q = e.target.value; });
 document.addEventListener('close', e => { if (e.target.id === 'obfdlg' && FINDER) { const n = FINDER.linked; FINDER = null; if (n) render(); } }, true);
+/* Settings → Barcode search → Test: one small search through the relay */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act="dmtest"]'); if (!b) return;
+  const i = $('[data-set="dmProxy"]'); if (i) db.settings.dmProxy = i.value.trim();
+  const base = dmRelay();
+  if (!/^https:\/\//.test(base)) return toast('⚠ Paste the relay address first. It starts with https://');
+  b.disabled = true; b.textContent = 'Testing…';
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+  fetch(base + '/search?pageSize=1&query=balea', { signal: ctl.signal, credentials: 'omit' })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 403 ? 'site' : 'http ' + r.status)))
+    .then(j => { const x = FSRC.dm.map(j)[0]; DMOFF = false;
+      toast(x && x.code ? `✓ dm search works: ${x.brand} ${x.name} · ${x.code}` : '⚠ The relay answered, but dm returned no products.'); })
+    .catch(e => toast(e.message === 'site' ? '⚠ The relay doesn’t accept this site. Add the site to ALLOWED in the Worker.' : e.name === 'AbortError' ? '⚠ The relay didn’t answer in time.' : '⚠ The relay didn’t answer. Check the address and that the Worker is deployed.'))
+    .finally(() => { clearTimeout(t); b.disabled = false; b.textContent = 'Test'; });
+});

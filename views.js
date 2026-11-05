@@ -312,6 +312,9 @@ V.settings = () => {
     ${f('packagingPct', 'Packaging added to content weight (%)', 'number', 'step="1" min="0"', 'Receipts only show the net content. This much is added for bottle, jar and box when splitting shipping by weight.')}
     ${shipInfoHTML()}
     ${f('lowStock', 'Warn when stock is at or below', 'number', 'step="1"')}</div>
+  <div class="card"><h3>Barcode search</h3>
+    <div class="f"><label>dm search relay address</label><div class="raterow"><input data-set="dmProxy" type="url" dir="ltr" autocomplete="off" placeholder="https://shanta-dm.….workers.dev" value="${esc(s.dmProxy || '')}"><button type="button" class="btn sm ghost" data-act="dmtest">Test</button></div>
+    <span class="hint">dm’s product search only answers dm’s own website, so “Find barcodes” asks it through a small relay on your free Cloudflare account. Without it, only Open Beauty Facts and Open Food Facts are searched.</span></div></div>
   <div class="card"><h3>Backup & sync</h3><div class="filebox" id="filebox"></div>
     <p class="note">${canFS() ? 'Data is written straight to a <code>.json</code> file on your disk. Pick it once with “Save as…”; after that every change is saved to it automatically. A backup copy also stays in this browser.' : 'This browser can’t write to files directly, so use “Download backup” to save a <code>.json</code> file and “Import” to load it again.'}</p>
     <div class="f chk"><input type="checkbox" id="as" data-set="autosave"${s.autosave ? ' checked' : ''}><label for="as">Save to the file automatically after every change</label></div>

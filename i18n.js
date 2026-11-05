@@ -634,3 +634,17 @@ Object.assign(AR, {
   'find.js couldn’t be loaded. Check it is uploaded to the site, next to index.html.': 'تعذّر تحميل find.js. تأكد من رفعه إلى الموقع بجوار index.html.'
 });
 Object.assign(AR, { 'No photo': 'لا صورة', 'Check on dm': 'تحقق على dm', 'Open page': 'افتح الصفحة' });
+/* dm search relay */
+rx(/^(?:✓ )?dm search works: (.+)$/, (m, x) => `بحث dm يعمل: ${x}`);
+Object.assign(AR, {
+  'Barcode search': 'البحث عن الباركود', 'dm search relay address': 'عنوان وسيط بحث dm', 'Test': 'اختبار', 'Testing…': 'جارٍ الاختبار…',
+  'dm’s product search only answers dm’s own website, so “Find barcodes” asks it through a small relay on your free Cloudflare account. Without it, only Open Beauty Facts and Open Food Facts are searched.': 'بحث منتجات dm لا يستجيب إلا لموقع dm نفسه، لذلك يسأله «البحث عن الباركود» عبر وسيط صغير على حسابك المجاني في Cloudflare. بدونه يتم البحث في Open Beauty Facts وOpen Food Facts فقط.',
+  'Paste the relay address first. It starts with https://': 'الصق عنوان الوسيط أولًا. يبدأ بـ https://',
+  'The relay answered, but dm returned no products.': 'استجاب الوسيط، لكن dm لم يُرجع أي منتجات.',
+  'The relay doesn’t accept this site. Add the site to ALLOWED in the Worker.': 'الوسيط لا يقبل هذا الموقع. أضف الموقع إلى ALLOWED في الـWorker.',
+  'The relay didn’t answer in time.': 'لم يستجب الوسيط في الوقت المناسب.',
+  'The relay didn’t answer. Check the address and that the Worker is deployed.': 'لم يستجب الوسيط. تحقق من العنوان ومن نشر الـWorker.',
+  'The dm search relay didn’t answer. Check its address in Settings → Barcode search.': 'لم يستجب وسيط بحث dm. تحقق من عنوانه في الإعدادات ← البحث عن الباركود.',
+  'The dm search relay doesn’t accept this site. Add the site to ALLOWED in the Worker.': 'وسيط بحث dm لا يقبل هذا الموقع. أضف الموقع إلى ALLOWED في الـWorker.',
+  'dm’s search needs the dm search relay. Set it up in Settings → Barcode search; until then only the open databases are used.': 'بحث dm يحتاج إلى وسيط بحث dm. اضبطه في الإعدادات ← البحث عن الباركود؛ وحتى ذلك الحين تُستخدم قواعد البيانات المفتوحة فقط.'
+});
