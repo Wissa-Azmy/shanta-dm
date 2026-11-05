@@ -737,3 +737,6 @@ small.egp{display:block;font:500 12px var(--mono);color:var(--muted);white-space
 .srctag.off{background:#e3f1e6;color:#2c6b3c}
 .obfres .err,.obfres .note{margin:8px 0 0}
 .obfres .rlink{display:inline-block;margin-top:8px}
+.obfr .noimg{display:grid;place-items:center;font-size:9.5px;line-height:1.1;text-align:center;color:var(--muted);padding:2px;box-sizing:border-box}
+.obfr .chk{display:flex;gap:12px;margin-top:3px;font-size:12px}
+.obfr .chk a{color:var(--nile);font-weight:600;text-decoration:underline;text-underline-offset:2px}

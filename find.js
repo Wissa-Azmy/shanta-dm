@@ -11,10 +11,10 @@ let FINDER = null, DMOFF = false;
 const OBF_GAP = 6500;       // ms between two searches on the same open database
 function offUrl(site, q) {
   return `https://world.${site}.org/cgi/search.pl?action=process&json=1&search_simple=1&page_size=12&sort_by=unique_scans_n`
-    + '&fields=code,product_name,product_name_de,brands,quantity,image_front_small_url&search_terms=' + encodeURIComponent(q);
+    + '&fields=code,product_name,product_name_de,brands,quantity,image_front_small_url,image_small_url,image_front_url,image_url&search_terms=' + encodeURIComponent(q);
 }
 const offMap = j => (j.products || []).map(x => ({ code: normEan(String(x.code || '')), name: (x.product_name_de || x.product_name || '').trim(),
-  brand: (x.brands || '').split(',')[0].trim(), qty: x.quantity || '', img: x.image_front_small_url || '' }));
+  brand: (x.brands || '').split(',')[0].trim(), qty: x.quantity || '', img: x.image_front_small_url || x.image_small_url || x.image_front_url || x.image_url || '' }));
 const FSRC = {
   dm: { name: 'dm', gap: 0, last: 0,
     url: q => 'https://product-search.services.dmtech.com/de/search?pageSize=12&query=' + encodeURIComponent(q),
@@ -119,9 +119,9 @@ function drawFind() {
   const g = FINDER.groups[FINDER.i], p = g.p, n = FINDER.groups.length, res = (FINDER.res || []).slice(0, 8), left = FINDER.tried ? srcLeft() : [];
   const used = code => { const o = db.purchases.find(x => x.ean === code); return o && grpKey(o) !== g.key ? o : null; };
   const card = r => { const o = used(r.code), pc = Math.round(r.score * 100);
-    return `<li class="obfr${r.score >= 0.75 ? ' good' : ''}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="noimg"></span>'}
+    return `<li class="obfr${r.score >= 0.75 ? ' good' : ''}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=noimg>No photo</span>'">` : '<span class="noimg">No photo</span>'}
       <span class="ox"><b class="notr">${esc(r.name)}</b><span class="sub notr">${esc([r.brand, r.qty, r.price].filter(Boolean).join(' · '))}</span>
-      <span class="srcline"><span class="mono notr">${esc(r.code)}</span>${[r.src, ...r.also].map(srcTag).join('')}</span>
+      <span class="srcline"><span class="mono notr">${esc(r.code)}</span>${[r.src, ...r.also].map(srcTag).join('')}</span><span class="chk"><a href="https://www.dm.de/search?query=${esc(r.code)}" target="_blank" rel="noopener">Check on dm</a>${r.src !== 'dm' ? `<a href="https://world.${r.src === 'off' ? 'openfoodfacts' : 'openbeautyfacts'}.org/product/${esc(r.code)}" target="_blank" rel="noopener">Open page</a>` : ''}</span>
       ${o ? `<span class="warnline">Already on “${esc(o.product)}”</span>` : ''}</span>
       <span class="oact"><span class="pill ${pc >= 75 ? 'ok' : pc >= 45 ? '' : 'warn'}">${pc}%</span><button type="button" class="btn sm" data-fb="link:${esc(r.code)}">Link</button></span></li>`; };
   const errs = Object.keys(FINDER.errs || {}).map(k => `<p class="err">${esc(FINDER.errs[k] === 'busy' ? `${FSRC[k].name} is busy right now. Wait a minute and try again.` : `${FSRC[k].name} couldn’t be reached. Check the connection and try again.`)}</p>`).join('');

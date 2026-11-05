@@ -633,3 +633,4 @@ Object.assign(AR, {
   'The barcode finder has an error. Send a screenshot of this message.': 'في أداة البحث عن الباركود خطأ. أرسل لقطة شاشة لهذه الرسالة.',
   'find.js couldn’t be loaded. Check it is uploaded to the site, next to index.html.': 'تعذّر تحميل find.js. تأكد من رفعه إلى الموقع بجوار index.html.'
 });
+Object.assign(AR, { 'No photo': 'لا صورة', 'Check on dm': 'تحقق على dm', 'Open page': 'افتح الصفحة' });
