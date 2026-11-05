@@ -589,3 +589,6 @@ Object.assign(AR, {
   'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر ذلك اليوم.',
   '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعرًا أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعرًا أكبر من 0، أو اتركه فارغًا.'
 });
+rx(/^Rate ([\d.,]+) EGP per €1$/, (m, r) => `السعر ${r} جنيه لكل €1`);
+Object.assign(AR, { 'Rate': 'السعر', 'Rate of the purchase day': 'سعر يوم الشراء', 'Change rate': 'تغيير السعر', 'Rate for box': 'سعر الصندوق',
+  'Set the exchange rate of every product in this box': 'حدد سعر الصرف لكل منتجات هذا الصندوق' });

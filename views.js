@@ -127,12 +127,13 @@ function boxReceipts(s, items) {
   by.forEach(r => { const a = [...r.rates]; r.rate = a.length === 1 && a[0] ? (Math.round(a[0] * 100) / 100).toLocaleString("en-US") : ""; });
   const list = [...by.values()].filter(r => r.no).sort((a, b) => (a.date || '').localeCompare(b.date || '')), loose = by.get('');
   if (!list.length && !loose) return '';
-  const li = r => `<li><button type="button" class="rcpt" data-rcpt="${esc(r.no)}" data-rbox="${s.id}" title="Show its products">
+  const li = r => `<li class="rcard"><button type="button" class="rcpt" data-rcpt="${esc(r.no)}" data-rbox="${s.id}" title="Show its products">
       <span class="rd">${r.date ? fDate(r.date) : '—'}</span>
       <span class="rn">${storeTag({ store: r.store })}<span class="notr mono">${esc(r.no)}</span><span class="sub">${r.lines} product${r.lines === 1 ? '' : 's'} · ${r.units} unit${r.units === 1 ? '' : 's'}</span></span>
-      <span class="rt">${fEUR(r.eur)}${[...r.who].map(pill).join('')}</span></button><button type="button" class="ib rrate" data-srbox="${s.id}" data-srrc="${esc(r.no)}" title="Set the exchange rate of this receipt">${r.rate ? `<span class="notr">${r.rate}</span>` : "€→EGP"}</button></li>`;
-  return `<details class="rcpts"${list.length && list.length <= 4 ? ' open' : ''}><summary><b>${list.length} receipt${list.length === 1 ? '' : 's'}</b>${loose ? `<span class="note"> · ${loose.lines} product${loose.lines === 1 ? '' : 's'} without a receipt</span>` : ''}</summary>
-    ${list.length ? `<ul>${list.map(li).join('')}</ul>` : ''}<button type="button" class="btn sm ghost rboxrate" data-srbox="${s.id}">€→EGP Set rate for the whole box</button></details>`;
+      <span class="rt">${fEUR(r.eur)}${[...r.who].map(pill).join("")}</span></button>
+      <div class="rfoot"><span>${r.rate ? `Rate <b class="notr">${r.rate}</b> EGP per €1` : "Rate of the purchase day"}</span><button type="button" class="rlink" data-srbox="${s.id}" data-srrc="${esc(r.no)}">${r.rate ? "Change rate" : "Set rate"}</button></div></li>`;
+  return `<details class="rcpts"${list.length && list.length <= 4 ? ' open' : ''}><summary><span class="rsum"><b>${list.length} receipt${list.length === 1 ? '' : 's'}</b>${loose ? `<span class="note"> · ${loose.lines} product${loose.lines === 1 ? '' : 's'} without a receipt</span>` : ''}</span><button type="button" class="rlink" data-srbox="${s.id}" title="Set the exchange rate of every product in this box">Rate for box</button></summary>
+    ${list.length ? `<ul>${list.map(li).join('')}</ul>` : ''}</details>`;
 }
 
 /* "Reset filters" for the filters a screen has: shown only when one of them is set, clears them all */
