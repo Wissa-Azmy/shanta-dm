@@ -561,3 +561,5 @@ Object.assign(AR, {
   'General costs': 'تكاليف عامة', 'not tied to a box or a sale': 'غير مرتبطة بصندوق أو بيع', 'Transfers sent': 'التحويلات المرسلة',
   '· settling up, not counted above': '· تسوية، غير محسوبة أعلاه', 'Nothing paid yet.': 'لم يُدفع شيء بعد.'
 });
+Object.assign(AR, { 'paid in €': 'مدفوعة باليورو', 'paid in EGP': 'مدفوعة بالجنيه' });
+rx(/^≈ (.+)$/, (m, v) => `≈ ${v}`);

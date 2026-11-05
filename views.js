@@ -243,10 +243,12 @@ function paidView() {
     groups.push(group('General costs', 'not tied to a box or a sale', db.expenses.filter(e => e.paidBy === k && !known(e.shipmentId) && !e.orderId).sort(byDate).map(exp)));
     const prodT = db.purchases.filter(p => p.paidBy === k).reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0);
     const expT = db.expenses.filter(e => e.paidBy === k).reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
-    const byCur = {}; db.expenses.filter(e => e.paidBy === k && e.currency === 'EGP').forEach(e => byCur.EGP = (byCur.EGP || 0) + num(e.amount));
+    /* costs split by the currency they were paid in; EGP shown as paid, with its € value at the saved rates */
+    const ke = db.expenses.filter(e => e.paidBy === k), eurC = ke.filter(e => (e.currency || "EUR") === "EUR"), egpC = ke.filter(e => e.currency === "EGP");
+    const cEUR = eurC.reduce((a, e) => a + num(e.amount), 0), cEGP = egpC.reduce((a, e) => a + num(e.amount), 0), cEGPe = egpC.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
     const tr = db.transfers.filter(t => t.from === k).sort(byDate).map(t => ({ date: t.date, what: `To ${pname(t.to)}`, sub: [t.method, t.notes].filter(Boolean).join(' · '), amt: num(t.amount), cur: t.currency || 'EUR', rate: t.rate, eur: toEUR(t.amount, t.currency, t.rate), edit: 'transfers:' + t.id }));
     return `<section class="pcard"><header class="phead">${pill(k)}<span class="sp"></span><span class="ptot"><span>Paid for the business</span><b>${fEUR(prodT + expT)}</b></span></header>
-      <div class="pmini"><span>Products <b>${fEUR(prodT)}</b></span><span>Costs <b>${fEUR(expT)}</b></span>${byCur.EGP ? `<span>Paid in EGP <b>${fEGP(byCur.EGP)}</b></span>` : ''}</div>
+      <div class="pbreak"><div><span>Products</span><small>paid in €</small><b>${fEUR(prodT)}</b></div><div><span>Costs</span><small>paid in €</small><b>${fEUR(cEUR)}</b></div>${cEGP ? `<div><span>Costs</span><small>paid in EGP</small><b>${fEGP(cEGP)}</b><em>≈ ${fEUR(cEGPe)}</em></div>` : ''}</div>
       ${groups.join('') || '<p class="empty">Nothing paid yet.</p>'}
       ${tr.length ? `<div class="psep">Transfers to ${esc(pname(PEOPLE.find(p => p !== k)))} <span class="note">· settling up, not counted above</span></div>${group('Transfers sent', '', tr)}` : ''}</section>`;
   }).join('');
