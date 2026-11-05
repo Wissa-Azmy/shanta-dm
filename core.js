@@ -1,9 +1,10 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-26";
+const APP_VERSION = "2026.11.05-27";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
-  if (!e.filename || !e.filename.startsWith(location.origin)) return;
+  /* "ResizeObserver loop…" is a harmless browser warning (the bottom bar resizing itself), not an error */
+  if (!e.filename || !e.filename.startsWith(location.origin) || /ResizeObserver loop/.test(e.message || '')) return;
   try { toast(`⚠ Error: ${e.message} (${e.filename.split('/').pop().split('?')[0]}:${e.lineno})`); } catch (x) { }
 });
 window.addEventListener('unhandledrejection', e => {
