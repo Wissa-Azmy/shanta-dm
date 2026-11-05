@@ -537,3 +537,17 @@ new MutationObserver(list => {
   });
   ensureSwitch();
 }).observe(document.documentElement, LANG === 'ar' ? { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: I18N_ATTRS } : { childList: true, subtree: true });
+/* moving products between boxes */
+rx(/^(\d+) products · (\d+) units$/, (m, a, b) => `${a} منتجات · ${b} وحدة`);
+rx(/^of (\d+)$/, (m, n) => `من ${n}`);
+rx(/^(?:✓ )?(\d+) units moved to (.+)$/, (m, n, b) => `تم نقل ${n} وحدة إلى ${b}`);
+Object.assign(AR, {
+  'Move to box': 'نقل إلى صندوق', 'Move products': 'نقل منتجات', 'Move to another box': 'النقل إلى صندوق آخر', 'Move to': 'النقل إلى',
+  'Choose a box…': 'اختر صندوقًا…', '+ New box…': '+ صندوق جديد…', 'New box name': 'اسم الصندوق الجديد', 'Move': 'نقل',
+  'One less': 'واحد أقل', 'One more': 'واحد أكثر', 'Don’t move': 'لا تنقل',
+  'Sold units stay in their box. Shipping costs are split again by weight in both boxes.': 'الوحدات المباعة تبقى في صندوقها. تُوزَّع تكاليف الشحن من جديد حسب الوزن في الصندوقين.',
+  'Choose the box to move them to.': 'اختر الصندوق المراد النقل إليه.', 'Give the new box a name.': 'أعطِ الصندوق الجديد اسمًا.',
+  'Nothing to move: they are already in that box.': 'لا شيء للنقل: المنتجات موجودة في هذا الصندوق بالفعل.',
+  'Nothing left in this box to move.': 'لم يتبقَّ شيء في هذا الصندوق للنقل.',
+  'Untick what stays, then tap “Move to box”.': 'ألغِ تحديد ما سيبقى، ثم اضغط «نقل إلى صندوق».'
+});

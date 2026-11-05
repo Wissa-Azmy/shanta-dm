@@ -110,7 +110,7 @@ V.shipments = R => {
       <button class="btn sm ghost" data-new="purchases" ${pre({ shipmentId: s.id })}>+ Product</button>
       <button class="btn sm ghost" data-receipt="${s.id}">${RCPTICON} Receipt</button>
       <button class="btn sm ghost" data-new="expenses" ${pre({ shipmentId: s.id, category: 'Shipping', description: 'Shipping for ' + s.name })}>+ Cost</button>
-      ${db.purchases.some(p => p.shipmentId === s.id) ? `<button class="btn sm ghost" data-pack="${s.id}">${SCANICON} Check box</button>` : ''}
+      ${db.purchases.some(p => p.shipmentId === s.id) ? `<button class="btn sm ghost" data-pack="${s.id}">${SCANICON} Check box</button><button class="btn sm ghost" data-moveof="${s.id}">⇄ Move products</button>` : ''}
       </div></div>`;
   }).join('')}</div>`;
 };
@@ -157,7 +157,7 @@ V.stock = R => {
   [...SEL].forEach(id => { const l = R.lots[id]; if (!l || l.left <= 0) SEL.delete(id); });
   const pickable = rows.filter(l => l.left > 0), allOn = pickable.length > 0 && pickable.every(l => SEL.has(l.p.id));
   const someOn = !allOn && pickable.some(l => SEL.has(l.p.id));
-  const selBar = SEL.size ? `<div class="selbar"><b>${SEL.size} selected</b><span class="sp"></span><button class="btn ghost sm" data-act="selclear">Clear selection</button><button class="btn" data-act="sellsel">Sell selected</button></div>` : '';
+  const selBar = SEL.size ? `<div class="selbar"><b>${SEL.size} selected</b><span class="sp"></span><button class="btn ghost sm" data-act="selclear">Clear selection</button><button class="btn ghost" data-act="movesel">Move to box</button><button class="btn" data-act="sellsel">Sell selected</button></div>` : '';
   return `<div class="toolbar">${search('Search stock')}${filters}</div>
   ${totBar([['Stock value at cost', fEUR(leftV)], ['In EGP', fEGP(eur2egp(leftV))], ['Units left', leftU], ['Products', rows.length]], rows.length)}${selBar}<div class="tablewrap"><table class="t"><thead><tr><th class="ck"><input type="checkbox" class="selck" data-selall="1" title="Select all" aria-label="Select all"${allOn ? ' checked' : ''}${someOn ? ' data-mixed="1"' : ''}${pickable.length ? '' : ' disabled'}></th><th>Product</th><th>Location</th><th class="num">Bought</th><th class="num">Sold</th><th class="num">Gift/lost</th><th class="num">Left</th><th class="num">Shipping weight</th><th class="num">Cost incl. shipping</th><th class="num">Avg sold at</th><th class="num">Markup</th><th class="num">Price for ${db.settings.targetMargin}% markup</th><th></th></tr></thead><tbody>
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
