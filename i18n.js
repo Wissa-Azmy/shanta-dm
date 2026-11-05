@@ -556,7 +556,7 @@ rx(/^To (.+)$/, (m, p) => `إلى ${p}`);
 rx(/^Transfers to (.+)$/, (m, p) => `تحويلات إلى ${p}`);
 Object.assign(AR, {
   'All movements': 'كل الحركات', 'Paid by each': 'مدفوعات كل شريك', 'Paid for the business': 'المدفوع للمشروع', 'Products': 'المنتجات', 'Costs': 'التكاليف',
-  'Paid in EGP': 'المدفوع بالجنيه', 'Paid': 'المدفوع', 'Rate': 'السعر', 'EGP per €1': 'جنيه لكل €1', 'Cost': 'التكلفة',
+  'Paid in EGP': 'المدفوع بالجنيه', 'Paid': 'المدفوع', 'Rate': 'سعر الصرف', 'EGP per €1': 'جنيه لكل €1', 'Cost': 'التكلفة',
   'Not in a box yet': 'ليست في صندوق بعد', 'Costs of sales': 'تكاليف المبيعات', 'delivery and other costs paid with a sale': 'التوصيل وتكاليف أخرى مدفوعة مع بيع',
   'General costs': 'تكاليف عامة', 'not tied to a box or a sale': 'غير مرتبطة بصندوق أو بيع', 'Transfers sent': 'التحويلات المرسلة',
   '· settling up, not counted above': '· تسوية، غير محسوبة أعلاه', 'Nothing paid yet.': 'لم يُدفع شيء بعد.'
@@ -589,8 +589,8 @@ Object.assign(AR, {
   'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر ذلك اليوم.',
   '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعرًا أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعرًا أكبر من 0، أو اتركه فارغًا.'
 });
-rx(/^Rate ([\d.,]+) EGP per €1$/, (m, r) => `السعر ${r} جنيه لكل €1`);
-Object.assign(AR, { 'Rate': 'السعر', 'Rate of the purchase day': 'سعر يوم الشراء', 'Change rate': 'تغيير السعر', 'Rate for box': 'سعر الصندوق',
+rx(/^Rate ([\d.,]+) EGP per €1$/, (m, r) => `سعر الصرف ${r} جنيه لكل €1`);
+Object.assign(AR, { 'Rate': 'سعر الصرف', 'Rate of the purchase day': 'سعر يوم الشراء', 'Change rate': 'تغيير السعر', 'Rate for box': 'سعر الصندوق',
   'Set the exchange rate of every product in this box': 'حدد سعر الصرف لكل منتجات هذا الصندوق' });
 rx(/^Rate of the purchase day ([\d.,]+)$/, (m, r) => `سعر يوم الشراء ${r}`);
 Object.assign(AR, { 'Different rates on its products': 'أسعار مختلفة على منتجاتها' });
