@@ -598,3 +598,21 @@ Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for €
 Object.assign(AR, { 'No rate saved: the rate of that day is used': 'لا يوجد سعر صرف محفوظ: يُستخدم سعر صرف ذلك اليوم' });
 Object.assign(AR, { 'rate of the day': 'سعر صرف ذلك اليوم' });
 Object.assign(AR, { 'Clear search': 'مسح البحث' });
+/* find barcodes on Open Beauty Facts */
+rx(/^Find barcodes · (\d+) of (\d+)( · (\d+) linked)?$/, (m, a, b, x, n) => `البحث عن الباركود · ${a} من ${b}${n ? ` · تم ربط ${n}` : ''}`);
+rx(/^Waiting (\d+)s \(Open Beauty Facts allows about 10 searches a minute\)…$/, (m, s) => `انتظار ${s} ث (يسمح Open Beauty Facts بنحو 10 عمليات بحث في الدقيقة)…`);
+rx(/^Already on “(.+)”$/, (m, p) => `موجود بالفعل على «${p}»`);
+rx(/^(?:✓ )?(\d+) products? linked to a barcode$/, (m, n) => `تم ربط ${n} منتج بباركود`);
+rx(/^(\d+) units?( · (\d+) lines)?$/, (m, n, x, l) => `${n} وحدة${l ? ` · ${l} أسطر` : ''}`);
+rx(/^Barcode (\d+) is already on “(.+)”\.$/, (m, c, p) => `الباركود ${c} موجود بالفعل على «${p}».`);
+rx(/^Link it to “(.+)” as well\?$/, (m, p) => `هل تربطه بـ«${p}» أيضًا؟`);
+Object.assign(AR, {
+  'Find barcodes': 'البحث عن الباركود', 'Find': 'بحث', 'Find its barcode on Open Beauty Facts': 'ابحث عن باركوده في Open Beauty Facts',
+  'Brand and product name': 'الماركة واسم المنتج', 'Search': 'بحث', 'Search without the brand': 'ابحث بدون الماركة', 'Searching Open Beauty Facts…': 'جارٍ البحث في Open Beauty Facts…',
+  'No matches found. Shorten the search (e.g. brand + two words) or skip this product.': 'لا توجد نتائج. اختصر البحث (مثل الماركة + كلمتين) أو تخطَّ هذا المنتج.',
+  'Check the picture and size before linking. The barcode goes on every line of this product.': 'تحقق من الصورة والحجم قبل الربط. يُضاف الباركود إلى كل أسطر هذا المنتج.',
+  'Link': 'ربط', 'Back': 'رجوع', 'Skip': 'تخطٍّ', 'Done': 'تم', 'No barcodes linked.': 'لم يُربط أي باركود.',
+  'This product already has a barcode.': 'هذا المنتج له باركود بالفعل.', 'Every product already has a barcode.': 'كل المنتجات لها باركود بالفعل.',
+  'Open Beauty Facts is busy right now. Wait a minute and try again.': 'Open Beauty Facts مشغول الآن. انتظر دقيقة وحاول مجددًا.',
+  'Open Beauty Facts couldn’t be reached. Check the connection and try again.': 'تعذّر الوصول إلى Open Beauty Facts. تحقق من الاتصال وحاول مجددًا.'
+});
