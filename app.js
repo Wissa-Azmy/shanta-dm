@@ -36,7 +36,7 @@ function render() {
   $('#nav').innerHTML = NAV.map(([k, i, l]) => `<button class="${k === view ? 'on' : ''}" data-go="${k}"><i>${i}</i>${l}${c[k] ? `<span class="cnt">${c[k]}</span>` : ''}</button>`).join('');
   const n = NAV.find(x => x[0] === view) || NAV[0];
   $('#eyebrow').textContent = n[3]; $('#vtitle').textContent = n[2];
-  $('#topact').innerHTML = NEWBTN[view] ? `${view === 'purchases' ? `<button class="btn ghost" data-scan="">${SCANICON} Scan barcode</button>${db.purchases.some(p => !p.ean) ? '<button class="btn ghost" data-obffind="">Find barcodes</button>' : ''}` : ''}${view === 'stock' ? `<button class="btn ghost" data-scanfind="">${SCANICON} Find by scan</button>` : ''}${view === 'sales' || view === 'stock' ? `<button class="btn ghost" data-scansell="">${SCANICON} Scan to sell</button>` : ''}${view === 'purchases' || view === 'shipments' ? `<button class="btn ghost" data-receipt="">${RCPTICON} Import receipt</button>` : ''}<button class="btn" data-new="${view === 'stock' ? 'sales' : view === 'customers' ? 'payments' : view}">+ ${NEWBTN[view]}</button>` :
+  $('#topact').innerHTML = NEWBTN[view] ? `${view === 'purchases' ? `<button class="btn ghost" data-scan="">${SCANICON} Scan barcode</button>${(typeof noEanGroups === 'function' ? noEanGroups().length : db.purchases.some(p => !p.ean)) ? '<button class="btn ghost" data-obffind="">Find barcodes</button>' : ''}` : ''}${view === 'stock' ? `<button class="btn ghost" data-scanfind="">${SCANICON} Find by scan</button>` : ''}${view === 'sales' || view === 'stock' ? `<button class="btn ghost" data-scansell="">${SCANICON} Scan to sell</button>` : ''}${view === 'purchases' || view === 'shipments' ? `<button class="btn ghost" data-receipt="">${RCPTICON} Import receipt</button>` : ''}<button class="btn" data-new="${view === 'stock' ? 'sales' : view === 'customers' ? 'payments' : view}">+ ${NEWBTN[view]}</button>` :
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
@@ -239,3 +239,16 @@ document.addEventListener('input', e => {
   const w = e.target.closest && e.target.closest('.srch'); if (!w) return;
   const x = w.querySelector('[data-srchx]'); if (x) x.hidden = !e.target.value;
 }, true);
+/* the barcode finder lives in find.js: if this copy of index.html doesn't load it yet (an older
+   index.html still cached or not replaced), load it on the first tap on Find instead of doing nothing */
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-obffind]'); if (!o || typeof openFind === 'function') return;
+  e.preventDefault();
+  const ids = o.dataset.obffind ? [o.dataset.obffind] : null;
+  if (!document.querySelector('script[src^="find.js"]')) {
+    const s = document.createElement('script'); s.src = 'find.js?v=' + APP_VERSION;
+    s.onload = () => { render(); openFind(ids); };
+    s.onerror = () => { s.remove(); toast('⚠ The barcode finder couldn’t be loaded. Check the connection and try again.'); };
+    document.body.appendChild(s);
+  }
+});

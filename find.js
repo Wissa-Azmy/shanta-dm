@@ -1,11 +1,32 @@
-/* ---------- find barcodes on Open Beauty Facts by product name, and link them ----------
-   Goes through the products that have no barcode yet, one at a time: searches Open Beauty Facts for
-   brand + name, shows the closest matches, and links the one you pick to every line of that product.
-   Nothing is linked without a tap. Open Beauty Facts allows about 10 name searches a minute and asks
-   apps not to search while typing, so searches only run on demand and are spaced out. */
-const OBFS = {};            // search results per query, for this session
-let FB = null, obfLast = 0;
-const OBF_GAP = 6500;       // ms between two searches
+/* ---------- find barcodes by product name, and link them ----------
+   Goes through the products that have no barcode yet, one at a time: searches dm's product search,
+   Open Beauty Facts and Open Food Facts for brand + name, shows the closest matches with where each
+   came from, and links the one you pick to every line of that product. Nothing is linked without a tap.
+   dm products try dm first; the others try Open Beauty Facts first. Sources are tried in order until a
+   close match turns up; "Search more sources" tries the rest. The open databases allow about
+   10 name searches a minute and ask apps not to search while typing, so searches only run on demand
+   and are spaced out. If the browser blocks dm's search from this site, it is skipped for the session. */
+const OBFS = {};            // search results per source + query, for this session
+let FB = null, DMOFF = false;
+const OBF_GAP = 6500;       // ms between two searches on the same open database
+function offUrl(site, q) {
+  return `https://world.${site}.org/cgi/search.pl?action=process&json=1&search_simple=1&page_size=12&sort_by=unique_scans_n`
+    + '&fields=code,product_name,product_name_de,brands,quantity,image_front_small_url&search_terms=' + encodeURIComponent(q);
+}
+const offMap = j => (j.products || []).map(x => ({ code: normEan(String(x.code || '')), name: (x.product_name_de || x.product_name || '').trim(),
+  brand: (x.brands || '').split(',')[0].trim(), qty: x.quantity || '', img: x.image_front_small_url || '' }));
+const FSRC = {
+  dm: { name: 'dm', gap: 0, last: 0,
+    url: q => 'https://product-search.services.dmtech.com/de/search?pageSize=12&query=' + encodeURIComponent(q),
+    map: j => (j.products || j.results || []).map(x => { const t = x.tileData || {}, ti = String(x.title || (t.title && t.title.tileHeadline) || '');
+      const sz = ti.match(/,\s*([\d.,]+\s*(?:ml|l|g|kg|stück|st\.?|blatt|paar))\s*$/i);
+      return { code: normEan(String(x.gtin || t.gtin || x.ean || '')), name: (sz ? ti.slice(0, sz.index) : ti).trim(), qty: sz ? sz[1] : '',
+        brand: String(x.brandName || (t.brand && t.brand.name) || (typeof x.brand === 'string' ? x.brand : x.brand && x.brand.name) || ''),
+        img: ((t.images || x.images || [])[0] || {}).tileSrc || x.imageUrl || '',
+        price: (((t.price || {}).price || {}).current || {}).value || '' }; }) },
+  obf: { name: 'Open Beauty Facts', gap: OBF_GAP, last: 0, url: q => offUrl('openbeautyfacts', q), map: offMap },
+  off: { name: 'Open Food Facts', gap: OBF_GAP, last: 0, url: q => offUrl('openfoodfacts', q), map: offMap }
+};
 
 /* products still without a barcode, one entry per product (same name + brand), most bought first */
 function noEanGroups(only) {
@@ -32,18 +53,19 @@ function obfScore(p, r) {
   if (a && b) s += Math.abs(a - b) < 1 ? 0.15 : -0.15;
   return Math.max(0, Math.min(1, s));
 }
-function obfSearch(q) {
-  if (OBFS[q]) return Promise.resolve(OBFS[q]);
-  const wait = Math.max(0, obfLast + OBF_GAP - Date.now());
+/* one search on one source; errors: 'busy' (rate limit), 'blocked' (dm refused this site), 'net' */
+function srcSearch(k, q) {
+  const S = FSRC[k], ck = k + '|' + q;
+  if (OBFS[ck]) return Promise.resolve(OBFS[ck]);
+  const wait = Math.max(0, S.last + S.gap - Date.now());
   FB && (FB.waitUntil = Date.now() + wait);
   return new Promise(res => setTimeout(res, wait)).then(() => {
-    obfLast = Date.now();
-    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
-    const u = 'https://world.openbeautyfacts.org/cgi/search.pl?action=process&json=1&search_simple=1&page_size=12&sort_by=unique_scans_n'
-      + '&fields=code,product_name,product_name_de,brands,quantity,image_front_small_url&search_terms=' + encodeURIComponent(q);
-    return fetch(u, { signal: ctl.signal }).then(r => { if (!r.ok) throw new Error(r.status === 429 || r.status === 503 ? 'busy' : 'http'); return r.json(); })
-      .then(j => OBFS[q] = (j.products || []).map(x => ({ code: normEan(String(x.code || '')), name: (x.product_name_de || x.product_name || '').trim(),
-        brand: (x.brands || '').split(',')[0].trim(), qty: x.quantity || '', img: x.image_front_small_url || '' })).filter(x => x.name && eanOK(x.code)))
+    S.last = Date.now();
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), k === 'dm' ? 8000 : 12000);
+    return fetch(S.url(q), { signal: ctl.signal, credentials: 'omit' })
+      .then(r => { if (!r.ok) throw new Error(r.status === 429 || r.status === 503 ? 'busy' : k === 'dm' && (r.status === 401 || r.status === 403) ? 'blocked' : 'net'); return r.json(); },
+        e => { throw new Error(k === 'dm' && e.name !== 'AbortError' && navigator.onLine !== false ? 'blocked' : 'net'); })
+      .then(j => OBFS[ck] = S.map(j).filter(x => x.name && eanOK(x.code)).map(x => Object.assign(x, { src: k })))
       .finally(() => clearTimeout(t));
   });
 }
@@ -51,41 +73,69 @@ function obfSearch(q) {
 function openFind(only) {
   const groups = noEanGroups(only);
   if (!groups.length) return toast(only ? 'This product already has a barcode.' : '✓ Every product already has a barcode.');
-  FB = { groups, i: 0, linked: 0, q: '', res: null, busy: false, err: '', noBrand: false };
+  FB = { groups, i: 0, linked: 0, q: '', res: null, tried: null, busy: false, errs: {}, noBrand: false, run: 0 };
   const d = scanDlg('obfdlg'); if (!d.open) d.showModal();
   findStep();
 }
 function findStep() {
   const g = FB.groups[FB.i]; if (!g) return findDone();
-  FB.noBrand = false; FB.q = obfQuery(g.p); FB.res = null; FB.err = '';
+  FB.noBrand = false; FB.q = obfQuery(g.p); FB.res = null; FB.tried = null; FB.errs = {};
   drawFind(); runFind();
 }
-function runFind() {
+const srcOrder = p => (storeOf(p) === 'dm' ? ['dm', 'obf', 'off'] : ['obf', 'dm', 'off']).filter(k => k !== 'dm' || !DMOFF);
+const srcLeft = () => srcOrder(FB.groups[FB.i].p).filter(k => !(FB.tried || []).includes(k));
+/* tries the sources in order, merging results, until a close match turns up (or all of them with more) */
+async function runFind(more) {
   const q = FB.q.trim(); if (!q) return;
-  const i = FB.i; FB.busy = true; FB.err = ''; drawFind();
-  const tick = setInterval(() => { const w = $('#obfwait'); if (w) { const s = Math.ceil((FB.waitUntil - Date.now()) / 1000); w.textContent = s > 0 ? `Waiting ${s}s (Open Beauty Facts allows about 10 searches a minute)…` : 'Searching Open Beauty Facts…'; } }, 400);
-  obfSearch(q).then(r => { if (!FB || FB.i !== i) return; const p = FB.groups[i].p;
-      FB.res = r.map(x => Object.assign({ score: obfScore(p, x) }, x)).sort((a, b) => b.score - a.score).slice(0, 6); })
-    .catch(e => { if (FB) FB.err = e.message === 'busy' ? 'Open Beauty Facts is busy right now. Wait a minute and try again.' : 'Open Beauty Facts couldn’t be reached. Check the connection and try again.'; })
-    .finally(() => { clearInterval(tick); if (!FB || FB.i !== i) return; FB.busy = false; drawFind(); });
+  if (!more || FB.lastQ !== q || FB.lastI !== FB.i || !FB.tried) { FB.res = []; FB.tried = []; FB.errs = {}; FB.lastQ = q; FB.lastI = FB.i; }
+  const i = FB.i, run = ++FB.run, p = FB.groups[i].p, live = () => FB && FB.run === run;
+  FB.busy = true; drawFind();
+  const tick = setInterval(() => { const w = $('#obfwait'); if (!w || !FB) return; const s = Math.ceil((FB.waitUntil - Date.now()) / 1000), n = FSRC[FB.cur] ? FSRC[FB.cur].name : '';
+    w.textContent = s > 0 ? `Waiting ${s}s (${n} allows about 10 searches a minute)…` : `Searching ${n}…`; }, 400);
+  try {
+    for (const k of srcLeft()) {
+      if (!live()) return;
+      FB.cur = k; FB.tried.push(k); FB.waitUntil = 0; drawFind();
+      try {
+        const r = await srcSearch(k, q); if (!live()) return;
+        r.forEach(x => { const o = FB.res.find(y => y.code === x.code);
+          if (o) { if (o.src !== x.src && !o.also.includes(x.src)) o.also.push(x.src); if (!o.img && x.img) o.img = x.img; }
+          else FB.res.push(Object.assign({ score: obfScore(p, x), also: [] }, x)); });
+      } catch (e) {
+        if (!live()) return;
+        if (e.message === 'blocked') { DMOFF = true; FB.dmNote = true; }
+        else FB.errs[k] = e.message;
+      }
+      FB.res.sort((a, b) => b.score - a.score);
+      if (!more && FB.res.length && FB.res[0].score >= 0.8) break;
+    }
+  } finally {
+    clearInterval(tick);
+    if (live()) { FB.busy = false; FB.cur = ''; drawFind(); }
+  }
 }
+const srcTag = k => `<span class="srctag ${k}">${esc(FSRC[k].name)}</span>`;
 function drawFind() {
-  const g = FB.groups[FB.i], p = g.p, n = FB.groups.length;
+  const g = FB.groups[FB.i], p = g.p, n = FB.groups.length, res = (FB.res || []).slice(0, 8), left = FB.tried ? srcLeft() : [];
   const used = code => { const o = db.purchases.find(x => x.ean === code); return o && grpKey(o) !== g.key ? o : null; };
   const card = r => { const o = used(r.code), pc = Math.round(r.score * 100);
     return `<li class="obfr${r.score >= 0.75 ? ' good' : ''}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="noimg"></span>'}
-      <span class="ox"><b class="notr">${esc(r.name)}</b><span class="sub notr">${esc([r.brand, r.qty].filter(Boolean).join(' · '))}</span><span class="mono notr">${esc(r.code)}</span>
+      <span class="ox"><b class="notr">${esc(r.name)}</b><span class="sub notr">${esc([r.brand, r.qty, r.price].filter(Boolean).join(' · '))}</span>
+      <span class="srcline"><span class="mono notr">${esc(r.code)}</span>${[r.src, ...r.also].map(srcTag).join('')}</span>
       ${o ? `<span class="warnline">Already on “${esc(o.product)}”</span>` : ''}</span>
       <span class="oact"><span class="pill ${pc >= 75 ? 'ok' : pc >= 45 ? '' : 'warn'}">${pc}%</span><button type="button" class="btn sm" data-fb="link:${esc(r.code)}">Link</button></span></li>`; };
+  const errs = Object.keys(FB.errs || {}).map(k => `<p class="err">${esc(FB.errs[k] === 'busy' ? `${FSRC[k].name} is busy right now. Wait a minute and try again.` : `${FSRC[k].name} couldn’t be reached. Check the connection and try again.`)}</p>`).join('');
+  const dmNote = FB.dmNote ? '<p class="note">dm’s search isn’t available from this site, so only the open databases are used.</p>' : '';
+  const moreBtn = !FB.busy && FB.tried && left.length ? `<button type="button" class="rlink" data-fb="more">Search more sources: ${left.map(k => FSRC[k].name).join(', ')}</button>` : '';
   scanDlg('obfdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Find barcodes · ${FB.i + 1} of ${n}${FB.linked ? ` · ${FB.linked} linked` : ''}</div>
     <h2 class="notr">${esc(p.product)}</h2>
     <p class="lead">${storeTag(p)}<span class="notr">${esc(p.brand || '')}</span>${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''} · ${g.units} unit${g.units === 1 ? '' : 's'}${g.ids.length > 1 ? ` · ${g.ids.length} lines` : ''}</p>
     <div class="toolbar obfq"><input type="text" data-fbq value="${esc(FB.q)}" autocomplete="off" dir="ltr" placeholder="Brand and product name"><button type="button" class="btn ghost" data-fb="search"${FB.busy ? ' disabled' : ''}>Search</button></div>
     ${p.brand && !FB.noBrand ? `<button type="button" class="rlink" data-fb="nobrand"${FB.busy ? ' disabled' : ''}>Search without the brand</button>` : ''}
-    <div class="obfres">${FB.busy ? `<p class="note" id="obfwait">Searching Open Beauty Facts…</p>`
-      : FB.err ? `<p class="err">${esc(FB.err)}</p>`
-      : FB.res && !FB.res.length ? '<p class="note">No matches found. Shorten the search (e.g. brand + two words) or skip this product.</p>'
-      : FB.res ? `<ul class="obflist">${FB.res.map(card).join('')}</ul>` : ''}</div>
+    <div class="obfres">${res.length ? `<ul class="obflist">${res.map(card).join('')}</ul>` : ''}
+      ${FB.busy ? `<p class="note" id="obfwait">Searching ${esc(FSRC[FB.cur] ? FSRC[FB.cur].name : '')}…</p>`
+      : FB.tried && !res.length && !errs ? '<p class="note">No matches found. Shorten the search (e.g. brand + two words) or skip this product.</p>' : ''}
+      ${errs}${dmNote}${moreBtn}</div>
     <p class="note">Check the picture and size before linking. The barcode goes on every line of this product.</p>
     <div class="mact sdact obfnav"><button type="button" class="btn ghost" data-fb="back"${FB.i ? '' : ' disabled'}>Back</button><button type="button" class="btn ghost" data-fb="skip">Skip</button><button type="button" class="btn ghost full" data-fb="done">Done</button></div></div>`;
 }
@@ -99,6 +149,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-fb]'); if (!b || !FB || b.disabled) return;
   const [a, code] = b.dataset.fb.split(':'), g = FB.groups[FB.i];
   if (a === 'search') { const i = $('#obfdlg [data-fbq]'); FB.q = i ? i.value : FB.q; runFind(); }
+  else if (a === 'more') runFind(true);
   else if (a === 'nobrand') { FB.noBrand = true; FB.q = obfQuery(g.p, true); runFind(); }
   else if (a === 'skip') { FB.i++; findStep(); }
   else if (a === 'back') { FB.i = Math.max(0, FB.i - 1); findStep(); }

@@ -616,3 +616,14 @@ Object.assign(AR, {
   'Open Beauty Facts is busy right now. Wait a minute and try again.': 'Open Beauty Facts مشغول الآن. انتظر دقيقة وحاول مجددًا.',
   'Open Beauty Facts couldn’t be reached. Check the connection and try again.': 'تعذّر الوصول إلى Open Beauty Facts. تحقق من الاتصال وحاول مجددًا.'
 });
+/* barcode finder: dm + Open Food Facts */
+rx(/^Waiting (\d+)s \((.+) allows about 10 searches a minute\)…$/, (m, s, n) => `انتظار ${s} ث (يسمح ${n} بنحو 10 عمليات بحث في الدقيقة)…`);
+rx(/^Searching (.+)…$/, (m, n) => `جارٍ البحث في ${n}…`);
+rx(/^(.+) is busy right now\. Wait a minute and try again\.$/, (m, n) => `${n} مشغول الآن. انتظر دقيقة وحاول مجددًا.`);
+rx(/^(.+) couldn’t be reached\. Check the connection and try again\.$/, (m, n) => `تعذّر الوصول إلى ${n}. تحقق من الاتصال وحاول مجددًا.`);
+rx(/^Search more sources: (.+)$/, (m, n) => `ابحث في مصادر أخرى: ${n}`);
+Object.assign(AR, {
+  'Find its barcode online': 'ابحث عن باركوده على الإنترنت',
+  'dm’s search isn’t available from this site, so only the open databases are used.': 'بحث dm غير متاح من هذا الموقع، لذلك تُستخدم قواعد البيانات المفتوحة فقط.'
+});
+Object.assign(AR, { 'The barcode finder couldn’t be loaded. Check the connection and try again.': 'تعذّر تحميل أداة البحث عن الباركود. تحقق من الاتصال وحاول مجددًا.' });

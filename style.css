@@ -729,3 +729,11 @@ small.egp{display:block;font:500 12px var(--mono);color:var(--muted);white-space
 .obfnav{grid-template-columns:1fr 1fr}
 @media (max-width:520px){.obfr{grid-template-columns:44px minmax(0,1fr)}.obfr img,.obfr .noimg{width:44px;height:44px}.obfr .oact{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
 [dir=rtl] .obfr .oact{align-items:flex-start}
+/* barcode finder: where each result came from */
+.obfr .srcline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:2px}
+.srctag{display:inline-block;font-size:10.5px;font-weight:700;line-height:1;padding:3px 6px;border-radius:999px;background:rgba(0,0,0,.06);color:var(--muted);white-space:nowrap}
+.srctag.dm{background:#fde9a8;color:#5b4300}
+.srctag.obf{background:#f3e3f1;color:#7a2d6c}
+.srctag.off{background:#e3f1e6;color:#2c6b3c}
+.obfres .err,.obfres .note{margin:8px 0 0}
+.obfres .rlink{display:inline-block;margin-top:8px}
