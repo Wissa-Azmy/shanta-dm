@@ -222,3 +222,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-lview]'); if (!b) return;
   UI.lview = b.dataset.lview; localStorage.setItem('shanta-lview', UI.lview); render();
 });
+/* a receipt on a box card: Purchases filtered to that box and receipt */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-rcpt]'); if (!b) return;
+  Object.assign(UI, { person: '', store: '', box: b.dataset.rbox }); go('purchases'); UI.q = b.dataset.rcpt; render();
+});

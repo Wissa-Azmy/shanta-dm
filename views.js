@@ -103,6 +103,7 @@ V.shipments = R => {
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
       ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
       ${x.impliedPack !== undefined && !x.tooLight && Math.abs(x.impliedPack - num(db.settings.packagingPct)) >= 3 ? `<div class="wnote">This box suggests about <b>${x.impliedPack}%</b> packaging (now ${num(db.settings.packagingPct)}%). <button class="btn sm ghost" data-act="setpack:${x.impliedPack}">Use ${x.impliedPack}%</button></div>` : ""}
+      ${boxReceipts(s, items)}
       <div class="lines"><ul class="mini">${items.map(p => `<li><span>${esc(p.product)} ×${p.qty}</span><span class="r">${fEUR(num(p.qty) * num(p.unitCost))} ${pill(p.paidBy)}</span></li>`).join('') || '<li class="empty">No products yet</li>'}
       ${costs.map(e => `<li><span>${esc(e.category)}${e.onDelivery ? ' (paid on delivery)' : ''}</span><span class="r">${fAmt(e.amount, e.currency)} ${pill(e.paidBy)}</span></li>`).join('')}</ul></div>
       ${s.notes ? `<p class="note">${esc(s.notes)}</p>` : ''}
@@ -114,6 +115,23 @@ V.shipments = R => {
       </div></div>`;
   }).join('')}</div>`;
 };
+/* the receipts in a box, read from its products: every imported (or typed) receipt number is one receipt.
+   Products moved to another box take their receipt number with them, so a receipt can show in two boxes */
+function boxReceipts(s, items) {
+  const by = new Map();
+  items.forEach(p => { const k = (p.receipt || '').trim() || '';
+    const r = by.get(k) || by.set(k, { no: k, date: p.date, store: storeOf(p), who: new Set(), lines: 0, units: 0, eur: 0 }).get(k);
+    if (p.date && (!r.date || p.date < r.date)) r.date = p.date;
+    r.who.add(p.paidBy); r.lines++; r.units += num(p.qty); r.eur += num(p.qty) * num(p.unitCost); });
+  const list = [...by.values()].filter(r => r.no).sort((a, b) => (a.date || '').localeCompare(b.date || '')), loose = by.get('');
+  if (!list.length && !loose) return '';
+  const li = r => `<li><button type="button" class="rcpt" data-rcpt="${esc(r.no)}" data-rbox="${s.id}" title="Show its products">
+      <span class="rd">${r.date ? fDate(r.date) : '—'}</span>
+      <span class="rn">${storeTag({ store: r.store })}<span class="notr mono">${esc(r.no)}</span><span class="sub">${r.lines} product${r.lines === 1 ? '' : 's'} · ${r.units} unit${r.units === 1 ? '' : 's'}</span></span>
+      <span class="rt">${fEUR(r.eur)}${[...r.who].map(pill).join('')}</span></button></li>`;
+  return `<details class="rcpts"${list.length && list.length <= 4 ? ' open' : ''}><summary><b>${list.length} receipt${list.length === 1 ? '' : 's'}</b>${loose ? `<span class="note"> · ${loose.lines} product${loose.lines === 1 ? '' : 's'} without a receipt</span>` : ''}</summary>
+    ${list.length ? `<ul>${list.map(li).join('')}</ul>` : ''}</details>`;
+}
 
 /* "Reset filters" for the filters a screen has: shown only when one of them is set, clears them all */
 const FILTER_DEFAULT = { q: '', person: '', type: '', box: '', stockStatus: 'left', store: '' };
@@ -215,25 +233,29 @@ V.ledger = R => {
    Products are grouped per box and store (always €). Every expense is its own line with the rate saved on it.
    Transfers between you are listed apart: they settle up and are not money spent on the business. */
 function paidView() {
+  rateOn.c = null;
   const who = UI.person ? [UI.person] : PEOPLE;
+  const sum = (xs, f) => xs.reduce((a, x) => a + f(x), 0), pEUR = p => num(p.qty) * num(p.unitCost), pEGP = p => toEGP(pEUR(p), "EUR", 0, p.date);
+  const eEGP = e => toEGP(e.amount, e.currency || "EUR", e.rate, e.date);
+  const two = (eur, egp) => `<b class="mono">${fEUR(eur)}</b><small class="egp">${fEGP(egp)}</small>`;
   const boxes = db.shipments.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const rateOf = (cur, r) => cur === 'EUR' ? '' : (num(r) || rate()).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const line = (l) => `<tr><td>${l.date ? fDate(l.date) : '<span class="note">' + esc(l.when || '') + '</span>'}</td><td><b>${esc(l.what)}</b>${l.sub ? `<span class="sub">${esc(l.sub)}</span>` : ''}</td>
-    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td>
+    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td><td class="num">${fEGP(l.egp)}${l.cur === "EUR" && !num(l.rate) ? `<span class="sub">at ${rateOn(l.date || l.from).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>` : ""}</td>
     <td class="acts">${l.edit ? `<button class="ib" data-edit="${l.edit}">${PENCIL}</button>` : ''}</td></tr>`;
   const group = (title, sub, lines) => { if (!lines.length) return '';
-    const t = lines.reduce((a, l) => a + l.eur, 0);
-    return `<details class="pgroup" open><summary><span><b>${esc(title)}</b>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><b class="mono">${fEUR(t)}</b></summary>
-      <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Cost</th><th class="num">Paid</th><th class="num">Rate</th><th class="num">In €</th><th></th></tr></thead><tbody>${lines.map(line).join('')}</tbody></table></div></details>`; };
+    const t = sum(lines, l => l.eur), te = sum(lines, l => l.egp);
+    return `<details class="pgroup" open><summary><span><b>${esc(title)}</b>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><span class="ptwo">${two(t, te)}</span></summary>
+      <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Cost</th><th class="num">Paid</th><th class="num">Rate</th><th class="num">In €</th><th class="num">In EGP</th><th></th></tr></thead><tbody>${lines.map(line).join('')}</tbody></table></div></details>`; };
   const products = (k, inBox) => {
     const ps = db.purchases.filter(p => p.paidBy === k && inBox(p)), by = {};
-    ps.forEach(p => { const s = storeOf(p), g = by[s] || (by[s] = { units: 0, eur: 0, rc: new Set(), from: p.date, to: p.date });
-      g.units += num(p.qty); g.eur += num(p.qty) * num(p.unitCost); if (p.receipt) g.rc.add(p.receipt);
+    ps.forEach(p => { const s = storeOf(p), g = by[s] || (by[s] = { units: 0, eur: 0, egp: 0, rc: new Set(), from: p.date, to: p.date });
+      g.units += num(p.qty); g.eur += pEUR(p); g.egp += pEGP(p); if (p.receipt) g.rc.add(p.receipt);
       if (p.date && (!g.from || p.date < g.from)) g.from = p.date; if (p.date && (!g.to || p.date > g.to)) g.to = p.date; });
     return Object.entries(by).map(([s, g]) => ({ when: !g.from ? "" : g.from === g.to ? fDate(g.from) : `${fDate(g.from)} – ${fDate(g.to)}`, what: `Products · ${s}`,
-      sub: `${g.units} units${g.rc.size ? ` · ${g.rc.size} receipt${g.rc.size === 1 ? '' : 's'}` : ''}`, amt: g.eur, cur: 'EUR', eur: g.eur }));
+      sub: `${g.units} units${g.rc.size ? ` · ${g.rc.size} receipt${g.rc.size === 1 ? '' : 's'}` : ''}`, amt: g.eur, cur: 'EUR', eur: g.eur, egp: g.egp, from: g.from }));
   };
-  const exp = e => ({ date: e.date, what: e.category, sub: [e.description, e.method, e.onDelivery ? 'on delivery' : ''].filter(Boolean).join(' · '), amt: num(e.amount), cur: e.currency || 'EUR', rate: e.rate, eur: toEUR(e.amount, e.currency, e.rate), edit: 'expenses:' + e.id });
+  const exp = e => ({ date: e.date, what: e.category, sub: [e.description, e.method, e.onDelivery ? 'on delivery' : ''].filter(Boolean).join(' · '), amt: num(e.amount), cur: e.currency || 'EUR', rate: e.rate, eur: toEUR(e.amount, e.currency, e.rate), egp: eEGP(e), edit: 'expenses:' + e.id });
   const known = id => boxes.some(s => s.id === id);
   const cards = who.map(k => {
     const groups = boxes.map(s => group(s.name, [s.status, s.date ? fDate(s.date) : ''].filter(Boolean).join(' · '),
@@ -246,9 +268,10 @@ function paidView() {
     /* costs split by the currency they were paid in; EGP shown as paid, with its € value at the saved rates */
     const ke = db.expenses.filter(e => e.paidBy === k), eurC = ke.filter(e => (e.currency || "EUR") === "EUR"), egpC = ke.filter(e => e.currency === "EGP");
     const cEUR = eurC.reduce((a, e) => a + num(e.amount), 0), cEGP = egpC.reduce((a, e) => a + num(e.amount), 0), cEGPe = egpC.reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
-    const tr = db.transfers.filter(t => t.from === k).sort(byDate).map(t => ({ date: t.date, what: `To ${pname(t.to)}`, sub: [t.method, t.notes].filter(Boolean).join(' · '), amt: num(t.amount), cur: t.currency || 'EUR', rate: t.rate, eur: toEUR(t.amount, t.currency, t.rate), edit: 'transfers:' + t.id }));
-    return `<section class="pcard"><header class="phead">${pill(k)}<span class="sp"></span><span class="ptot"><span>Paid for the business</span><b>${fEUR(prodT + expT)}</b></span></header>
-      <div class="pbreak"><div><span>Products</span><small>paid in €</small><b>${fEUR(prodT)}</b></div><div><span>Costs</span><small>paid in €</small><b>${fEUR(cEUR)}</b></div>${cEGP ? `<div><span>Costs</span><small>paid in EGP</small><b>${fEGP(cEGP)}</b><em>≈ ${fEUR(cEGPe)}</em></div>` : ''}</div>
+    const kp = db.purchases.filter(p => p.paidBy === k), prodG = sum(kp, pEGP), cEURg = sum(eurC, eEGP);
+    const tr = db.transfers.filter(t => t.from === k).sort(byDate).map(t => ({ date: t.date, what: `To ${pname(t.to)}`, sub: [t.method, t.notes].filter(Boolean).join(' · '), amt: num(t.amount), cur: t.currency || 'EUR', rate: t.rate, eur: toEUR(t.amount, t.currency, t.rate), egp: toEGP(t.amount, t.currency || 'EUR', t.rate, t.date), edit: 'transfers:' + t.id }));
+    return `<section class="pcard"><header class="phead">${pill(k)}<span class="sp"></span><span class="ptot"><span>Paid for the business</span>${two(prodT + expT, prodG + cEURg + cEGP)}</span></header>
+      <div class="pbreak"><div><span>Products</span><small>paid in €</small><b>${fEUR(prodT)}</b><em>≈ ${fEGP(prodG)}</em></div><div><span>Costs</span><small>paid in €</small><b>${fEUR(cEUR)}</b><em>≈ ${fEGP(cEURg)}</em></div>${cEGP ? `<div><span>Costs</span><small>paid in EGP</small><b>${fEGP(cEGP)}</b><em>≈ ${fEUR(cEGPe)}</em></div>` : ''}</div>
       ${groups.join('') || '<p class="empty">Nothing paid yet.</p>'}
       ${tr.length ? `<div class="psep">Transfers to ${esc(pname(PEOPLE.find(p => p !== k)))} <span class="note">· settling up, not counted above</span></div>${group('Transfers sent', '', tr)}` : ''}</section>`;
   }).join('');

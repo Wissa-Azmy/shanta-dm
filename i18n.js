@@ -563,3 +563,10 @@ Object.assign(AR, {
 });
 Object.assign(AR, { 'paid in €': 'مدفوعة باليورو', 'paid in EGP': 'مدفوعة بالجنيه' });
 rx(/^≈ (.+)$/, (m, v) => `≈ ${v}`);
+/* receipts in a box */
+rx(/^(\d+) receipts?$/, (m, n) => `${n} فاتورة`);
+rx(/^· (\d+) products? without a receipt$/, (m, n) => `· ${n} منتج بدون فاتورة`);
+rx(/^(\d+) products? · (\d+) units?$/, (m, a, b) => `${a} منتج · ${b} وحدة`);
+Object.assign(AR, { 'Show its products': 'اعرض منتجاتها' });
+Object.assign(AR, { 'In EGP': 'بالجنيه' });
+rx(/^at ([\d.,]+)$/, (m, r) => `بسعر ${r}`);

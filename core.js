@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-6";
+const APP_VERSION = "2026.11.05-8";
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -17,6 +17,22 @@ const rate = () => num(db.settings.rate) || 1;
 const toEUR = (amount, cur, r) => cur === 'EUR' ? num(amount) : num(amount) / (num(r) || rate());
 const toEGP = (amount, cur, r) => cur === 'EGP' ? num(amount) : num(amount) * (num(r) || rate());
 const eur2egp = x => x * rate();
+/* the EGP rate on a day: the one saved on the nearest entry paid on or before it (sales, payments, costs,
+   transfers all keep the rate of their day), else the first one after it, else today's rate */
+function rateOn(date) {
+
+  if (!rateOn.c) {   /* filled once per screen draw: rateOn.c = null before using it */
+    const rs = [];
+    ['sales', 'payments', 'expenses', 'transfers'].forEach(c => (db[c] || []).forEach(x => { if (x.date && num(x.rate) > 0) rs.push([x.date, num(x.rate)]); }));
+    rateOn.c = { rs: rs.sort((a, b) => a[0].localeCompare(b[0])), m: {} };
+  }
+  const C = rateOn.c; if (!date || !C.rs.length) return rate();
+  if (C.m[date]) return C.m[date];
+  let r = 0; for (const [d, v] of C.rs) { if (d <= date) r = v; else { if (!r) r = v; break; } }
+  return C.m[date] = r || rate();
+}
+/* an amount in EGP: as paid when it was paid in EGP, else at the rate saved on it or the rate of its day */
+const toEGP = (amount, cur, r, date) => cur === 'EGP' ? num(amount) : num(amount) * (num(r) || rateOn(date));
 const both = x => `${fEUR(x)}<span class="sub">${fEGP(eur2egp(x))}</span>`;
 const TRASH = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PENCIL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
