@@ -117,6 +117,8 @@ V.shipments = R => {
 };
 /* the receipts in a box, read from its products: every imported (or typed) receipt number is one receipt.
    Products moved to another box take their receipt number with them, so a receipt can show in two boxes */
+/* does a receipt number already carry its date (2026-11-04, 04.11.2026, 04.11.26 or 20261104)? */
+const hasDate = (no, d) => { const [y, m, dd] = d.split("-"); return [d, `${dd}.${m}.${y}`, `${dd}.${m}.${y.slice(2)}`, y + m + dd].some(x => no.includes(x)); };
 function boxReceipts(s, items) {
   const by = new Map();
   items.forEach(p => { const k = (p.receipt || '').trim() || '';
@@ -128,8 +130,7 @@ function boxReceipts(s, items) {
   const list = [...by.values()].filter(r => r.no).sort((a, b) => (a.date || '').localeCompare(b.date || '')), loose = by.get('');
   if (!list.length && !loose) return '';
   const li = r => `<li class="rcard"><button type="button" class="rcpt" data-rcpt="${esc(r.no)}" data-rbox="${s.id}" title="Show its products">
-      <span class="rd">${r.date ? fDate(r.date) : '—'}</span>
-      <span class="rn">${storeTag({ store: r.store })}<span class="notr mono">${esc(r.no)}</span><span class="sub">${r.lines} product${r.lines === 1 ? '' : 's'} · ${r.units} unit${r.units === 1 ? '' : 's'}</span></span>
+      <span class="rn">${storeTag({ store: r.store })}<span class="notr mono">${esc(r.no)}</span>${r.date && !hasDate(r.no, r.date) ? `<span class="rdt"> · ${fDate(r.date)}</span>` : ""}<span class="sub">${r.lines} product${r.lines === 1 ? '' : 's'} · ${r.units} unit${r.units === 1 ? '' : 's'}</span></span>
       <span class="rt">${fEUR(r.eur)}${[...r.who].map(pill).join("")}</span></button>
       <div class="rfoot"><span>${r.rate ? `Rate <b class="notr">${r.rate}</b> EGP per €1` : "Rate of the purchase day"}</span><button type="button" class="rlink" data-srbox="${s.id}" data-srrc="${esc(r.no)}">${r.rate ? "Change rate" : "Set rate"}</button></div></li>`;
   return `<details class="rcpts"${list.length && list.length <= 4 ? ' open' : ''}><summary><span class="rsum"><b>${list.length} receipt${list.length === 1 ? '' : 's'}</b>${loose ? `<span class="note"> · ${loose.lines} product${loose.lines === 1 ? '' : 's'} without a receipt</span>` : ''}</span><button type="button" class="rlink" data-srbox="${s.id}" title="Set the exchange rate of every product in this box">Rate for box</button></summary>

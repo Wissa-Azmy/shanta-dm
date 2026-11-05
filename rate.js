@@ -18,8 +18,8 @@ function drawRate() {
   scanDlg('ratedlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Exchange rate</div>
     <h2>${esc(SR.title)}</h2>
     <p class="lead">${ps.length} product line${ps.length === 1 ? '' : 's'} · ${fEUR(eur)}${savedN ? ` · ${savedN} with a saved rate` : ''}</p>
-    <div class="f"><label>Rate (EGP per €1)</label><input type="number" step="0.01" min="0" inputmode="decimal" data-srk="v" value="${esc(SR.v)}" placeholder="${dayR.join(' / ')} · rate of the day"></div>
-    <div class="srcmp"><div><span>Now</span><b>${fEGP(now)}</b></div><div><span>With this rate</span><b>${fEGP(v ? eur * v : ps.reduce((a, p) => a + num(p.qty) * num(p.unitCost) * rateOn(p.date), 0))}</b></div></div>
+    <div class="f"><label>Rate (EGP per €1)</label><input type="text" inputmode="decimal" autocomplete="off" dir="ltr" data-srk="v" value="${esc(SR.v)}" placeholder="${dayR.join(' / ')} · rate of the day"></div>
+    <div class="srcmp"><div><span>Now</span><b>${fEGP(now)}</b></div><div><span>With this rate</span><b id="srnew">${fEGP(v ? eur * v : ps.reduce((a, p) => a + num(p.qty) * num(p.unitCost) * rateOn(p.date), 0))}</b></div></div>
     <p class="note">Used for what you paid in EGP and for stock and profit at purchase rates. Suggested selling prices keep using today’s rate (${fr(rate())}). Leave empty to go back to the rate of the purchase day.</p>
     <div class="mact sdact"><button type="button" class="btn" data-sr="save">Save</button><button type="button" class="btn ghost" data-sr="cancel">Cancel</button></div></div>`;
 }
@@ -40,7 +40,8 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   if (!SR || !e.target.dataset || e.target.dataset.srk !== 'v') return;
-  SR.v = e.target.value; const pos = e.target.selectionStart; drawRate();
-  const i = $('#ratedlg [data-srk="v"]'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (x) { } }
+  /* only the preview number changes while typing: redrawing the field would move the cursor to the start */
+  SR.v = e.target.value; const ps = SR.ids.map(id => db.purchases.find(p => p.id === id)).filter(Boolean), v = num(SR.v);
+  const b = $("#srnew"); if (b) b.textContent = fEGP(ps.reduce((a, p) => a + num(p.qty) * num(p.unitCost) * (v || rateOn(p.date)), 0));
 });
 document.addEventListener('keydown', e => { if (SR && e.key === 'Enter' && e.target.dataset && e.target.dataset.srk) { e.preventDefault(); saveRate(); } });
