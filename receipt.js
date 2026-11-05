@@ -211,6 +211,7 @@ function drawReceipt() {
       <div class="f"><label>Paid with</label>${sel('method', OPT.payDE)}</div>
       <div class="f"><label>Receipt / order no.</label><input data-ro="receipt" value="${esc(o.receipt)}"></div>
       <div class="f"><label>Where</label><input data-ro="place" value="${esc(o.place)}"></div>
+      <div class="f"><label>Rate (EGP per €1)</label><input type="number" step="0.01" inputmode="decimal" data-ro="rate" value="${esc(o.rate || "")}" placeholder="${(Math.round(rateOn(o.date) * 100) / 100).toLocaleString("en-US")} · rate of that day"></div>
       ${m.sum && m.paid && m.paid < m.sum ? `<div class="f chk span"><input type="checkbox" id="rx_spread" data-ro="spread"${o.spread ? ' checked' : ''}><label for="rx_spread">Spread the coupon discount of ${fEUR(m.sum - m.paid)} over the products (you paid ${fEUR(m.paid)} instead of ${fEUR(m.sum)})</label></div>` : ''}
     </div>
     ${dup ? `<div class="err">This receipt (${esc(m.invoice)}) looks like it was imported before. Importing again will add the products twice.</div>` : ''}
@@ -243,7 +244,7 @@ function doImport() {
   let linked = 0;
   on.forEach(x => { const ean = x.ean || eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
     db.purchases.push({ id: uid(), date: o.date, store: o.store, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
-    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean,
+    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean, rate: num(o.rate) || "",
     notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }); });
   commit(); rdlg().close();
   toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}${linked ? ` · ${linked} with a barcode` : ''}`);

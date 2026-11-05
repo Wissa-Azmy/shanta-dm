@@ -570,3 +570,22 @@ rx(/^(\d+) products? · (\d+) units?$/, (m, a, b) => `${a} منتج · ${b} وح
 Object.assign(AR, { 'Show its products': 'اعرض منتجاتها' });
 Object.assign(AR, { 'In EGP': 'بالجنيه' });
 rx(/^at ([\d.,]+)$/, (m, r) => `بسعر ${r}`);
+/* exchange rate of products */
+rx(/^(\d+) product lines?( · (.+?))?( · (\d+) with a saved rate)?$/, (m, n, a, eur, b, s) => `${n} سطر منتجات${eur ? ' · ' + eur : ''}${s ? ` · ${s} بسعر محفوظ` : ''}`);
+rx(/^(\d+) selected products?$/, (m, n) => `${n} منتجات محددة`);
+rx(/^All products in (.+)$/, (m, b) => `كل المنتجات في ${b}`);
+rx(/^(?:✓ )?Rate ([\d.]+) saved on (\d+) product lines?$/, (m, r, n) => `تم حفظ السعر ${r} على ${n} سطر منتجات`);
+rx(/^(?:✓ )?Saved rate removed from (\d+) product lines?$/, (m, n) => `أُزيل السعر المحفوظ من ${n} سطر منتجات`);
+rx(/^today ([\d.,]+) · bought at ([\d.,]+)(\*?)$/, (m, a, b, s) => `اليوم ${a} · الشراء بسعر ${b}${s}`);
+rx(/^(.+) at purchase rates$/, (m, v) => `${v} بأسعار الشراء`);
+rx(/^(.+) · on goods sold, at the rates paid$/, (m, v) => `${v} · على البضاعة المباعة، بأسعار الدفع`);
+rx(/^(.+) · rate of (?:that|the) day$/, (m, v) => `${v} · سعر ذلك اليوم`);
+rx(/^EGP prices and markups use today’s rate \(([\d.,]+) EGP\/€\)\..*$/, (m, r) => `أسعار الجنيه ونسب الربح بسعر اليوم (${r} جنيه/€). «الشراء بسعر» هو السعر المحفوظ على المنتج؛ * تعني أنه لا يوجد سعر محفوظ فيُستخدم سعر يوم الشراء.`);
+rx(/^Used for what you paid in EGP and for stock and profit at purchase rates\. Suggested selling prices keep using today’s rate \(([\d.,]+)\)\..*$/, (m, r) => `يُستخدم لما دفعتماه بالجنيه وللمخزون والربح بأسعار الشراء. أسعار البيع المقترحة تبقى بسعر اليوم (${r}). اتركه فارغًا للعودة إلى سعر يوم الشراء.`);
+Object.assign(AR, {
+  'Exchange rate': 'سعر الصرف', 'Set rate': 'تحديد السعر', 'Now': 'الآن', 'With this rate': 'بهذا السعر', 'Save': 'حفظ', 'Nothing changed.': 'لم يتغير شيء.',
+  '€→EGP Set rate for the whole box': '€→جنيه تحديد السعر للصندوق كله', 'Set the exchange rate of this receipt': 'حدد سعر الصرف لهذه الفاتورة',
+  'In EGP at purchase rates': 'بالجنيه بأسعار الشراء', 'In EGP at today’s rate': 'بالجنيه بسعر اليوم',
+  'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.': 'اختياري: كم جنيهًا كلّفك €1 عند الدفع. اتركه فارغًا لاستخدام سعر ذلك اليوم.',
+  '⚠ Enter a rate above 0, or leave it empty.': '⚠ أدخل سعرًا أكبر من 0، أو اتركه فارغًا.', 'Enter a rate above 0, or leave it empty.': 'أدخل سعرًا أكبر من 0، أو اتركه فارغًا.'
+});

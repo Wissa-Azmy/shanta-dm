@@ -58,7 +58,7 @@ const SCHEMAS = {
   },
   purchases: {
     title: 'purchase', lead: 'One product line from a receipt. Use “Save & add another” to enter a whole receipt.',
-    again: ['date', 'store', 'place', 'paidBy', 'method', 'shipmentId', 'receipt'],
+    again: ['date', 'store', 'place', 'paidBy', 'method', 'shipmentId', 'receipt', 'rate'],
     fields: [
       { k: 'date', l: 'Date bought', t: 'date', def: today, req: true },
       { k: 'store', l: 'Store', t: 'select', opts: OPT.store, def: 'dm' },
@@ -74,6 +74,7 @@ const SCHEMAS = {
       { k: 'method', l: 'Paid with', t: 'select', opts: OPT.payDE, def: 'Card' },
       { k: 'shipmentId', l: 'Shipment', t: 'select', opts: shipOpts, def: '' },
       { k: 'receipt', l: 'Receipt / order no.', t: 'text' },
+      { k: 'rate', l: 'Rate (EGP per €1)', t: 'number', step: '0.01', hint: 'Optional: what €1 cost you in pounds when you paid. Leave empty to use the rate of that day.' },
       { k: 'notes', l: 'Notes', t: 'textarea', span: true }
     ],
     validate(v, old) {

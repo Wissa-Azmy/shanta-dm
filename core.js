@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-9";
+const APP_VERSION = "2026.11.05-10";
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -16,6 +16,8 @@ const pill = p => `<span class="pill ${p === 'friend' ? 'friend' : 'me'}">${esc(
 const rate = () => num(db.settings.rate) || 1;
 const toEUR = (amount, cur, r) => cur === 'EUR' ? num(amount) : num(amount) / (num(r) || rate());
 /* an amount in EGP: as paid when it was paid in EGP, else at the rate saved on it, else the rate of its day (rateOn below) */
+/* a product's rate: the one saved on it (set on import or with "Set rate"), else the rate of its purchase day */
+const pRate = p => num(p.rate) || rateOn(p.date);
 const toEGP = (amount, cur, r, date) => cur === 'EGP' ? num(amount) : num(amount) * (num(r) || (date ? rateOn(date) : rate()));
 const eur2egp = x => x * rate();
 /* the EGP rate on a day: the one saved on the nearest entry paid on or before it (sales, payments, costs,
@@ -172,8 +174,8 @@ function saleBook(skipPaymentId) {
   return { byId, orders, customers, unused };
 }
 function calc() {
-  const s = db.settings;
-  const R = { lots: {}, ship: {}, person: {}, rev: 0, revEGP: 0, unpaidEUR: 0, unpaidEGP: 0, stockEUR: 0, unpaidCostEUR: 0, spent: 0, lossEUR: 0 };
+  const s = db.settings; rateOn.c = null;
+  const R = { lots: {}, ship: {}, person: {}, rev: 0, revEGP: 0, unpaidEUR: 0, unpaidEGP: 0, stockEUR: 0, stockEGP0: 0, recEGP: 0, unpaidCostEUR: 0, spent: 0, lossEUR: 0 };
   PEOPLE.forEach(p => R.person[p] = { outlay: 0, recovered: 0, received: 0, tin: 0, tout: 0 });
   db.purchases.forEach(p => R.lots[p.id] = { p, qty: num(p.qty), unit: num(p.unitCost), sold: 0, paidQty: 0, unpaid: 0, lost: 0, revEGP: 0, revEUR: 0 });
   const B = R.book = saleBook();
@@ -194,7 +196,7 @@ function calc() {
      - otherwise they are estimated from their price, using the box's average grams per euro.
      A box with no weights at all (and not weighed) is split by price instead. */
   const pack = 1 + num(s.packagingPct) / 100;
-  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0, wG: 0, wV: 0, netG: 0, uV: 0, unknown: 0, basis: 0, consumedB: 0, grams: 0, estimated: 0, fromBox: 0, measuredG: num(sh.weight) * 1000 });
+  db.shipments.forEach(sh => R.ship[sh.id] = { goods: 0, costs: 0, consumed: 0, units: 0, items: 0, wG: 0, wV: 0, netG: 0, uV: 0, unknown: 0, basis: 0, consumedB: 0, grams: 0, estimated: 0, fromBox: 0, measuredG: num(sh.weight) * 1000, costsEGP: 0 });
   Object.values(R.lots).forEach(l => {
     l.left = l.qty - l.sold - l.lost;
     l.consumed = l.paidQty + l.lost;
@@ -222,12 +224,17 @@ function calc() {
   });
   db.expenses.forEach(e => {
     const sh = R.ship[e.shipmentId];
-    if (sh) sh.costs += toEUR(e.amount, e.currency, e.rate);
+    if (sh) { sh.costs += toEUR(e.amount, e.currency, e.rate); sh.costsEGP += toEGP(e.amount, e.currency || "EUR", e.rate, e.date); }
   });
   Object.values(R.lots).forEach(l => {
     const sh = R.ship[l.p.shipmentId];
     l.shipShare = sh && sh.basis > 0 ? sh.costs * l.basis / sh.basis : 0;
     l.landed = l.unit + l.shipShare;
+    /* the same cost in EGP at the rates paid: the product at its saved rate (or the rate of its day), its shipping
+       share at the box costs' own rates */
+    l.rateP = pRate(l.p); l.shipRate = sh && sh.costs > 0 ? sh.costsEGP / sh.costs : l.rateP;
+    l.landedEGP = l.unit * l.rateP + l.shipShare * l.shipRate;
+    R.stockEGP0 += Math.max(0, l.left) * l.landedEGP;
     R.stockEUR += Math.max(0, l.left) * l.landed;
     R.unpaidCostEUR += l.unpaid * l.landed;
     R.lossEUR += l.lost * l.landed;
@@ -236,12 +243,14 @@ function calc() {
   db.purchases.forEach(p => {
     const l = R.lots[p.id];
     P(p.paidBy).outlay += l.qty * l.unit;
-    P(p.paidBy).recovered += l.consumed * l.unit;
+    P(p.paidBy).recovered += l.consumed * l.unit; R.recEGP += l.consumed * l.unit * l.rateP;
+    R.spentEGP0 = (R.spentEGP0 || 0) + l.qty * l.unit * l.rateP;
   });
   db.expenses.forEach(e => {
     const eur = toEUR(e.amount, e.currency, e.rate), sh = R.ship[e.shipmentId];
     P(e.paidBy).outlay += eur;
-    P(e.paidBy).recovered += sh && sh.basis > 0 ? eur * sh.consumedB / sh.basis : eur;
+    const f = sh && sh.basis > 0 ? sh.consumedB / sh.basis : 1, egp = toEGP(e.amount, e.currency || "EUR", e.rate, e.date);
+    P(e.paidBy).recovered += eur * f; R.recEGP += egp * f; R.spentEGP0 = (R.spentEGP0 || 0) + egp;
   });
   db.sales.forEach(x => {
     if (x.kind !== 'sale') return;
@@ -259,6 +268,8 @@ function calc() {
   const rec = PEOPLE.reduce((a, k) => a + R.person[k].recovered, 0);
   R.spent = PEOPLE.reduce((a, k) => a + R.person[k].outlay, 0);
   R.profit = R.rev - rec;
+  /* profit in EGP: the pounds collected minus what the goods sold cost in pounds at the rates they were paid */
+  R.profitEGP0 = R.revEGP - R.recEGP;
   const share = { me: num(s.meShare) / 100, friend: 1 - num(s.meShare) / 100 };
   PEOPLE.forEach(k => {
     const p = R.person[k];

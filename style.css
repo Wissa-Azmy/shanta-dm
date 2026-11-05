@@ -602,7 +602,8 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   #dock .selbar>b{font-size:14.5px;white-space:nowrap}
   #dock .selbar .sp{display:none}
   #dock .selbar .btn{box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:0;margin:0;padding:0 10px;justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:1}
-  #dock .selbar [data-act="selclear"]{justify-self:end;width:auto;height:30px;padding:0 4px;background:none;box-shadow:none;border:0;color:rgba(255,255,255,.75);font-weight:500;font-size:13.5px;text-decoration:underline;text-underline-offset:3px}
+  #dock .selbar .slinks{justify-self:end;display:flex;gap:12px}
+  #dock .selbar .slinks .btn{width:auto;height:30px;padding:0 4px;background:none;box-shadow:none;border:0;color:rgba(255,255,255,.75);font-weight:500;font-size:13.5px;text-decoration:underline;text-underline-offset:3px}
   [dir=rtl] #dock .selbar{padding:10px 14px 10px 10px}
   #view{padding-bottom:calc(var(--dockh,0px) + 12px)}
   #totop{bottom:calc(var(--dockh,14px) + 6px)}
@@ -678,3 +679,16 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 small.egp{display:block;font:500 12px var(--mono);color:var(--muted);white-space:nowrap}
 .ptot small.egp{font-size:13.5px}
 [dir=rtl] .ptwo,[dir=rtl] .ptot,[dir=rtl] .ptot>span{align-items:flex-start;align-self:flex-start}
+
+/* ---------- exchange rate of products ---------- */
+.slinks{display:flex;gap:6px}
+.selbar .slinks .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.rcpts li{display:flex;gap:6px;align-items:stretch}
+.rcpts li .rcpt{flex:1;min-width:0}
+.rrate{flex:none;width:auto;min-width:54px;padding:0 8px;border-radius:9px;font:600 11.5px var(--mono);white-space:nowrap}
+.rboxrate{margin-top:8px}
+.srcmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.srcmp>div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.srcmp span{display:block;font-size:12px;color:var(--muted)}
+.srcmp b{font:600 16px var(--mono)}
+#ratedlg .f input{width:100%;font-size:16px}

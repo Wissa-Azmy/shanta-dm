@@ -72,6 +72,7 @@ document.addEventListener('click', e => {
   if (a === 'selclear') { SEL.clear(); render(); }
   if (a === 'sellsel') { const ids = [...SEL]; SEL.clear(); render(); openOrder(null, { purchaseIds: ids }); }
   if (a === 'movesel') { const ids = [...SEL]; SEL.clear(); render(); openMove(ids); }
+  if (a === 'ratesel') { const ids = [...SEL]; openRate(ids, ids.length + ' selected product' + (ids.length === 1 ? '' : 's')); }
 });
 /* Stock: pick products to sell together */
 /* a tap anywhere on a row with units left picks or unpicks it; its buttons, links and fields keep working as usual */
