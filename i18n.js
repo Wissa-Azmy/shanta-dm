@@ -597,3 +597,4 @@ Object.assign(AR, { 'Different rates on its products': 'أسعار مختلفة 
 Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.': 'سعر ذلك اليوم. للتكاليف بالجنيه يحوّلها إلى €؛ وللتكاليف باليورو يعطي قيمتها بالجنيه.' });
 Object.assign(AR, { 'No rate saved: the rate of that day is used': 'لا يوجد سعر محفوظ: يُستخدم سعر ذلك اليوم' });
 Object.assign(AR, { 'rate of the day': 'سعر ذلك اليوم' });
+Object.assign(AR, { 'Clear search': 'مسح البحث' });

@@ -5,7 +5,8 @@ const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
 const shipName = id => { const s = db.shipments.find(x => x.id === id); return s ? s.name : ''; };
 const actions = (coll, id) => `<td class="acts"><button class="ib" data-edit="${coll}:${id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="${coll}:${id}" title="Delete">${TRASH}</button></td>`;
 const match = (...vals) => !UI.q || vals.join(' ').toLowerCase().includes(UI.q.toLowerCase());
-const search = ph => `<input type="search" placeholder="${ph}" value="${esc(UI.q)}" data-ui="q">`;
+/* search field with its own clear (×) button: iOS hides the built-in one */
+const search = ph => `<span class="srch"><input type="search" placeholder="${ph}" value="${esc(UI.q)}" data-ui="q" autocomplete="off"><button type="button" class="srchx" data-srchx aria-label="Clear search" title="Clear search"${UI.q ? "" : " hidden"}>×</button></span>`;
 const personFilter = () => `<select data-ui="person"><option value="">Everyone</option>${PEOPLE.map(p => `<option value="${p}"${UI.person === p ? ' selected' : ''}>${esc(pname(p))}</option>`).join('')}</select>`;
 
 function settlementHero(R, compact) {

@@ -91,8 +91,8 @@ document.addEventListener('input', e => {
   const u = e.target.dataset.ui;
   if (u) {
     UI[u] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    const pos = e.target.selectionStart; render();
-    if (u === 'q') { const el = $('[data-ui="q"]'); el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) { } }
+    const pos = e.target.selectionStart, had = document.activeElement === e.target; render();
+    if (u === 'q' && had) { const el = $('[data-ui="q"]'); el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) { } }
     return;
   }
   const k = e.target.dataset.set;
@@ -228,3 +228,14 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-rcpt]'); if (!b) return;
   Object.assign(UI, { person: '', store: '', box: b.dataset.rbox }); go('purchases'); UI.q = b.dataset.rcpt; render();
 });
+/* search fields: the × clears the text and runs the search again, like the built-in button on desktop */
+document.addEventListener('pointerdown', e => { if (e.target.closest('[data-srchx]')) e.preventDefault(); });
+document.addEventListener('click', e => {
+  const x = e.target.closest('[data-srchx]'); if (!x) return;
+  const i = x.parentNode.querySelector('input'); if (!i) return;
+  i.value = ''; x.hidden = true; i.dispatchEvent(new Event('input', { bubbles: true }));
+});
+document.addEventListener('input', e => {
+  const w = e.target.closest && e.target.closest('.srch'); if (!w) return;
+  const x = w.querySelector('[data-srchx]'); if (x) x.hidden = !e.target.value;
+}, true);

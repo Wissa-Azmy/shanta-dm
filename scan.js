@@ -204,7 +204,7 @@ function drawLink() {
   scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
     <h2>${known ? 'Link more lines' : 'New barcode'}</h2>
     <p class="lead">${known ? 'Pick another product line that has this barcode, e.g. the same product named differently on another receipt.' : 'This barcode isn’t linked to a product yet. Pick the product it belongs to; all its lines get the barcode, so the next scan finds it.'}</p>
-    <div class="toolbar"><input type="search" data-lxq placeholder="Search product or brand" value="${esc(SX.q)}" autocomplete="off">
+    <div class="toolbar"><span class="srch"><input type="search" data-lxq placeholder="Search product or brand" value="${esc(SX.q)}" autocomplete="off"><button type="button" class="srchx" data-srchx aria-label="Clear search" title="Clear search"${SX.q ? "" : " hidden"}>×</button></span>
     <select data-lxbox>${o('', 'All boxes')}${boxes.map(s => o(s.id, s.name)).join('')}${o('none', 'Not in a box')}</select></div>
     <div class="obfhint" id="obfhint"></div>
     <ul class="linklist" id="lxlist">${linkListHTML()}</ul>
