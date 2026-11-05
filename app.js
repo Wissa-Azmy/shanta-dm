@@ -42,7 +42,7 @@ function render() {
   const R = calc();
   $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : V[view](R));
   document.querySelectorAll("[data-mixed]").forEach(c => c.indeterminate = true);
-  document.body.classList.toggle("hassel", !!$("#view .selbar"));
+  document.body.classList.toggle("hassel", !!$("#view .selbar")); placeBars();
   V[view].after && V[view].after();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
@@ -201,7 +201,7 @@ function fxHint() {
       if (!m || m[1] === APP_VERSION || $('#newver')) return;
       const b = document.createElement('div'); b.id = 'newver';
       b.innerHTML = `<span>A new version is available (<b class="notr">${esc(m[1])}</b>).</span><button type="button" class="btn sm" data-act="reload">Reload</button>`;
-      document.body.appendChild(b); document.body.classList.add('hasnew');
+      document.body.appendChild(b); document.body.classList.add('hasnew'); placeBars();
     } catch (e) { }
   };
   /* a plain reload takes the scripts from the browser's cache (GitHub Pages lets it keep them for

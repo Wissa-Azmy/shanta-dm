@@ -467,9 +467,7 @@ td.paycell .sub{white-space:nowrap}
 #newver .btn{flex:none}
 @media (max-width:820px){
   /* a card above the bottom edge instead of a pill over the title */
-  #newver{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:12px;right:12px;transform:none;max-width:none;border-radius:14px;padding:12px 12px 12px 16px;justify-content:space-between;line-height:1.35}
   #newver .btn{padding:9px 16px;font-size:14px}
-  body.hasnew #totop{bottom:calc(84px + env(safe-area-inset-bottom))}
   /* version: short "v…" label that fits under the language switch */
   .rail .ver{white-space:nowrap;font-size:11px}
   .rail .ver span{display:none}
@@ -545,17 +543,10 @@ table.t th.ck,table.t td.ck{width:34px;padding-left:12px;padding-right:0;text-al
 @media (max-width:820px),(pointer:coarse){
   .selck{width:22px;height:22px}
   table.t th.ck,table.t td.ck{width:40px}
-  .selbar{position:fixed;left:12px;right:12px;top:auto;bottom:calc(14px + env(safe-area-inset-bottom));z-index:40;margin:0}
   .selbar .btn{min-height:40px}
 }
 [dir=rtl] table.t th.ck,[dir=rtl] table.t td.ck{padding-right:12px;padding-left:0;text-align:center}
 [dir=rtl] .selbar{padding:8px 14px 8px 10px}
-@media (max-width:820px),(pointer:coarse){
-  body.hassel #view{padding-bottom:84px}
-  body.hassel #totop{bottom:calc(84px + env(safe-area-inset-bottom))}
-  body.hassel.hasnew .selbar{bottom:calc(84px + env(safe-area-inset-bottom))}
-  body.hassel.hasnew #totop{bottom:calc(150px + env(safe-area-inset-bottom))}
-}
 
 /* ---------- snackbar (same look as the new-version notice) ---------- */
 #toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));z-index:55;display:flex;align-items:center;gap:10px;
@@ -569,14 +560,6 @@ table.t th.ck,table.t td.ck{width:34px;padding-left:12px;padding-right:0;text-al
 #toast.warn .tic{background:#d49a2a;color:#1d2a25}
 #toast .tx{min-width:0;overflow-wrap:anywhere}
 [dir=rtl] #toast{padding:10px 10px 10px 18px}
-@media (max-width:820px){
-  #toast{left:12px;right:12px;width:auto;max-width:none;transform:translateY(14px);border-radius:14px;padding:12px 16px 12px 12px;bottom:calc(14px + env(safe-area-inset-bottom))}
-  #toast.on{transform:none}
-  [dir=rtl] #toast{padding:12px 12px 12px 16px}
-  body.hasnew #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
-  body.hassel #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
-  body.hassel.hasnew #toast{bottom:calc(150px + env(safe-area-inset-bottom))}
-}
 @media (prefers-reduced-motion:reduce){#toast{transition:opacity .2s}}
 
 /* upload glyph on the receipt buttons: the font's ⇪ is tiny, so it gets its own size */
@@ -599,19 +582,30 @@ table.t tr[data-pickrow]{cursor:pointer;-webkit-tap-highlight-color:transparent;
 @media (max-width:520px){.mvto{grid-template-columns:1fr}}
 [dir=rtl] .mvn small{margin-right:0;margin-left:4px}
 
-/* ---------- phones: selection bar in two rows, everything above the home indicator ---------- */
-:root{--sab:max(14px,calc(env(safe-area-inset-bottom) + 8px))}
+
+/* ---------- phones: one bottom dock for the bars, stacked and above the home indicator ----------
+   snackbar on top, then the update notice, then the selection bar. Nothing is positioned by hand,
+   so the bars can never float over the list or cover each other */
 body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+#dock{display:none}
 @media (max-width:820px),(pointer:coarse){
-  .selbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;bottom:var(--sab)}
-  .selbar>b{grid-column:1/-1;padding:0 4px;font-size:14.5px}
-  .selbar .sp{display:none}
-  .selbar .btn{width:100%;min-height:44px;margin:0;padding:6px 8px;justify-content:center;text-align:center;white-space:normal;line-height:1.15;font-size:13.5px}
-  #toast,#newver{bottom:var(--sab)}
-  #totop{bottom:calc(var(--sab) + 4px)}
-  body.hasnew #toast,body.hasnew #totop{bottom:calc(var(--sab) + 70px)}
-  body.hassel #view{padding-bottom:130px}
-  body.hassel #toast,body.hassel #totop{bottom:calc(var(--sab) + 112px)}
-  body.hassel.hasnew .selbar{bottom:calc(var(--sab) + 70px)}
-  body.hassel.hasnew #toast,body.hassel.hasnew #totop{bottom:calc(var(--sab) + 182px)}
+  #dock{display:flex;flex-direction:column;gap:8px;position:fixed;left:0;right:0;bottom:0;z-index:55;pointer-events:none;
+    padding:0 max(12px,env(safe-area-inset-right)) max(14px,calc(env(safe-area-inset-bottom) + 8px)) max(12px,env(safe-area-inset-left))}
+  #dock>*{pointer-events:auto}
+  #dock #toast{order:1;position:static;display:none;width:auto;max-width:none;transform:none;opacity:1;border-radius:14px;padding:12px 16px 12px 12px;transition:none}
+  #dock #toast.on{display:flex;animation:toastin .22s ease-out}
+  [dir=rtl] #dock #toast{padding:12px 12px 12px 16px}
+  #dock #newver{order:2;position:static;transform:none;max-width:none;border-radius:14px;padding:12px 12px 12px 16px;justify-content:space-between;line-height:1.35}
+  [dir=rtl] #dock #newver{padding:12px 16px 12px 12px}
+  #dock #newver .btn{padding:9px 16px;font-size:14px}
+  #dock .selbar{order:3;position:static;margin:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:8px;padding:10px 10px 10px 14px}
+  #dock .selbar>b{font-size:14.5px;white-space:nowrap}
+  #dock .selbar .sp{display:none}
+  #dock .selbar .btn{box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:0;margin:0;padding:0 10px;justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:1}
+  #dock .selbar [data-act="selclear"]{justify-self:end;width:auto;height:30px;padding:0 4px;background:none;box-shadow:none;border:0;color:rgba(255,255,255,.75);font-weight:500;font-size:13.5px;text-decoration:underline;text-underline-offset:3px}
+  [dir=rtl] #dock .selbar{padding:10px 14px 10px 10px}
+  #view{padding-bottom:calc(var(--dockh,0px) + 12px)}
+  #totop{bottom:calc(var(--dockh,14px) + 6px)}
 }
+@keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#dock #toast.on{animation:none}}

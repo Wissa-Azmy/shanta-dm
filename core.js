@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.05-2";
+const APP_VERSION = "2026.11.05-4";
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -29,7 +29,27 @@ function parseWeightG(t) {
 }
 const fG = g => g >= 1000 ? (g / 1000).toLocaleString("en-US", { maximumFractionDigits: 2 }) + " kg" : Math.round(g) + " g";
 
+/* phones: the snackbar, the update notice and the Stock selection bar share one dock at the bottom,
+   so they stack instead of being placed by hand. --dockh lets the page and back-to-top keep clear of it */
+const PHONE = matchMedia('(max-width:820px),(pointer:coarse)');
+function dock() {
+  let d = document.getElementById('dock');
+  if (!d) {
+    d = document.createElement('div'); d.id = 'dock'; document.body.appendChild(d);
+    const fit = () => document.documentElement.style.setProperty('--dockh', (PHONE.matches ? d.offsetHeight : 0) + 'px');
+    window.ResizeObserver ? new ResizeObserver(fit).observe(d) : setInterval(fit, 500);
+  }
+  return d;
+}
+function placeBars() {
+  const d = dock(), ph = PHONE.matches, home = ph ? d : document.body;
+  ['toast', 'newver'].forEach(id => { const e = document.getElementById(id); if (e && e.parentNode !== home) home.appendChild(e); });
+  d.querySelectorAll('.selbar').forEach(s => s.remove());
+  const s = ph && document.querySelector('#view .selbar'); if (s) d.appendChild(s);
+}
+PHONE.addEventListener && PHONE.addEventListener('change', () => typeof render === 'function' ? render() : placeBars());
 function toast(msg) {
+  placeBars();
   const t = $('#toast'), warn = /^\s*(⚠|!)/.test(msg), ok = /^\s*✓/.test(msg);
   t.className = warn ? 'warn' : ok ? 'ok' : '';
   t.innerHTML = `<span class="tic">${warn ? '!' : ok ? '✓' : 'i'}</span><span class="tx"></span>`;
