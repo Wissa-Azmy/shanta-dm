@@ -37,7 +37,7 @@ function drawCount() {
   const shown = items.filter(x => !q || (x.name + ' ' + x.brand + ' ' + x.ean).toLowerCase().includes(q))
     .sort((a, b) => (kept(b) > 0) - (kept(a) > 0) || a.name.localeCompare(b.name));
   const row = x => { const n = kept(x);
-    return `<li class="cntr${n ? ' kept' : ''}"><span class="cx"><b class="notr">${esc(x.name)}</b><span class="sub"><span class="notr">${esc(x.brand)}</span>${x.ean ? ` · <span class="mono notr">${esc(x.ean)}</span>` : ' · <span class="warnline">no barcode, count it by hand</span>'}</span></span>
+    return `<li class="cntr${n ? ' kept' : ''}"><span class="cx"><b class="notr">${esc(x.name)}</b><span class="sub"><span class="notr">${esc(x.brand)}</span>${x.ean ? ` · <span class="mono notr">${esc(x.ean)}</span>` : ' · <span class="warnline">no barcode, count it by hand</span>'}${typeof dmLink === 'function' ? dmLink(x.lots[0].p) : ''}</span></span>
       <span class="cstep"><button type="button" class="ib" data-cnt="dec:${esc(x.key)}"${n ? '' : ' disabled'} aria-label="One less">−</button><b>${n}<small>/${x.total}</small></b><button type="button" class="ib" data-cnt="inc:${esc(x.key)}"${n < x.total ? '' : ' disabled'} aria-label="One more">+</button></span>
       <span class="csell">${x.total - n ? `sell ${x.total - n}` : 'keep all'}</span></li>`; };
   scanDlg('cntdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Stock count · Egypt</div>

@@ -667,3 +667,4 @@ Object.assign(AR, {
   'Not in the selected delivered boxes, or none left': 'ليس في الصناديق المُسلَّمة المختارة، أو لم يتبقَّ منه شيء',
   'This barcode isn’t linked to a product': 'هذا الباركود غير مرتبط بمنتج'
 });
+Object.assign(AR, { 'Check on dm ↗': 'تحقق على dm ↗', 'View this product on dm.de': 'اعرض هذا المنتج على dm.de' });
