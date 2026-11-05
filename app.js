@@ -217,3 +217,8 @@ function fxHint() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   setTimeout(check, 3000);
 })();
+/* Ledger: all movements, or what each of you paid */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-lview]'); if (!b) return;
+  UI.lview = b.dataset.lview; localStorage.setItem('shanta-lview', UI.lview); render();
+});

@@ -1,5 +1,5 @@
 /* ---------- views ---------- */
-const UI = { q: '', person: '', type: '', stockStatus: 'left', box: '', store: '' };
+const UI = { q: '', person: '', type: '', stockStatus: 'left', box: '', store: '', lview: localStorage.getItem('shanta-lview') || '' };
 let chart = null;
 const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
 const shipName = id => { const s = db.shipments.find(x => x.id === id); return s ? s.name : ''; };
@@ -207,6 +207,52 @@ function ledgerRows(R) {
   return out.sort(byDate);
 }
 V.ledger = R => {
+  const tabs = `<div class="segtabs" role="tablist"><button class="${UI.lview === 'paid' ? '' : 'on'}" data-lview="">All movements</button><button class="${UI.lview === 'paid' ? 'on' : ''}" data-lview="paid">Paid by each</button></div>`;
+  if (UI.lview === 'paid') return tabs + paidView();
+  return tabs + ledgerAll(R);
+};
+/* ---------- Paid by each: what each partner paid, per box and per cost, in the currency it was paid in ----------
+   Products are grouped per box and store (always €). Every expense is its own line with the rate saved on it.
+   Transfers between you are listed apart: they settle up and are not money spent on the business. */
+function paidView() {
+  const who = UI.person ? [UI.person] : PEOPLE;
+  const boxes = db.shipments.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const rateOf = (cur, r) => cur === 'EUR' ? '' : (num(r) || rate()).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const line = (l) => `<tr><td>${l.date ? fDate(l.date) : '<span class="note">' + esc(l.when || '') + '</span>'}</td><td><b>${esc(l.what)}</b>${l.sub ? `<span class="sub">${esc(l.sub)}</span>` : ''}</td>
+    <td class="num">${fAmt(l.amt, l.cur)}<span class="sub notr">${l.cur}</span></td><td class="num">${l.cur === 'EUR' ? '<span class="note">—</span>' : `<span class="notr">${rateOf(l.cur, l.rate)}</span><span class="sub">EGP per €1</span>`}</td><td class="num">${fEUR(l.eur)}</td>
+    <td class="acts">${l.edit ? `<button class="ib" data-edit="${l.edit}">${PENCIL}</button>` : ''}</td></tr>`;
+  const group = (title, sub, lines) => { if (!lines.length) return '';
+    const t = lines.reduce((a, l) => a + l.eur, 0);
+    return `<details class="pgroup" open><summary><span><b>${esc(title)}</b>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span><b class="mono">${fEUR(t)}</b></summary>
+      <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Cost</th><th class="num">Paid</th><th class="num">Rate</th><th class="num">In €</th><th></th></tr></thead><tbody>${lines.map(line).join('')}</tbody></table></div></details>`; };
+  const products = (k, inBox) => {
+    const ps = db.purchases.filter(p => p.paidBy === k && inBox(p)), by = {};
+    ps.forEach(p => { const s = storeOf(p), g = by[s] || (by[s] = { units: 0, eur: 0, rc: new Set(), from: p.date, to: p.date });
+      g.units += num(p.qty); g.eur += num(p.qty) * num(p.unitCost); if (p.receipt) g.rc.add(p.receipt);
+      if (p.date && (!g.from || p.date < g.from)) g.from = p.date; if (p.date && (!g.to || p.date > g.to)) g.to = p.date; });
+    return Object.entries(by).map(([s, g]) => ({ when: !g.from ? "" : g.from === g.to ? fDate(g.from) : `${fDate(g.from)} – ${fDate(g.to)}`, what: `Products · ${s}`,
+      sub: `${g.units} units${g.rc.size ? ` · ${g.rc.size} receipt${g.rc.size === 1 ? '' : 's'}` : ''}`, amt: g.eur, cur: 'EUR', eur: g.eur }));
+  };
+  const exp = e => ({ date: e.date, what: e.category, sub: [e.description, e.method, e.onDelivery ? 'on delivery' : ''].filter(Boolean).join(' · '), amt: num(e.amount), cur: e.currency || 'EUR', rate: e.rate, eur: toEUR(e.amount, e.currency, e.rate), edit: 'expenses:' + e.id });
+  const known = id => boxes.some(s => s.id === id);
+  const cards = who.map(k => {
+    const groups = boxes.map(s => group(s.name, [s.status, s.date ? fDate(s.date) : ''].filter(Boolean).join(' · '),
+      [...products(k, p => p.shipmentId === s.id), ...db.expenses.filter(e => e.paidBy === k && e.shipmentId === s.id).sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(exp)]));
+    groups.push(group('Not in a box yet', '', products(k, p => !known(p.shipmentId))));
+    groups.push(group('Costs of sales', 'delivery and other costs paid with a sale', db.expenses.filter(e => e.paidBy === k && !known(e.shipmentId) && e.orderId).sort(byDate).map(exp)));
+    groups.push(group('General costs', 'not tied to a box or a sale', db.expenses.filter(e => e.paidBy === k && !known(e.shipmentId) && !e.orderId).sort(byDate).map(exp)));
+    const prodT = db.purchases.filter(p => p.paidBy === k).reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0);
+    const expT = db.expenses.filter(e => e.paidBy === k).reduce((a, e) => a + toEUR(e.amount, e.currency, e.rate), 0);
+    const byCur = {}; db.expenses.filter(e => e.paidBy === k && e.currency === 'EGP').forEach(e => byCur.EGP = (byCur.EGP || 0) + num(e.amount));
+    const tr = db.transfers.filter(t => t.from === k).sort(byDate).map(t => ({ date: t.date, what: `To ${pname(t.to)}`, sub: [t.method, t.notes].filter(Boolean).join(' · '), amt: num(t.amount), cur: t.currency || 'EUR', rate: t.rate, eur: toEUR(t.amount, t.currency, t.rate), edit: 'transfers:' + t.id }));
+    return `<section class="pcard"><header class="phead">${pill(k)}<span class="sp"></span><span class="ptot"><span>Paid for the business</span><b>${fEUR(prodT + expT)}</b></span></header>
+      <div class="pmini"><span>Products <b>${fEUR(prodT)}</b></span><span>Costs <b>${fEUR(expT)}</b></span>${byCur.EGP ? `<span>Paid in EGP <b>${fEGP(byCur.EGP)}</b></span>` : ''}</div>
+      ${groups.join('') || '<p class="empty">Nothing paid yet.</p>'}
+      ${tr.length ? `<div class="psep">Transfers to ${esc(pname(PEOPLE.find(p => p !== k)))} <span class="note">· settling up, not counted above</span></div>${group('Transfers sent', '', tr)}` : ''}</section>`;
+  }).join('');
+  return `<div class="toolbar">${personFilter()}${resetBtn('person')}</div><div class="pgrid">${cards}</div>`;
+}
+function ledgerAll(R) {
   const rows = ledgerRows(R).filter(r => (!UI.person || r.who === UI.person || r.to === UI.person) && (!UI.type || r.dir === UI.type) && match(r.type, r.desc, r.place, r.how));
   const flow = { in: ['Money in', 'ok'], out: ['Money out', 'bad'], pending: ['Owed by customer', 'warn'], move: ['Between you', ''] };
   return `<div class="toolbar">${search('Search everything')}${personFilter()}<select data-ui="type"><option value="">All movements</option>${Object.entries(flow).map(([k, [l]]) => `<option value="${k}"${UI.type === k ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}<button class="btn sm ghost" data-act="csv">Export CSV</button></div>
@@ -215,7 +261,7 @@ V.ledger = R => {
     <td class="num">${fAmt(r.amt, r.cur)}</td><td class="num ${r.dir === 'in' ? 'in-amt' : r.dir === 'out' ? 'out-amt' : ''}">${r.dir === 'out' ? '−' : r.dir === 'in' ? '+' : ''}${fEUR(r.eur)}</td>
     <td><span class="pill ${flow[r.dir][1]}">${flow[r.dir][0]}</span></td><td class="acts"><button class="ib" data-edit="${r.coll}:${r.id}">${PENCIL}</button></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Nothing recorded yet.</td></tr>'}
   </tbody></table></div>`;
-};
+}
 V.ledger.csv = () => {
   const R = calc();
   downloadCSV('shanta-ledger-' + today() + '.csv', [['Date', 'Type', 'Description', 'Who', 'To', 'Where', 'How', 'Amount', 'Currency', 'EUR', 'Flow']]

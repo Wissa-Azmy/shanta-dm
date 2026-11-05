@@ -609,3 +609,37 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 }
 @keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#dock #toast.on{animation:none}}
+
+/* ---------- Ledger: tabs and "Paid by each" ---------- */
+.segtabs{display:inline-flex;gap:2px;padding:3px;margin:0 0 12px;background:var(--paper2);border:1px solid var(--line);border-radius:999px}
+.segtabs button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.segtabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(29,42,37,.15)}
+.segtabs button:focus-visible{outline:2px solid var(--nile);outline-offset:1px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px;align-items:start}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.phead{display:flex;align-items:center;gap:10px}
+.phead .sp{flex:1}
+.ptot{text-align:right}.ptot span{display:block;font-size:12px;color:var(--muted)}.ptot b{font:600 20px var(--mono)}
+.pmini{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 12px;font-size:12.5px;color:var(--muted)}
+.pmini b{font:600 13px var(--mono);color:var(--ink);margin-left:4px}
+.pgroup{border-top:1px dashed var(--line);padding:6px 0}
+.pgroup>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 2px;list-style:none}
+.pgroup>summary::-webkit-details-marker{display:none}
+.pgroup>summary>span:first-child{min-width:0}
+.pgroup>summary>span:first-child:before{content:"▸";display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+.pgroup[open]>summary>span:first-child:before{transform:rotate(90deg)}
+.pgroup>summary .sub{display:inline;margin-left:8px}
+.pgroup .tablewrap{border-radius:10px;margin:4px 0 6px}
+.pgroup table.t td{padding:7px 10px}.pgroup table.t th{padding:8px 10px}
+.psep{margin:14px 0 2px;padding-top:10px;border-top:2px solid var(--line);font-weight:600;font-size:13.5px}
+[dir=rtl] .ptot{text-align:left}
+[dir=rtl] .pmini b{margin-left:0;margin-right:4px}
+[dir=rtl] .pgroup>summary .sub{margin-left:0;margin-right:8px}
+[dir=rtl] .pgroup>summary>span:first-child:before{content:"◂"}
+[dir=rtl] .pgroup[open]>summary>span:first-child:before{transform:rotate(-90deg)}
+@media (max-width:820px){
+  .segtabs{display:flex}.segtabs button{flex:1;text-align:center}
+  .pcard{padding:12px 10px}
+  .pgroup>summary .sub{display:block;margin:0 0 0 14px}
+  [dir=rtl] .pgroup>summary .sub{margin:0 14px 0 0}
+}

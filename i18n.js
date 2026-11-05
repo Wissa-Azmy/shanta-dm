@@ -549,3 +549,15 @@ Object.assign(AR, {
   'Choose the box to move them to.': 'اختر الصندوق المراد النقل إليه.', 'Give the new box a name.': 'أعطِ الصندوق الجديد اسمًا.',
   'Nothing to move: they are already in that box.': 'لا شيء للنقل: المنتجات موجودة في هذا الصندوق بالفعل.'
 });
+/* Ledger: paid by each */
+rx(/^Products · (.+)$/, (m, s) => `منتجات · ${s}`);
+rx(/^(\d+) units( · (\d+) receipts?)?$/, (m, n, x, r) => `${n} وحدة${r ? ` · ${r} فاتورة` : ''}`);
+rx(/^To (.+)$/, (m, p) => `إلى ${p}`);
+rx(/^Transfers to (.+)$/, (m, p) => `تحويلات إلى ${p}`);
+Object.assign(AR, {
+  'All movements': 'كل الحركات', 'Paid by each': 'مدفوعات كل شريك', 'Paid for the business': 'المدفوع للمشروع', 'Products': 'المنتجات', 'Costs': 'التكاليف',
+  'Paid in EGP': 'المدفوع بالجنيه', 'Paid': 'المدفوع', 'Rate': 'السعر', 'EGP per €1': 'جنيه لكل €1', 'Cost': 'التكلفة',
+  'Not in a box yet': 'ليست في صندوق بعد', 'Costs of sales': 'تكاليف المبيعات', 'delivery and other costs paid with a sale': 'التوصيل وتكاليف أخرى مدفوعة مع بيع',
+  'General costs': 'تكاليف عامة', 'not tied to a box or a sale': 'غير مرتبطة بصندوق أو بيع', 'Transfers sent': 'التحويلات المرسلة',
+  '· settling up, not counted above': '· تسوية، غير محسوبة أعلاه', 'Nothing paid yet.': 'لم يُدفع شيء بعد.'
+});
