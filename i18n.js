@@ -595,3 +595,4 @@ Object.assign(AR, { 'Rate': 'السعر', 'Rate of the purchase day': 'سعر ي
 rx(/^Rate of the purchase day ([\d.,]+)$/, (m, r) => `سعر يوم الشراء ${r}`);
 Object.assign(AR, { 'Different rates on its products': 'أسعار مختلفة على منتجاتها' });
 Object.assign(AR, { 'Rate on that day. For EGP costs it converts to €; for € costs it gives their value in EGP.': 'سعر ذلك اليوم. للتكاليف بالجنيه يحوّلها إلى €؛ وللتكاليف باليورو يعطي قيمتها بالجنيه.' });
+Object.assign(AR, { 'No rate saved: the rate of that day is used': 'لا يوجد سعر محفوظ: يُستخدم سعر ذلك اليوم' });
