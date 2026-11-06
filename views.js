@@ -50,8 +50,10 @@ V.overview = R => {
   const lows = Object.values(R.lots).filter(l => l.left > 0 && l.left <= num(db.settings.lowStock));
   const unpaid = salesOrders().filter(o => { const b = R.book.byId[o.id]; return o.h.kind === 'sale' && b && b.balance > 0.005; }).sort((a, b) => (R.book.byId[a.id].h.dueDate || '9').localeCompare(R.book.byId[b.id].h.dueDate || '9') || byDate(a, b));
   const moving = db.shipments.filter(s => s.status !== 'Delivered');
-  const prod = {}; Object.values(R.lots).forEach(l => { const k = l.p.product; prod[k] = prod[k] || { n: 0, rev: 0, cost: 0 }; prod[k].n += l.sold; prod[k].rev += l.revEUR; prod[k].cost += l.sold * l.landed; });
+  const prod = {}; Object.values(R.lots).forEach(l => { const k = l.p.product; prod[k] = prod[k] || { n: 0, rev: 0, cost: 0, left: 0 }; prod[k].n += l.sold; prod[k].left += Math.max(0, l.left); prod[k].rev += l.revEUR; prod[k].cost += l.sold * l.landed; });
   const top = Object.entries(prod).filter(([, x]) => x.n).sort((a, b) => (b[1].rev - b[1].cost) - (a[1].rev - a[1].cost)).slice(0, 6);
+  const topN = Object.entries(prod).filter(([, x]) => x.n).sort((a, b) => b[1].n - a[1].n || (b[1].rev - b[1].cost) - (a[1].rev - a[1].cost)).slice(0, 6);
+  const slow = Object.entries(prod).filter(([, x]) => x.left > 0).sort((a, b) => a[1].n - b[1].n || b[1].left - a[1].left).slice(0, 6);
   return settlementHero(R) + `
   <div class="stamps">
     <div class="stamp n"><div class="in"><div class="k">Collected from sales</div><div class="v">${fEGP(R.revEGP)}</div><div class="s">${fEUR(R.rev)}</div></div></div>
@@ -62,6 +64,10 @@ V.overview = R => {
   <div class="grid2">
     <div class="card"><h3>Money in vs money out, by month</h3><div class="chartbox"><canvas id="chart"></canvas></div></div>
     <div class="card"><h3>Best earners</h3>${top.length ? `<ul class="mini">${top.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${x.n} sold</span></span><span class="r">${fEUR(x.rev - x.cost)} profit</span></li>`).join('')}</ul>` : '<div class="empty">No sales yet.</div>'}</div>
+  </div>
+  <div class="grid2" style="margin-top:18px">
+    <div class="card"><h3>Best sellers</h3>${topN.length ? `<ul class="mini">${topN.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${fEUR(x.rev - x.cost)} profit</span></span><span class="r">${x.n} sold</span></li>`).join('')}</ul>` : '<div class="empty">No sales yet.</div>'}</div>
+    <div class="card"><h3>Least sold in stock</h3>${slow.length ? `<ul class="mini">${slow.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${x.left} in stock</span></span><span class="r">${x.n} sold</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in stock.</div>'}</div>
   </div>
   <div class="grid3" style="margin-top:18px">
     <div class="card"><h3>On the way</h3>${moving.length ? `<ul class="mini">${moving.map(s => `<li><span>${esc(s.name)}<span class="sub note">${esc(s.carrier || '')} ${fDate(s.date)}</span></span><span class="pill warn">${esc(s.status)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in transit.</div>'}</div>

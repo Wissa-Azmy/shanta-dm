@@ -699,3 +699,10 @@ Object.assign(AR, {
   'Fill in the receipt prices before coupons on those products instead of importing it again?': 'هل تُدخل أسعار الإيصال قبل الكوبونات في هذه المنتجات بدلًا من استيراده مرة أخرى؟',
   'None of the receipt lines matched the products saved from it.': 'لم يطابق أي سطر في الإيصال المنتجات المحفوظة منه.'
 });
+/* overview best sellers, sales list summary */
+rx(/^(\d+) products$/, (m, n) => `${n} منتجات`);
+rx(/^(\d+) units?(?: · (.+) and (\d+) more)?(?: · (\d+) extras?)?$/, (m, u, f, k, x) => `${u} قطعة${f ? ` · ${f} و${k} غيره` : ''}${x ? ` · ${x} إضافات` : ''}`);
+rx(/^(\d+) product lines · (\d+) units?$/, (m, a, b) => `${a} سطر منتجات · ${b} قطعة`);
+rx(/^(\d+) in stock$/, (m, n) => `${n} في المخزون`);
+Object.assign(AR, { 'Best sellers': 'الأكثر مبيعًا', 'Least sold in stock': 'الأقل مبيعًا في المخزون', 'Nothing in stock.': 'لا شيء في المخزون.', 'View products': 'عرض المنتجات', 'Edit sale': 'تعديل البيع', 'Customer pays': 'يدفع العميل', 'Qty': 'الكمية', 'Price': 'السعر', 'Total': 'الإجمالي', 'Product': 'المنتج' });
+rx(/^Extra costs: (.+)$/, (m, x) => `تكاليف إضافية: ${x}`);

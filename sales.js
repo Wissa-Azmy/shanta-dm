@@ -224,8 +224,7 @@ V.sales = R => {
   let bill = 0, prof = 0;
   const body = rows.map(o => { const h = o.h, m = orderMoney(o, R); bill += m.bill; prof += m.profit;
     return `<tr><td>${fDate(h.date)}</td><td><b>${esc(h.customer || (h.kind === 'sale' ? 'Customer' : kinds[h.kind]))}</b><span class="sub">${esc(h.place || '')}${h.method && h.kind === 'sale' ? ' · ' + esc(h.method) : ''}</span></td>
-      <td>${o.lines.map(s => `<span class="pline">${num(s.qty)}× ${esc(pn(s))}${h.kind === 'sale' ? ` <span class="note">@ ${fAmt(s.unitPrice, s.currency)}${typeof wasPrice === 'function' ? wasPrice(num(s.listPrice), num(s.unitPrice), v => fAmt(v, s.currency)) : ''}</span>` : ''}</span>`).join('')}
-        ${o.extras.concat(o.costs).length ? `<span class="sub">${[...new Set(o.costs.map(e => e.description || e.category).concat(o.extras.map(s => s.product)))].map(esc).join(', ')}</span>` : ''}</td>
+      <td>${saleSummary(o, pn)}</td>
       <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</td>
       <td class="num">${m.cost ? fEGP(m.cost) : '—'}</td>
       <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
@@ -389,3 +388,40 @@ V.customers = R => {
       <td class="num">${fAmt(p.amount, p.currency)}</td><td>${pill(p.receivedBy)}</td><td>${esc(p.method || '')}</td>${actions('payments', p.id)}</tr>`; }).join('') || '<tr><td colspan="7" class="empty">No credit payments yet.</td></tr>'}
   </tbody></table></div>`;
 };
+/* ---------- sales list: a short summary per sale; tapping it opens the full list of products ---------- */
+function saleSummary(o, pn) {
+  const units = o.lines.reduce((a, s) => a + num(s.qty), 0), prods = new Set(o.lines.map(s => s.purchaseId ? pn(s) : '')).size;
+  const first = o.lines[0] ? pn(o.lines[0]) : '';
+  const extras = [...new Set(o.costs.map(e => e.description || e.category).concat(o.extras.filter(s => !s.discount).map(s => s.product)))];
+  if (!o.lines.length) return extras.length ? `<span class="sub">${extras.map(esc).join(', ')}</span>` : '—';
+  return `<button type="button" class="slsum" data-salelines="${o.id}"><b>${prods === 1 ? `<span class="notr">${esc(first)}</span>` : `${prods} products`}</b>
+    <span class="sub">${units} unit${units === 1 ? '' : 's'}${prods > 1 ? ` · ${esc(first)} and ${prods - 1} more` : ''}${extras.length ? ` · ${extras.length} extra${extras.length === 1 ? '' : 's'}` : ''}</span><span class="slview">View products</span></button>`;
+}
+function openSaleLines(id) {
+  const o = salesOrders().find(x => x.id === id); if (!o) return;
+  const R = calc(), h = o.h, sale = h.kind === 'sale', m = orderMoney(o, R), kinds = Object.fromEntries(OPT.kind);
+  const pn = s => { const l = R.lots[s.purchaseId]; return l ? l.p : null; };
+  const units = o.lines.reduce((a, s) => a + num(s.qty), 0);
+  const rows = o.lines.map(s => { const p = pn(s), q = num(s.qty), u = num(s.unitPrice);
+    return `<tr><td><b class="notr">${esc(p ? p.product : '(deleted product)')}</b><span class="sub">${p ? `${typeof storeTag === 'function' ? storeTag(p) : ''}<span class="notr">${esc(p.brand || '')}</span>${p.shipmentId ? ' · ' + esc(shipName(p.shipmentId)) : ''}` : ''}</span></td>
+      <td class="num">${q}</td>${sale ? `<td class="num">${fAmt(u, s.currency)}${typeof wasPrice === 'function' ? wasPrice(num(s.listPrice), u, v => fAmt(v, s.currency)) : ''}</td><td class="num">${fAmt(q * u, s.currency)}</td>` : ''}</tr>`; }).join('');
+  const extras = o.extras.filter(s => !s.discount), cur = (o.lines[0] || {}).currency || h.currency || 'EGP';
+  const d = scanDlg('sldlg');
+  d.innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">${fDate(h.date)} · ${sale ? 'Sale' : esc(kinds[h.kind] || h.kind)}</div>
+    <h2 class="notr">${esc(h.customer || (sale ? 'Customer' : kinds[h.kind] || ''))}</h2>
+    <p class="lead">${new Set(o.lines.map(s => s.purchaseId)).size} product lines · ${units} unit${units === 1 ? '' : 's'}${h.place ? ' · <span class="notr">' + esc(h.place) + '</span>' : ''}</p>
+    <div class="tablewrap sltable"><table class="t"><thead><tr><th>Product</th><th class="num">Qty</th>${sale ? '<th class="num">Price</th><th class="num">Total</th>' : ''}</tr></thead><tbody>${rows}</tbody>
+    ${sale ? `<tfoot>${extras.map(s => `<tr><td colspan="3">${esc(s.product || s.category)}</td><td class="num">${fAmt(num(s.qty) * num(s.unitPrice), s.currency)}</td></tr>`).join('')}
+      ${m.discount ? `<tr><td colspan="3">Discount</td><td class="num out-amt">− ${fEGP(m.discount)}</td></tr>` : ''}
+      <tr class="sltot"><td colspan="3">Customer pays</td><td class="num">${fEGP(m.bill)}</td></tr></tfoot>` : ''}</table></div>
+    ${o.costs.length ? `<p class="note">Extra costs: ${o.costs.map(e => `${esc(e.description || e.category)} ${fAmt(num(e.amount), e.currency)}`).join(' · ')}</p>` : ''}
+    ${h.notes ? `<p class="note notr">${esc(h.notes)}</p>` : ''}
+    <div class="mact sdact"><button type="button" class="btn ghost" data-sl="close">Close</button><button type="button" class="btn" data-sl="edit:${o.id}">Edit sale</button></div></div>`;
+  if (!d.open) d.showModal();
+}
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-salelines]'); if (s) { e.preventDefault(); return openSaleLines(s.dataset.salelines); }
+  const b = e.target.closest('[data-sl]'); if (!b) return;
+  const [a, id] = b.dataset.sl.split(':'); scanDlg('sldlg').close();
+  if (a === 'edit') openOrder(id);
+});
