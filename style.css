@@ -794,3 +794,12 @@ a.eanlink:hover{background:#fdf3cf}
   nav button{box-sizing:border-box;height:36px;padding:0 12px;line-height:1;flex:none}
   nav button i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;line-height:1;font-size:15px;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 }
+/* phone nav: the bar itself is a fixed 40px strip; nothing inside (tall emoji/£ glyphs, scroll area) can stretch it,
+   and the space under it matches the space above it */
+@media (max-width:820px){
+  .rail{padding-bottom:10px;gap:12px}
+  nav{height:40px;min-height:40px;max-height:40px;overflow-x:auto;overflow-y:hidden;align-items:center;flex-wrap:nowrap;padding:0;margin:0}
+  nav button{height:36px!important;max-height:36px;align-self:center}
+  nav button i{height:18px!important;max-height:18px;line-height:18px!important;font-size:15px!important}
+  main{padding-top:14px}
+}
