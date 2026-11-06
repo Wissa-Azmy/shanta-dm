@@ -676,3 +676,9 @@ Object.assign(AR, {
   'No matches found. Try the brand and two or three words of the name.': 'لا توجد نتائج. جرّب العلامة التجارية وكلمتين أو ثلاث من الاسم.', 'Close': 'إغلاق'
 });
 rx(/^In your products: “(.+)”$/, (m, x) => `ضمن منتجاتك: «${x}»`);
+/* sale discount */
+rx(/^Discount \((EGP|EUR)\)$/, (m, c) => `الخصم (${c})`);
+rx(/^Or type what the customer really pays \((EGP|EUR)\)$/, (m, c) => `أو اكتب ما يدفعه العميل فعلًا (${c})`);
+rx(/^The discount is worked out for you: (.+) before the discount\.$/, (m, x) => `يُحسب الخصم تلقائيًا: ${x} قبل الخصم.`);
+rx(/^after (.+) discount$/, (m, x) => `بعد خصم ${x}`);
+Object.assign(AR, { 'Discount': 'الخصم', 'The discount can’t be below 0. Add an extra the customer pays instead.': 'لا يمكن أن يكون الخصم أقل من 0. أضف تكلفة إضافية يدفعها العميل بدلًا من ذلك.', 'The discount is bigger than the whole sale.': 'الخصم أكبر من قيمة البيع كلها.' });

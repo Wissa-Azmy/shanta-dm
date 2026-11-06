@@ -16,10 +16,12 @@ const orderOf = ref => { const s = db.sales.find(x => x.id === ref); return s ? 
 const inOrder = (s, oid) => (s.orderId || s.id) === oid;
 function orderMoney(o, R) {
   const goods = o.lines.reduce((a, s) => a + toEGP(num(s.qty) * num(s.unitPrice), s.currency, s.rate), 0);
-  const charged = o.extras.reduce((a, s) => a + toEGP(num(s.qty) * num(s.unitPrice), s.currency, s.rate), 0);
+  const charged = o.extras.filter(s => !s.discount).reduce((a, s) => a + toEGP(num(s.qty) * num(s.unitPrice), s.currency, s.rate), 0);
+  /* a discount is stored as a customer-pays line with a negative price, so every total already counts it */
+  const discount = -o.extras.filter(s => s.discount).reduce((a, s) => a + toEGP(num(s.qty) * num(s.unitPrice), s.currency, s.rate), 0);
   const cost = o.costs.reduce((a, e) => a + toEGP(e.amount, e.currency, e.rate), 0);
   const landed = o.lines.reduce((a, s) => { const l = R.lots[s.purchaseId]; return a + (l ? eur2egp(num(s.qty) * l.landed) : 0); }, 0);
-  return { goods, charged, bill: goods + charged, cost, landed, profit: goods + charged - landed - cost };
+  return { goods, charged, discount, bill: goods + charged - discount, cost, landed, profit: goods + charged - discount - landed - cost };
 }
 
 /* ---------- editor ---------- */
@@ -33,16 +35,17 @@ function openOrder(id, preset) {
   if (o) {
     const h = o.h, ex = {};
     o.costs.forEach(e => { const k = e.extraKey || e.id; ex[k] = Object.assign(ex[k] || { category: e.category, description: e.description || '', charge: '' }, { cost: num(e.amount), paidBy: e.paidBy }); });
-    o.extras.forEach(s => { const k = s.extraKey || s.id; ex[k] = Object.assign(ex[k] || { category: s.category || 'Other', description: s.product || '', cost: '', paidBy: 'friend' }, { charge: num(s.unitPrice) }); });
+    o.extras.filter(s => !s.discount).forEach(s => { const k = s.extraKey || s.id; ex[k] = Object.assign(ex[k] || { category: s.category || 'Other', description: s.product || '', cost: '', paidBy: 'friend' }, { charge: num(s.unitPrice) }); });
+    const disc = -o.extras.filter(s => s.discount).reduce((a, s) => a + num(s.qty) * num(s.unitPrice), 0);
     OR = { id: o.id, isNew: false,
-      h: { date: h.date, customer: h.customer || '', place: h.place || '', receivedBy: h.receivedBy || 'friend', method: h.method || 'Cash', paid: !!h.paid, payMode: h.payMode || (h.paid ? 'full' : 'credit'), downPayment: h.downPayment || '', dueDate: h.dueDate || '', currency: h.currency || 'EGP', rate: h.rate || db.settings.rate, kind: h.kind || 'sale', notes: h.notes || '' },
+      h: { date: h.date, customer: h.customer || '', place: h.place || '', receivedBy: h.receivedBy || 'friend', method: h.method || 'Cash', paid: !!h.paid, payMode: h.payMode || (h.paid ? 'full' : 'credit'), downPayment: h.downPayment || '', dueDate: h.dueDate || '', currency: h.currency || 'EGP', rate: h.rate || db.settings.rate, kind: h.kind || 'sale', notes: h.notes || '', discount: disc > 0 ? Math.round(disc * 100) / 100 : '' },
       lines: o.lines.map(s => ({ purchaseId: s.purchaseId, qty: num(s.qty), unitPrice: h.kind === 'sale' ? num(s.unitPrice) : '' })),
       extras: Object.values(ex),
       old: { sales: o.lines.concat(o.extras).map(s => s.id), exps: o.costs.map(e => e.id) }, orig: {} };
     o.lines.forEach(s => OR.orig[s.purchaseId] = (OR.orig[s.purchaseId] || 0) + num(s.qty));
   } else {
     OR = { id: null, isNew: true,
-      h: { date: today(), customer: '', place: db.settings.cityEG, receivedBy: 'friend', method: 'Cash', paid: true, payMode: 'full', downPayment: '', dueDate: '', currency: 'EGP', rate: db.settings.rate, kind: 'sale', notes: '' },
+      h: { date: today(), customer: '', place: db.settings.cityEG, receivedBy: 'friend', method: 'Cash', paid: true, payMode: 'full', downPayment: '', dueDate: '', currency: 'EGP', rate: db.settings.rate, kind: 'sale', notes: '', discount: '' },
       lines: [{ purchaseId: (preset && preset.purchaseId) || '', qty: 1, unitPrice: '' }], extras: [], old: { sales: [], exps: [] }, orig: {} };
     /* several products picked on Stock: one line each, 1 unit at the suggested price */
     if (preset && preset.purchaseIds) {
@@ -62,14 +65,28 @@ function orderTotals() {
   const egp = a => toEGP(a, h.currency, h.rate);
   const goods = sale ? OR.lines.reduce((a, x) => a + egp(num(x.qty) * num(x.unitPrice)), 0) : 0;
   const charged = sale ? OR.extras.reduce((a, x) => a + egp(num(x.charge)), 0) : 0;
+  const discount = sale ? egp(num(h.discount)) : 0;
   const cost = OR.extras.reduce((a, x) => a + egp(num(x.cost)), 0);
   const landed = OR.lines.reduce((a, x) => { const l = R.lots[x.purchaseId]; return a + (l ? eur2egp(num(x.qty) * l.landed) : 0); }, 0);
-  return { goods, charged, bill: goods + charged, cost, landed, profit: goods + charged - landed - cost, units: OR.lines.reduce((a, x) => a + num(x.qty), 0) };
+  return { goods, charged, discount, before: goods + charged, bill: goods + charged - discount, cost, landed, profit: goods + charged - discount - landed - cost, units: OR.lines.reduce((a, x) => a + num(x.qty), 0) };
+}
+/* the sale's total before the discount, in the sale's own currency */
+const beforeDisc = () => { return OR.lines.reduce((a, x) => a + num(x.qty) * num(x.unitPrice), 0) + OR.extras.reduce((a, x) => a + num(x.charge), 0); };
+const r2 = x => Math.round(x * 100) / 100;
+function discountHTML() {
+  const h = OR.h, cur = h.currency, before = beforeDisc(), real = h.discount === '' ? '' : r2(before - num(h.discount));
+  return `<h3 class="osec">Discount</h3>
+    <div class="grid2 odisc">
+      <div class="f"><label>Discount (${cur})</label><input type="text" inputmode="decimal" data-num="1" data-oh="discount" id="o_disc" value="${esc(h.discount)}" placeholder="0"></div>
+      <div class="f"><label>Or type what the customer really pays (${cur})</label><input type="text" inputmode="decimal" data-num="1" data-oreal="1" id="o_real" value="${esc(real)}" placeholder="${esc(fAmt(before, cur))}">
+      <span class="hint">The discount is worked out for you: ${esc(fAmt(before, cur))} before the discount.</span></div>
+    </div>`;
 }
 function totalsHTML() {
   const t = orderTotals(), sale = OR.h.kind === 'sale', f = x => fAmt(OR.h.currency === 'EUR' ? x / (num(OR.h.rate) || rate()) : x, OR.h.currency);
   return `<dl class="kv">
     ${sale ? `<dt>Products (${t.units} units)</dt><dd>${f(t.goods)}</dd><dt>Extras the customer pays</dt><dd>${f(t.charged)}</dd>
+    ${t.discount ? `<dt>Discount</dt><dd class="out-amt">− ${f(t.discount)}</dd>` : ''}
     <dt><b>Customer pays in total</b></dt><dd><b>${f(t.bill)}</b></dd>
     ${OR.h.payMode !== 'full' ? (() => { const now = OR.h.payMode === 'down' ? toEGP(num(OR.h.downPayment), OR.h.currency, OR.h.rate) : 0;
       return `<dt class="kvsub">Paid now</dt><dd class="kvsub">${f(now)}</dd><dt class="kvsub">On ${esc(OR.h.customer || 'the customer')}’s credit</dt><dd class="kvsub">${f(Math.max(0, t.bill - now))}${OR.h.dueDate ? ` <span class="pill warn">due ${fDate(OR.h.dueDate)}</span>` : ''}</dd>`; })() : ''}` : `<dt>Units leaving stock</dt><dd>${t.units}</dd>`}
@@ -122,6 +139,7 @@ function drawOrder(err) {
     </tbody></table></div>` : '<p class="note">No extra costs. Add delivery, packaging or anything else this sale cost you, or that the customer pays on top.</p>'}
     <div class="topact" style="margin-top:8px">${EXTRA_CATS.map(c => `<button type="button" class="btn sm ghost" data-o="add-extra:${c}">+ ${c === 'Delivery to customer' ? 'Delivery' : c}</button>`).join('')}</div>
 
+    ${sale ? discountHTML() : ''}
     <div class="grid2" style="margin-top:16px">
       <div class="f"><label>Notes</label><textarea data-oh="notes" rows="3">${esc(h.notes)}</textarea></div>
       <div class="card" id="o_tot">${totalsHTML()}</div>
@@ -140,6 +158,9 @@ function saveOrder() {
     if (q > av) return drawOrder(`Only ${av} of “${l ? l.p.product : 'this product'}” are available.`);
   }
   if (sale && lines.some(x => x.unitPrice === '' || x.unitPrice == null)) return drawOrder('Enter a price for every product.');
+  const disc = sale ? r2(num(h.discount)) : 0;
+  if (disc < 0) return drawOrder('The discount can’t be below 0. Add an extra the customer pays instead.');
+  if (disc > 0 && disc > r2(beforeDisc()) + 0.005) return drawOrder('The discount is bigger than the whole sale.');
   if (sale && h.payMode !== 'full') {
     if (!String(h.customer || '').trim()) return drawOrder('Enter the customer’s name: the rest goes on their credit balance.');
     const bill = orderTotals().bill, dp = toEGP(num(h.downPayment), h.currency, h.rate);
@@ -158,6 +179,7 @@ function saveOrder() {
       paidBy: x.paidBy, method: 'Cash', place: h.place, shipmentId: '', notes: h.customer ? 'Sale to ' + h.customer : 'Sale' });
     if (sale && num(x.charge) > 0) db.sales.push(Object.assign({ id: uid() }, base, { extra: true, extraKey: key, purchaseId: '', product: what, category: x.category, qty: 1, unitPrice: num(x.charge) }));
   });
+  if (disc > 0) db.sales.push(Object.assign({ id: uid() }, base, { extra: true, discount: true, purchaseId: '', product: 'Discount', category: 'Discount', qty: 1, unitPrice: -disc }));
   commit(); odlg().close(); toast('Sale saved');
 }
 function deleteOrder(oid) {
@@ -196,7 +218,7 @@ V.sales = R => {
     return `<tr><td>${fDate(h.date)}</td><td><b>${esc(h.customer || (h.kind === 'sale' ? 'Customer' : kinds[h.kind]))}</b><span class="sub">${esc(h.place || '')}${h.method && h.kind === 'sale' ? ' · ' + esc(h.method) : ''}</span></td>
       <td>${o.lines.map(s => `<span class="pline">${num(s.qty)}× ${esc(pn(s))}${h.kind === 'sale' ? ` <span class="note">@ ${fAmt(s.unitPrice, s.currency)}</span>` : ''}</span>`).join('')}
         ${o.extras.concat(o.costs).length ? `<span class="sub">${[...new Set(o.costs.map(e => e.description || e.category).concat(o.extras.map(s => s.product)))].map(esc).join(', ')}</span>` : ''}</td>
-      <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}</td>
+      <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</td>
       <td class="num">${m.cost ? fEGP(m.cost) : '—'}</td>
       <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
@@ -283,7 +305,13 @@ function orderInput(e, redraw) {
     if (t.dataset.k === 'purchaseId' && x.unitPrice === '' && OR.h.kind === 'sale') { const l = calc().lots[val]; if (l && OR.h.currency === 'EGP') x.unitPrice = suggestEGP(l); }
     const c = $('#ol_t_' + t.dataset.ol); if (c) c.textContent = fAmt(num(x.qty) * num(x.unitPrice), OR.h.currency);
   } else if (t.dataset.oe) OR.extras[+t.dataset.oe][t.dataset.k] = val;
+  else if (t.dataset.oreal) {
+    /* the real total typed in: the discount is the difference (only down; to go up, add an extra) */
+    OR.h.discount = val === '' ? '' : r2(Math.max(0, beforeDisc() - val));
+    const d = $('#o_disc'); if (d) d.value = OR.h.discount;
+  }
   else return;
+  if (t.dataset.oh === 'discount' || t.dataset.ol || t.dataset.oe) { const r = $('#o_real'); if (r && r !== t) { const b = beforeDisc(); r.value = OR.h.discount === '' ? '' : r2(b - num(OR.h.discount)); r.placeholder = fAmt(b, OR.h.currency); } }
   if (redraw) drawOrder(); else $('#o_tot').innerHTML = totalsHTML();
 }
 document.addEventListener('input', e => orderInput(e, false));
