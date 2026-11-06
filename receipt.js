@@ -241,6 +241,10 @@ function loadText(text, fileName) {
 function doImport() {
   const f = factor(), o = RX.o, on = RX.items.filter(x => x.on && num(x.qty) > 0 && x.product.trim());
   if (!on.length) return toast('Nothing selected to import');
+  /* the same receipt imported again: fill in the prices before coupons on the products already saved
+     (earlier imports didn't keep them) instead of adding the products a second time */
+  const rno = String(o.receipt || '').trim(), had = rno ? db.purchases.filter(p => String(p.receipt || '').trim() === rno) : [];
+  if (had.length && confirm(`Receipt #${rno} is already imported (${had.length} product lines).\n\nFill in the receipt prices before coupons on those products instead of importing it again?`)) return refillPrices(had, on, f);
   let linked = 0;
   on.forEach(x => { const ean = x.ean || eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
     db.purchases.push({ id: uid(), date: o.date, store: o.store, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
@@ -325,3 +329,29 @@ document.addEventListener('drop', e => {
   openReceipt(card ? card.dataset.shipId : '');
   readReceiptFile(file);
 });
+/* match the receipt lines to the purchases already saved from it (by barcode, else by name) and keep each
+   receipt price as listCost. Lines saved at the full receipt price although the receipt had coupons can get
+   the coupon share taken off as well, after asking, since that changes what the products cost. */
+function refillPrices(had, items, f) {
+  const key = s => String(s || '').trim().toLowerCase(), used = new Set();
+  const pairs = [];
+  items.forEach(x => {
+    const p = had.find(p => !used.has(p.id) && x.ean && p.ean === x.ean)
+      || had.find(p => !used.has(p.id) && key(p.product) === key(x.product) && key(p.brand) === key(x.brand))
+      || had.find(p => !used.has(p.id) && key(p.product) === key(x.product));
+    if (p) { used.add(p.id); pairs.push([p, x]); }
+  });
+  if (!pairs.length) return toast('⚠ None of the receipt lines matched the products saved from it.');
+  const full = f < 1 ? pairs.filter(([p, x]) => Math.abs(num(p.unitCost) - x.unit) < 0.005) : [];
+  const cut = full.length && confirm(`${full.length} of these products were saved at the full receipt price, without the coupons.\n\nTake their share of the coupons off their price too? Their cost goes down by ${fEUR(full.reduce((a, [p, x]) => a + num(p.qty) * x.unit * (1 - f), 0))} in total.`);
+  let n = 0;
+  pairs.forEach(([p, x]) => {
+    const list = Math.round(x.unit * 1000) / 1000;
+    if (cut && full.includes(pairs.find(q => q[0] === p))) p.unitCost = Math.round(x.unit * f * 1000) / 1000;
+    if (list > num(p.unitCost) + 0.004 && num(p.listCost) !== list) { p.listCost = list; n++; }
+  });
+  commit(); rdlg().close();
+  const miss = items.length - pairs.length;
+  toast(n ? `✓ Prices before coupons filled in on ${n} product${n === 1 ? '' : 's'}${miss ? ` · ${miss} receipt line${miss === 1 ? '' : 's'} not matched` : ''}`
+    : `No prices to fill in: these products were bought at the receipt price${miss ? ` · ${miss} line${miss === 1 ? '' : 's'} not matched` : ''}`);
+}

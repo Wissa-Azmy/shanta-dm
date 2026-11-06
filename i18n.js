@@ -689,3 +689,13 @@ Object.assign(AR, {
   'Spread over the products by their share of the price, like receipt coupons. Each product keeps its price before the discount for reference.': 'يُوزَّع على المنتجات حسب حصة كل منها من السعر، مثل كوبونات الإيصال. ويحتفظ كل منتج بسعره قبل الخصم كمرجع.',
   'The discount is bigger than the products’ total.': 'الخصم أكبر من إجمالي المنتجات.'
 });
+/* refill prices before coupons from a receipt imported again */
+rx(/^Receipt #(.+) is already imported \((\d+) product lines\)\.$/, (m, r, n) => `الإيصال #${r} مستورد بالفعل (${n} سطر منتجات).`);
+rx(/^(\d+) of these products were saved at the full receipt price, without the coupons\.$/, (m, n) => `${n} من هذه المنتجات حُفظت بسعر الإيصال الكامل، بدون الكوبونات.`);
+rx(/^Take their share of the coupons off their price too\? Their cost goes down by (.+) in total\.$/, (m, x) => `هل تخصم حصتها من الكوبونات من سعرها أيضًا؟ ستنخفض تكلفتها بمقدار ${x} إجمالًا.`);
+rx(/^Prices before coupons filled in on (\d+) products?(?: · (\d+) receipt lines? not matched)?$/, (m, n, k) => `تم إدخال الأسعار قبل الكوبونات في ${n} منتج${k ? ` · ${k} سطر من الإيصال لم يُطابَق` : ''}`);
+rx(/^No prices to fill in: these products were bought at the receipt price(?: · (\d+) lines? not matched)?$/, (m, k) => `لا أسعار لإدخالها: هذه المنتجات اشتُريت بسعر الإيصال${k ? ` · ${k} سطر لم يُطابَق` : ''}`);
+Object.assign(AR, {
+  'Fill in the receipt prices before coupons on those products instead of importing it again?': 'هل تُدخل أسعار الإيصال قبل الكوبونات في هذه المنتجات بدلًا من استيراده مرة أخرى؟',
+  'None of the receipt lines matched the products saved from it.': 'لم يطابق أي سطر في الإيصال المنتجات المحفوظة منه.'
+});
