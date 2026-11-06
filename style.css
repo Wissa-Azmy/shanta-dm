@@ -787,3 +787,10 @@ a.eanlink:hover{background:#fdf3cf}
 /* price before coupons / discounts, shown struck through next to the price paid */
 .was{display:block;font-size:11px;color:var(--muted);text-decoration:line-through;font-weight:400}
 .pline .was{display:inline;margin-inline-start:4px}
+/* phone nav: every tab the same height, whatever its icon (the £ and emoji icons have taller glyphs) */
+@media (max-width:820px){
+  nav{align-items:center;gap:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  nav button{box-sizing:border-box;height:36px;padding:0 12px;line-height:1;flex:none}
+  nav button i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;line-height:1;font-size:15px;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+}
