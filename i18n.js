@@ -682,3 +682,10 @@ rx(/^Or type what the customer really pays \((EGP|EUR)\)$/, (m, c) => `أو اك
 rx(/^The discount is worked out for you: (.+) before the discount\.$/, (m, x) => `يُحسب الخصم تلقائيًا: ${x} قبل الخصم.`);
 rx(/^after (.+) discount$/, (m, x) => `بعد خصم ${x}`);
 Object.assign(AR, { 'Discount': 'الخصم', 'The discount can’t be below 0. Add an extra the customer pays instead.': 'لا يمكن أن يكون الخصم أقل من 0. أضف تكلفة إضافية يدفعها العميل بدلًا من ذلك.', 'The discount is bigger than the whole sale.': 'الخصم أكبر من قيمة البيع كلها.' });
+Object.assign(AR, {
+  'Price before coupons (€)': 'السعر قبل الكوبونات (€)', 'Price before coupons/discounts': 'السعر قبل الكوبونات/الخصومات',
+  'What you really paid, after coupons and discounts.': 'ما دفعته فعلًا بعد الكوبونات والخصومات.',
+  'Optional. The shelf or receipt price before coupons, kept for reference.': 'اختياري. سعر الرف أو الإيصال قبل الكوبونات، يُحفظ كمرجع.',
+  'Spread over the products by their share of the price, like receipt coupons. Each product keeps its price before the discount for reference.': 'يُوزَّع على المنتجات حسب حصة كل منها من السعر، مثل كوبونات الإيصال. ويحتفظ كل منتج بسعره قبل الخصم كمرجع.',
+  'The discount is bigger than the products’ total.': 'الخصم أكبر من إجمالي المنتجات.'
+});

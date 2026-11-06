@@ -146,6 +146,9 @@ const totBar = (items, show = true) => show ? `<div class="totbar">${items.map((
 const storeOf = p => p.store || 'dm';
 const storeTag = p => { const s = storeOf(p); return `<span class="stag ${s === 'dm' ? 'dm' : s === 'Rossmann' ? 'ross' : ''}">${esc(s)}</span>`; };
 /* dm products: open the product on dm.de, looked up by its barcode, or by brand + name when it has no barcode */
+/* a purchase's price before receipt coupons: saved as listCost, or read from the note older imports wrote */
+const pList = p => num(p.listCost) || (m => m ? num(m[1].replace(/\.(?=\d{3})/g, '').replace(',', '.')) : 0)(String(p.notes || '').match(/Receipt price[^\d]*([\d.,]+)/));
+const wasPrice = (list, now, f) => list > now + 0.004 ? `<span class="was" title="Price before coupons/discounts">${f(list)}</span>` : '';
 const dmUrl = p => 'https://www.dm.de/search?query=' + encodeURIComponent(String(p.ean || '').trim() || [p.brand, p.product].filter(Boolean).join(' '));
 const dmAttr = p => `href="${dmUrl(p)}" target="_blank" rel="noopener" title="View this product on dm.de"`;
 /* small "dm ↗" chip next to a product name */
@@ -162,7 +165,7 @@ V.purchases = R => {
   return `<div class="toolbar">${search('Search product, brand, receipt…')}${boxFilter()}${storeFilter()}${personFilter()}${resetBtn('q', 'box', 'store', 'person')}</div>
   ${totBar([["Total", fEUR(tot)], ["Units", units], ["Lines", rows.length], ...PEOPLE.map(k => [pname(k), fEUR(rows.filter(p => p.paidBy === k).reduce((a, p) => a + num(p.qty) * num(p.unitCost), 0))])], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Product</th><th>Category</th><th>Barcode</th><th class="num">Qty</th><th class="num">Per unit</th><th class="num">Total</th><th>Paid by</th><th>Where / how</th><th>Shipment</th><th></th></tr></thead><tbody>
   ${rows.map(p => `<tr><td>${fDate(p.date)}</td><td><b>${esc(p.product)}</b><span class="sub">${storeTag(p)}${esc(p.brand || '')}${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''}${p.receipt ? ' · #' + esc(p.receipt) : ''}</span></td><td>${esc(p.category)}</td><td>${p.ean ? (storeOf(p) === 'dm' ? `<a class="mono eanlink" ${dmAttr(p)}>${esc(p.ean)} <span aria-hidden="true">↗</span></a>` : `<span class="mono">${esc(p.ean)}</span>`) : `<span class="eanbtns"><button class="btn sm ghost" data-scanrow="${p.id}" title="Scan to link this product">${SCANICON} Link</button><button class="btn sm ghost" data-obffind="${p.id}" title="Find its barcode online">Find</button>${storeOf(p) === 'dm' ? `<a class="btn sm ghost" ${dmAttr(p)}>dm ↗</a>` : ''}</span>`}</td>
-    <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
+    <td class="num">${p.qty}</td><td class="num">${fEUR(num(p.unitCost))}${wasPrice(pList(p), num(p.unitCost), fEUR)}</td><td class="num">${fEUR(num(p.qty) * num(p.unitCost))}</td><td>${pill(p.paidBy)}</td>
     <td>${esc(p.place || '')}<span class="sub">${esc(p.method || '')}</span></td><td>${p.shipmentId ? esc(shipName(p.shipmentId)) : '<span class="pill warn">Not shipped</span>'}</td>${actions('purchases', p.id)}</tr>`).join('') || '<tr><td colspan="11" class="empty">No purchases yet.</td></tr>'}
   </tbody><tfoot><tr><td colspan="4">${rows.length} lines</td><td class="num">${units}</td><td></td><td class="num">${fEUR(tot)}</td><td colspan="4"></td></tr></tfoot></table></div>`;
 };

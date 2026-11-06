@@ -784,3 +784,6 @@ a.eanlink:hover{background:#fdf3cf}
 /* sale form: discount */
 .odisc{align-items:start}
 .odisc .hint{display:block;margin-top:4px}
+/* price before coupons / discounts, shown struck through next to the price paid */
+.was{display:block;font-size:11px;color:var(--muted);text-decoration:line-through;font-weight:400}
+.pline .was{display:inline;margin-inline-start:4px}

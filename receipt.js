@@ -244,7 +244,7 @@ function doImport() {
   let linked = 0;
   on.forEach(x => { const ean = x.ean || eanFor(x.product.trim(), x.brand.trim()); if (ean) linked++;
     db.purchases.push({ id: uid(), date: o.date, store: o.store, place: o.place, product: x.product.trim(), brand: x.brand.trim(), category: x.category,
-    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean, rate: num(o.rate) || "",
+    qty: num(x.qty), netG: num(x.netG) || '', unitCost: Math.round(x.unit * f * 1000) / 1000, listCost: Math.round(x.unit * 1000) / 1000, paidBy: o.paidBy, method: o.method, shipmentId: o.shipmentId, receipt: o.receipt, ean, rate: num(o.rate) || "",
     notes: f < 1 ? `Receipt price ${fEUR(x.unit)}, coupons spread` : '' }); });
   commit(); rdlg().close();
   toast(`${on.length} products imported${o.shipmentId ? ' into ' + shipName(o.shipmentId) : ''}${linked ? ` · ${linked} with a barcode` : ''}`);
