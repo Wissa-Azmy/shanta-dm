@@ -803,3 +803,6 @@ a.eanlink:hover{background:#fdf3cf}
   nav button i{height:18px!important;max-height:18px;line-height:18px!important;font-size:15px!important}
   main{padding-top:14px}
 }
+/* phones: the header row keeps its own height; on short pages (e.g. Sales with few sales) the spare screen
+   space goes below the content instead of being shared with the header */
+@media (max-width:820px){.app{grid-template-rows:auto 1fr;align-content:start}}
