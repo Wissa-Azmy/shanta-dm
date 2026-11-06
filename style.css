@@ -816,3 +816,6 @@ a.eanlink:hover{background:#fdf3cf}
 .sltable td .sub{display:block}
 .sltable tfoot td{font-size:13px}
 .sltable .sltot td{font-weight:700;border-top:1px solid var(--line)}
+/* overview: damaged, lost & gifts */
+.lossTot{border-top:1px solid var(--line)!important;margin-top:2px}
+h3.lossh{margin:14px 0 4px;font-size:14px}

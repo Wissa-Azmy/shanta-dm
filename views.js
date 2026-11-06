@@ -69,6 +69,7 @@ V.overview = R => {
     <div class="card"><h3>Best sellers</h3>${topN.length ? `<ul class="mini">${topN.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${fEUR(x.rev - x.cost)} profit</span></span><span class="r">${x.n} sold</span></li>`).join('')}</ul>` : '<div class="empty">No sales yet.</div>'}</div>
     <div class="card"><h3>Least sold in stock</h3>${slow.length ? `<ul class="mini">${slow.map(([k, x]) => `<li><span>${esc(k)}<span class="sub note">${x.left} in stock</span></span><span class="r">${x.n} sold</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in stock.</div>'}</div>
   </div>
+  ${lossCard(R)}
   <div class="grid3" style="margin-top:18px">
     <div class="card"><h3>On the way</h3>${moving.length ? `<ul class="mini">${moving.map(s => `<li><span>${esc(s.name)}<span class="sub note">${esc(s.carrier || '')} ${fDate(s.date)}</span></span><span class="pill warn">${esc(s.status)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in transit.</div>'}</div>
     <div class="card"><h3>Running low</h3>${lows.length ? `<ul class="mini">${lows.map(l => `<li><span>${esc(l.p.product)}</span><span class="r">${l.left} left</span></li>`).join('')}</ul>` : '<div class="empty">Stock levels look fine.</div>'}</div>
@@ -239,6 +240,7 @@ function ledgerRows(R) {
     if (now > 0.005) out.push(Object.assign({}, base, { type: o.mode === 'down' ? 'Sale · down payment' : 'Sale', desc, dir: 'in', amt: now, eur: nowEUR }));
     const credit = o.bill - now;
     if (credit > 0.005) out.push(Object.assign({}, base, { type: 'Sale · on credit', desc: desc + (h.dueDate ? ' · due ' + fDate(h.dueDate) : ''), dir: 'pending', amt: credit, eur: o.cur === 'EUR' ? credit : credit / o.rate, how: '' })); });
+  R.lossRecs.forEach(r => out.push({ date: r.x.date, type: r.x.kind === 'gift' ? 'Gift / sample' : 'Damaged / lost', desc: `${r.l.p.product} ×${r.q}${r.x.customer ? ' · ' + r.x.customer : ''} · cost shared by the profit split`, who: r.l.p.paidBy, dir: 'loss', place: r.x.place || '', how: '', amt: r.q * r.l.landed, cur: 'EUR', eur: r.q * r.l.landed, coll: 'sales', id: r.x.orderId || r.x.id }));
   db.payments.forEach(p => out.push({ date: p.date, type: 'Credit payment', desc: `from ${p.customer}${p.notes ? ' · ' + p.notes : ''}`, who: p.receivedBy, dir: 'in', place: '', how: p.method, amt: p.amount, cur: p.currency, eur: toEUR(p.amount, p.currency, p.rate), coll: 'payments', id: p.id }));
   db.transfers.forEach(t => out.push({ date: t.date, type: 'Transfer', desc: `${pname(t.from)} → ${pname(t.to)}${t.notes ? ' · ' + t.notes : ''}`, who: t.from, to: t.to, dir: 'move', place: '', how: t.method, amt: t.amount, cur: t.currency, eur: toEUR(t.amount, t.currency, t.rate), coll: 'transfers', id: t.id }));
   return out.sort(byDate);
@@ -298,8 +300,9 @@ function paidView() {
 }
 function ledgerAll(R) {
   const rows = ledgerRows(R).filter(r => (!UI.person || r.who === UI.person || r.to === UI.person) && (!UI.type || r.dir === UI.type) && match(r.type, r.desc, r.place, r.how));
-  const flow = { in: ['Money in', 'ok'], out: ['Money out', 'bad'], pending: ['Owed by customer', 'warn'], move: ['Between you', ''] };
-  return `<div class="toolbar">${search('Search everything')}${personFilter()}<select data-ui="type"><option value="">All movements</option>${Object.entries(flow).map(([k, [l]]) => `<option value="${k}"${UI.type === k ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}<button class="btn sm ghost" data-act="csv">Export CSV</button></div>
+  const flow = { in: ['Money in', 'ok'], out: ['Money out', 'bad'], pending: ['Owed by customer', 'warn'], move: ['Between you', ''], loss: ['Written off', 'warn'] };
+  const lossBar = R.lossEUR > 0.005 ? totBar([['Damaged / lost', fEUR(R.dmgEUR)], ['Gifts / samples', fEUR(R.giftEUR)], ['Written off at cost', fEUR(R.lossEUR)], ...PEOPLE.map(k => [pname(k) + ' carries', fEUR(R.person[k].lossShare)])], 1) : '';
+  return lossBar + `<div class="toolbar">${search('Search everything')}${personFilter()}<select data-ui="type"><option value="">All movements</option>${Object.entries(flow).map(([k, [l]]) => `<option value="${k}"${UI.type === k ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}<button class="btn sm ghost" data-act="csv">Export CSV</button></div>
   <div class="tablewrap"><table class="t"><thead><tr><th>When</th><th>What</th><th>Who</th><th>Where</th><th>How</th><th class="num">How much</th><th class="num">In €</th><th>Flow</th><th></th></tr></thead><tbody>
   ${rows.map(r => `<tr><td>${fDate(r.date)}</td><td><b>${esc(r.type)}</b><span class="sub">${esc(r.desc)}</span></td><td>${pill(r.who)}${r.to ? ' → ' + pill(r.to) : ''}</td><td>${esc(r.place || '')}</td><td>${esc(r.how || '')}</td>
     <td class="num">${fAmt(r.amt, r.cur)}</td><td class="num ${r.dir === 'in' ? 'in-amt' : r.dir === 'out' ? 'out-amt' : ''}">${r.dir === 'out' ? '−' : r.dir === 'in' ? '+' : ''}${fEUR(r.eur)}</td>
@@ -434,3 +437,20 @@ document.addEventListener('click', e => {
   if (b.dataset.b === 'close') bdlg().close();
   if (b.dataset.b === 'go') runShipDelete(b.dataset.id, b);
 }, true);
+/* ---------- damaged / lost and gifts: stock that left without money, shared by the profit split ---------- */
+function lossCard(R) {
+  const recs = R.lossRecs.slice().sort((a, b) => (b.x.date || '').localeCompare(a.x.date || ''));
+  if (!recs.length) return '';
+  const kindName = k => k === 'gift' ? 'Gift / sample' : 'Damaged / lost';
+  const units = k => recs.filter(r => (r.x.kind === 'gift') === (k === 'gift')).reduce((a, r) => a + r.q, 0);
+  const row = (label, eur, egp, n) => eur > 0.005 ? `<li><span>${label}<span class="sub note">${n} unit${n === 1 ? '' : 's'} · ${fEGP(egp)}</span></span><span class="r">${fEUR(eur)}</span></li>` : '';
+  return `<div class="grid2" style="margin-top:18px">
+    <div class="card"><h3>Damaged, lost &amp; gifts</h3>
+      <p class="note">Stock that left without any money. Its cost goes back to whoever paid it and comes out of the profit, so you share it by the profit split.</p>
+      <ul class="mini">${row('Damaged / lost', R.dmgEUR, R.dmgEGP0, units('dmg'))}${row('Gifts / samples', R.giftEUR, R.giftEGP0, units('gift'))}
+        <li class="lossTot"><span><b>Total at cost</b><span class="sub note">${fEGP(R.lossEGP0)} at the rates paid</span></span><span class="r"><b>${fEUR(R.lossEUR)}</b></span></li></ul>
+      <h3 class="lossh">Carried by each of you</h3>
+      <ul class="mini">${PEOPLE.map(k => `<li><span>${pill(k)}<span class="sub note">${Math.round(R.person[k].shareRatio * 100)}% profit share · ${fEGP(R.person[k].lossShareEGP)}</span></span><span class="r">${fEUR(R.person[k].lossShare)}</span></li>`).join('')}</ul></div>
+    <div class="card"><h3>Latest damaged, lost &amp; gifts</h3><ul class="mini">${recs.slice(0, 8).map(r => `<li><span>${esc(r.l.p.product)} ×${r.q}<span class="sub note">${fDate(r.x.date)} · ${kindName(r.x.kind)}${r.x.customer ? ' · <span class="notr">' + esc(r.x.customer) + '</span>' : ''}</span></span><span class="r">${fEUR(r.q * r.l.landed)}</span></li>`).join('')}</ul></div>
+  </div>`;
+}

@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.06-09";
+const APP_VERSION = "2026.11.06-10";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -184,9 +184,9 @@ function saleBook(skipPaymentId) {
 }
 function calc() {
   const s = db.settings; rateOn.c = null;
-  const R = { lots: {}, ship: {}, person: {}, rev: 0, revEGP: 0, unpaidEUR: 0, unpaidEGP: 0, stockEUR: 0, stockEGP0: 0, recEGP: 0, unpaidCostEUR: 0, spent: 0, lossEUR: 0 };
+  const R = { lots: {}, ship: {}, person: {}, rev: 0, revEGP: 0, unpaidEUR: 0, unpaidEGP: 0, stockEUR: 0, stockEGP0: 0, recEGP: 0, unpaidCostEUR: 0, spent: 0, lossEUR: 0, lossEGP0: 0, dmgEUR: 0, dmgEGP0: 0, giftEUR: 0, giftEGP0: 0, lossRecs: [] };
   PEOPLE.forEach(p => R.person[p] = { outlay: 0, recovered: 0, received: 0, tin: 0, tout: 0 });
-  db.purchases.forEach(p => R.lots[p.id] = { p, qty: num(p.qty), unit: num(p.unitCost), sold: 0, paidQty: 0, unpaid: 0, lost: 0, revEGP: 0, revEUR: 0 });
+  db.purchases.forEach(p => R.lots[p.id] = { p, qty: num(p.qty), unit: num(p.unitCost), sold: 0, paidQty: 0, unpaid: 0, lost: 0, dmg: 0, gift: 0, revEGP: 0, revEUR: 0 });
   const B = R.book = saleBook();
   db.sales.forEach(x => {
     const l = R.lots[x.purchaseId]; if (!l) return;
@@ -197,7 +197,7 @@ function calc() {
       l.sold += q; l.paidQty += q * f; l.unpaid += q * (1 - f);
       l.revEGP += toEGP(q * num(x.unitPrice), x.currency, x.rate);
       l.revEUR += toEUR(q * num(x.unitPrice), x.currency, x.rate);
-    } else l.lost += q;
+    } else { l.lost += q; l[x.kind === 'gift' ? 'gift' : 'dmg'] += q; R.lossRecs.push({ x, l, q }); }
   });
   /* Shipping split by weight: a product's share of its box's costs = its shipping weight ÷ the box's total weight.
      Shipping weight = content weight × (1 + packaging %). Products without a weight:
@@ -246,7 +246,8 @@ function calc() {
     R.stockEGP0 += Math.max(0, l.left) * l.landedEGP;
     R.stockEUR += Math.max(0, l.left) * l.landed;
     R.unpaidCostEUR += l.unpaid * l.landed;
-    R.lossEUR += l.lost * l.landed;
+    R.lossEUR += l.lost * l.landed; R.lossEGP0 += l.lost * l.landedEGP;
+    R.dmgEUR += l.dmg * l.landed; R.dmgEGP0 += l.dmg * l.landedEGP; R.giftEUR += l.gift * l.landed; R.giftEGP0 += l.gift * l.landedEGP;
   });
   const P = k => R.person[k] || R.person.me;
   db.purchases.forEach(p => {
@@ -284,6 +285,7 @@ function calc() {
     const p = R.person[k];
     p.shareRatio = share[k];
     p.share = share[k] * R.profit;
+    p.lossShare = share[k] * R.lossEUR; p.lossShareEGP = share[k] * R.lossEGP0;
     p.entitled = p.recovered + p.share;
     p.actual = p.received + p.tin - p.tout;
     p.owes = p.actual - p.entitled;

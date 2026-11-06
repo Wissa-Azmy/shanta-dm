@@ -706,3 +706,12 @@ rx(/^(\d+) product lines · (\d+) units?$/, (m, a, b) => `${a} سطر منتجا
 rx(/^(\d+) in stock$/, (m, n) => `${n} في المخزون`);
 Object.assign(AR, { 'Best sellers': 'الأكثر مبيعًا', 'Least sold in stock': 'الأقل مبيعًا في المخزون', 'Nothing in stock.': 'لا شيء في المخزون.', 'View products': 'عرض المنتجات', 'Edit sale': 'تعديل البيع', 'Customer pays': 'يدفع العميل', 'Qty': 'الكمية', 'Price': 'السعر', 'Total': 'الإجمالي', 'Product': 'المنتج' });
 rx(/^Extra costs: (.+)$/, (m, x) => `تكاليف إضافية: ${x}`);
+/* damaged / lost and gifts */
+rx(/^(.+) carries$/, (m, n) => `يتحمل ${n}`);
+rx(/^(\d+)% profit share$/, (m, n) => `${n}% من الأرباح`);
+rx(/^(.+) at the rates paid$/, (m, x) => `${x} بأسعار الصرف وقت الدفع`);
+Object.assign(AR, {
+  'Damaged, lost & gifts': 'التالف والمفقود والهدايا', 'Latest damaged, lost & gifts': 'أحدث التالف والمفقود والهدايا', 'Gifts / samples': 'هدايا / عينات',
+  'Total at cost': 'الإجمالي بالتكلفة', 'Carried by each of you': 'ما يتحمله كل منكما', 'Written off': 'مشطوب', 'Written off at cost': 'المشطوب بالتكلفة',
+  'Stock that left without any money. Its cost goes back to whoever paid it and comes out of the profit, so you share it by the profit split.': 'مخزون خرج بدون أي مال. تعود تكلفته لمن دفعها وتُخصم من الأرباح، فتتقاسمانها حسب نسبة الأرباح.'
+});
