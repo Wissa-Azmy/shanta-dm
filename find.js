@@ -76,15 +76,18 @@ function srcSearch(k, q) {
 
 function openFind(only) {
   const groups = noEanGroups(only);
-  if (!groups.length) return toast(only ? 'This product already has a barcode.' : '✓ Every product already has a barcode.');
-  FINDER = { groups, i: 0, linked: 0, q: '', res: null, tried: null, busy: false, errs: {}, noBrand: false, run: 0 };
+  if (!groups.length && only) return toast('This product already has a barcode.');
+  /* nothing left to link: open as a plain product lookup (search any product, see its barcode) */
+  const lookup = !groups.length;
+  if (lookup) groups.push({ key: '\u0000lookup', p: { product: '', brand: '' }, ids: [], units: 0 });
+  FINDER = { groups, lookup, i: 0, linked: 0, q: '', res: null, tried: null, busy: false, errs: {}, noBrand: false, run: 0 };
   const d = scanDlg('obfdlg'); if (!d.open) d.showModal();
   findStep();
 }
 function findStep() {
   const g = FINDER.groups[FINDER.i]; if (!g) return findDone();
-  FINDER.noBrand = false; FINDER.man = ''; FINDER.q = obfQuery(g.p); FINDER.res = null; FINDER.tried = null; FINDER.errs = {};
-  drawFind(); runFind();
+  FINDER.noBrand = false; FINDER.man = ''; FINDER.q = FINDER.lookup ? '' : obfQuery(g.p); FINDER.res = null; FINDER.tried = null; FINDER.errs = {};
+  drawFind(); if (FINDER.lookup) { const i = $('#obfdlg [data-fbq]'); if (i && !matchMedia('(pointer:coarse)').matches) i.focus(); } else runFind();
 }
 const srcOrder = p => (storeOf(p) === 'dm' ? ['dm', 'obf', 'off'] : ['obf', 'dm', 'off']).filter(k => k !== 'dm' || !DMOFF || dmRelay());
 const srcLeft = () => srcOrder(FINDER.groups[FINDER.i].p).filter(k => !(FINDER.tried || []).includes(k));
@@ -111,7 +114,7 @@ async function runFind(more) {
         else FINDER.errs[k] = e.message;
       }
       FINDER.res.sort((a, b) => b.score - a.score);
-      if (!more && FINDER.res.length && FINDER.res[0].score >= 0.8) break;
+      if (!more && FINDER.res.length && (FINDER.lookup || FINDER.res[0].score >= 0.8)) break;
     }
   } finally {
     clearInterval(tick);
@@ -120,14 +123,14 @@ async function runFind(more) {
 }
 const srcTag = k => `<span class="srctag ${k}">${esc(FSRC[k].name)}</span>`;
 function drawFind() {
-  const g = FINDER.groups[FINDER.i], p = g.p, n = FINDER.groups.length, res = (FINDER.res || []).slice(0, 8), left = FINDER.tried ? srcLeft() : [];
+  const g = FINDER.groups[FINDER.i], p = g.p, n = FINDER.groups.length, res = (FINDER.res || []).slice(0, 8), left = FINDER.tried ? srcLeft() : [], L = FINDER.lookup;
   const used = code => { const o = db.purchases.find(x => x.ean === code); return o && grpKey(o) !== g.key ? o : null; };
   const card = r => { const o = used(r.code), pc = Math.round(r.score * 100);
-    return `<li class="obfr${r.score >= 0.75 ? ' good' : ''}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=noimg>No photo</span>'">` : '<span class="noimg">No photo</span>'}
+    return `<li class="obfr${!L && r.score >= 0.75 ? ' good' : ''}${L && o ? ' good' : ''}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=noimg>No photo</span>'">` : '<span class="noimg">No photo</span>'}
       <span class="ox"><b class="notr">${esc(r.name)}</b><span class="sub notr">${esc([r.brand, r.qty, r.price].filter(Boolean).join(' · '))}</span>
       <span class="srcline"><span class="mono notr">${esc(r.code)}</span>${[r.src, ...r.also].map(srcTag).join('')}</span><span class="chk"><a href="https://www.dm.de/search?query=${esc(r.code)}" target="_blank" rel="noopener">Check on dm</a>${r.src !== 'dm' ? `<a href="https://world.${r.src === 'off' ? 'openfoodfacts' : 'openbeautyfacts'}.org/product/${esc(r.code)}" target="_blank" rel="noopener">Open page</a>` : ''}</span>
-      ${o ? `<span class="warnline">Already on “${esc(o.product)}”</span>` : ''}</span>
-      <span class="oact"><span class="pill ${pc >= 75 ? 'ok' : pc >= 45 ? '' : 'warn'}">${pc}%</span><button type="button" class="btn sm" data-fb="link:${esc(r.code)}">Link</button></span></li>`; };
+      ${o ? (L ? `<span class="okline">In your products: “${esc(o.product)}”</span>` : `<span class="warnline">Already on “${esc(o.product)}”</span>`) : ''}</span>
+      ${L ? '' : `<span class="oact"><span class="pill ${pc >= 75 ? 'ok' : pc >= 45 ? '' : 'warn'}">${pc}%</span><button type="button" class="btn sm" data-fb="link:${esc(r.code)}">Link</button></span>`}</li>`; };
   const ERR = { busy: n => `${n} is busy right now. Wait a minute and try again.`,
     relay: () => 'The dm search relay didn’t answer. Check its address in Settings → Barcode search.',
     relaysite: () => 'The dm search relay doesn’t accept this site. Add the site to ALLOWED in the Worker.',
@@ -135,22 +138,27 @@ function drawFind() {
   const errs = Object.keys(FINDER.errs || {}).map(k => `<p class="err">${esc((ERR[FINDER.errs[k]] || ERR.net)(FSRC[k].name))}</p>`).join('');
   const dmNote = FINDER.dmNote ? '<p class="note">dm’s search needs the dm search relay. Set it up in Settings → Barcode search; until then only the open databases are used.</p>' : '';
   const moreBtn = !FINDER.busy && FINDER.tried && left.length ? `<button type="button" class="rlink" data-fb="more">Search more sources: ${left.map(k => FSRC[k].name).join(', ')}</button>` : '';
-  scanDlg('obfdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Find barcodes · ${FINDER.i + 1} of ${n}${FINDER.linked ? ` · ${FINDER.linked} linked` : ''}</div>
+  scanDlg('obfdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus>${L ? `<div class="eyebrow">Find barcodes · product lookup</div>
+    <h2>Look up a product</h2>
+    <p class="lead"><span class="pill ok">✓ No products without a barcode</span></p>
+    <p class="note">Every product already has a barcode. You can still search dm and the open databases for any product to see its barcode, size and photo.</p>`
+    : `<div class="eyebrow">Find barcodes · ${FINDER.i + 1} of ${n}${FINDER.linked ? ` · ${FINDER.linked} linked` : ''}</div>
     <h2 class="notr">${esc(p.product)}</h2>
-    <p class="lead">${storeTag(p)}<span class="notr">${esc(p.brand || '')}</span>${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''} · ${g.units} unit${g.units === 1 ? '' : 's'}${g.ids.length > 1 ? ` · ${g.ids.length} lines` : ''}</p>
+    <p class="lead">${storeTag(p)}<span class="notr">${esc(p.brand || '')}</span>${num(p.netG) ? ' · ' + fG(num(p.netG)) : ''} · ${g.units} unit${g.units === 1 ? '' : 's'}${g.ids.length > 1 ? ` · ${g.ids.length} lines` : ''}</p>`}
     <div class="toolbar obfq"><input type="text" data-fbq value="${esc(FINDER.q)}" autocomplete="off" dir="ltr" placeholder="Brand and product name"><button type="button" class="btn ghost" data-fb="search"${FINDER.busy ? ' disabled' : ''}>Search</button></div>
-    ${p.brand && !FINDER.noBrand ? `<button type="button" class="rlink" data-fb="nobrand"${FINDER.busy ? ' disabled' : ''}>Search without the brand</button>` : ''}
+    ${!L && p.brand && !FINDER.noBrand ? `<button type="button" class="rlink" data-fb="nobrand"${FINDER.busy ? ' disabled' : ''}>Search without the brand</button>` : ''}
     <div class="obfres">${res.length ? `<ul class="obflist">${res.map(card).join('')}</ul>` : ''}
       ${FINDER.busy ? `<p class="note" id="obfwait">Searching ${esc(FSRC[FINDER.cur] ? FSRC[FINDER.cur].name : '')}…</p>`
-      : FINDER.tried && !res.length && !errs ? '<p class="note">No matches found. Shorten the search (e.g. brand + two words) or skip this product.</p>' : ''}
+      : FINDER.tried && !res.length && !errs ? `<p class="note">${L ? 'No matches found. Try the brand and two or three words of the name.' : 'No matches found. Shorten the search (e.g. brand + two words) or skip this product.'}</p>` : ''}
       ${errs}${dmNote}${moreBtn}</div>
-    <div class="obfman"><label for="fbman">Or type the barcode</label><div class="toolbar"><input id="fbman" type="text" inputmode="numeric" data-fbman value="${esc(FINDER.man || '')}" autocomplete="off" dir="ltr" placeholder="e.g. 4066447985290" maxlength="20"><button type="button" class="btn" data-fb="manual">Link</button></div></div>
-    <p class="note">Check the picture and size before linking. The barcode goes on every line of this product.</p>
-    <div class="mact sdact obfnav"><button type="button" class="btn ghost" data-fb="back"${FINDER.i ? '' : ' disabled'}>Back</button><button type="button" class="btn ghost" data-fb="skip">Skip</button><button type="button" class="btn ghost full" data-fb="done">Done</button></div></div>`;
+    ${L ? '' : `<div class="obfman"><label for="fbman">Or type the barcode</label><div class="toolbar"><input id="fbman" type="text" inputmode="numeric" data-fbman value="${esc(FINDER.man || '')}" autocomplete="off" dir="ltr" placeholder="e.g. 4066447985290" maxlength="20"><button type="button" class="btn" data-fb="manual">Link</button></div></div>
+    <p class="note">Check the picture and size before linking. The barcode goes on every line of this product.</p>`}
+    ${L ? '<div class="mact"><button type="button" class="btn ghost" data-fb="done">Close</button></div>'
+    : `<div class="mact sdact obfnav"><button type="button" class="btn ghost" data-fb="back"${FINDER.i ? '' : ' disabled'}>Back</button><button type="button" class="btn ghost" data-fb="skip">Skip</button><button type="button" class="btn ghost full" data-fb="done">Done</button></div>`}</div>`;
 }
 function findDone() {
-  const n = FINDER ? FINDER.linked : 0; FINDER = null; scanDlg('obfdlg').close(); render();
-  toast(n ? `✓ ${n} product${n === 1 ? '' : 's'} linked to a barcode` : 'No barcodes linked.');
+  const n = FINDER ? FINDER.linked : 0, L = FINDER && FINDER.lookup; FINDER = null; scanDlg('obfdlg').close(); render();
+  if (!L) toast(n ? `✓ ${n} product${n === 1 ? '' : 's'} linked to a barcode` : 'No barcodes linked.');
 }
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-obffind]');

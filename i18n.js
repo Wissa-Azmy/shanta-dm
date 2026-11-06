@@ -670,3 +670,9 @@ Object.assign(AR, {
 Object.assign(AR, { 'View this product on dm.de': 'اعرض هذا المنتج على dm.de' });
 rx(/^(\d+) doesn’t look like a valid barcode \(the last digit doesn’t match\)\.$/, (m, c) => `${c} لا يبدو باركودًا صحيحًا (الرقم الأخير غير مطابق).`);
 Object.assign(AR, { 'Or type the barcode': 'أو اكتب الباركود', 'Type the barcode first.': 'اكتب الباركود أولًا.', 'A barcode has 8 to 14 digits.': 'الباركود من 8 إلى 14 رقمًا.', 'Link it anyway?': 'هل تربطه على أي حال؟' });
+Object.assign(AR, {
+  'Find barcodes · product lookup': 'البحث عن الباركود · البحث عن منتج', 'Look up a product': 'ابحث عن منتج', '✓ No products without a barcode': '✓ لا توجد منتجات بدون باركود',
+  'Every product already has a barcode. You can still search dm and the open databases for any product to see its barcode, size and photo.': 'كل المنتجات لها باركود بالفعل. ما زال بإمكانك البحث في dm وقواعد البيانات المفتوحة عن أي منتج لرؤية الباركود والحجم والصورة.',
+  'No matches found. Try the brand and two or three words of the name.': 'لا توجد نتائج. جرّب العلامة التجارية وكلمتين أو ثلاث من الاسم.', 'Close': 'إغلاق'
+});
+rx(/^In your products: “(.+)”$/, (m, x) => `ضمن منتجاتك: «${x}»`);
