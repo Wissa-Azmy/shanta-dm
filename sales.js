@@ -231,10 +231,10 @@ V.sales = R => {
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
-  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}</div>
-  ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof)], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
+  return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}${viewToggle('sales')}</div>
+  ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof)], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}${isGrid('sales') ? `<div class="cgrid">${rows.map(o => saleCard(o, R, pn, kinds)).join('') || '<div class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</div>'}</div>` : `<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
-  </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>
+  </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>`}
   <p class="note">Profit = what the customer pays, minus the products’ cost including shipping from Germany, minus extra costs like delivery and packaging.</p>`;
 };
 
@@ -371,15 +371,15 @@ V.customers = R => {
     <div class="stamp ${overdue ? 't' : 'n'}"><div class="in"><div class="k">Overdue</div><div class="v">${fEGP(overdue)}</div><div class="s">past the due date</div></div></div>
     <div class="stamp n"><div class="in"><div class="k">Credit payments</div><div class="v">${fEGP(db.payments.reduce((a, p) => a + toEGP(p.amount, p.currency, p.rate), 0))}</div><div class="s">${db.payments.length} recorded</div></div></div>
   </div>
-  <div class="toolbar">${search('Search customer')}${resetBtn('q')}</div>
-  <div class="tablewrap"><table class="t"><thead><tr><th>Customer</th><th class="num">Bought</th><th class="num">Still owes</th><th>Due</th><th>Open sales</th><th></th></tr></thead><tbody>
+  <div class="toolbar">${search('Search customer')}${resetBtn('q')}${viewToggle('customers')}</div>
+  ${isGrid('customers') ? `<div class="cgrid">${list.map(c => custCard(c, t)).join('') || '<div class="empty">No customers yet. They appear here when you record a sale with a customer name.</div>'}</div>` : `<div class="tablewrap"><table class="t"><thead><tr><th>Customer</th><th class="num">Bought</th><th class="num">Still owes</th><th>Due</th><th>Open sales</th><th></th></tr></thead><tbody>
   ${list.map(c => { const open = c.orders.filter(o => o.balance > 0.005);
     return `<tr><td><b>${esc(c.name)}</b></td><td class="num">${fEGP(c.billEGP)}</td>
       <td class="num">${c.balanceEGP > 0.005 ? `<b class="${c.overdue ? 'out-amt' : ''}">${fEGP(c.balanceEGP)}</b>${c.overdue ? `<span class="sub out-amt">${fEGP(c.overdue)} overdue</span>` : ''}` : '<span class="pill ok">Nothing</span>'}</td>
       <td>${c.nextDue ? `<span class="pill ${c.nextDue < t ? 'bad' : 'warn'}">${fDate(c.nextDue)}</span>` : '—'}</td>
       <td>${open.map(o => `<span class="pline">${fDate(o.h.date)} · ${fAmt(o.balance, o.cur)} <button class="ib" data-edit="sales:${o.id}" title="Open sale">${PENCIL}</button></span>`).join('') || '<span class="note">none</span>'}</td>
       <td class="acts">${c.balanceEGP > 0.005 ? `<button class="btn sm" data-new="payments" ${pre({ customer: c.name, amount: Math.round(c.balanceEGP), currency: 'EGP' })}>+ Payment</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">No customers yet. They appear here when you record a sale with a customer name.</td></tr>'}
-  </tbody></table></div>
+  </tbody></table></div>`}
   <h3 style="margin-top:24px">Credit payments</h3>
   <div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Pays for</th><th class="num">Amount</th><th>Collected by</th><th>How</th><th></th></tr></thead><tbody>
   ${pays.map(p => { const parts = B.orders.flatMap(o => o.payments.filter(x => x.id === p.id).map(x => `${fDate(o.h.date)}: ${fAmt(x.amt, o.cur)}`));
@@ -425,3 +425,37 @@ document.addEventListener('click', e => {
   const [a, id] = b.dataset.sl.split(':'); scanDlg('sldlg').close();
   if (a === 'edit') openOrder(id);
 });
+/* ---------- optional grid view for Sales and Customers (remembered on this device) ---------- */
+const GRID_KEY = 'shanta_grid';
+const gridPrefs = () => { try { return JSON.parse(localStorage.getItem(GRID_KEY) || '{}'); } catch (e) { return {}; } };
+const isGrid = page => !!gridPrefs()[page];
+const GRIDICON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor"/></svg>';
+const LISTICON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="1.5" y="2" width="13" height="2.6" rx="1" fill="currentColor"/><rect x="1.5" y="6.7" width="13" height="2.6" rx="1" fill="currentColor"/><rect x="1.5" y="11.4" width="13" height="2.6" rx="1" fill="currentColor"/></svg>';
+const viewToggle = page => { const g = isGrid(page);
+  return `<span class="vtog" role="group" aria-label="View"><button type="button" class="${g ? '' : 'on'}" data-vtog="${page}:list" title="List view" aria-pressed="${!g}">${LISTICON}</button><button type="button" class="${g ? 'on' : ''}" data-vtog="${page}:grid" title="Grid view" aria-pressed="${g}">${GRIDICON}</button></span>`; };
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-vtog]'); if (!b) return;
+  const [page, mode] = b.dataset.vtog.split(':'), p = gridPrefs(); p[page] = mode === 'grid';
+  try { localStorage.setItem(GRID_KEY, JSON.stringify(p)); } catch (x) { }
+  render();
+});
+function saleCard(o, R, pn, kinds) {
+  const h = o.h, m = orderMoney(o, R), sale = h.kind === 'sale', units = o.lines.reduce((a, s) => a + num(s.qty), 0);
+  const prods = new Set(o.lines.map(s => s.purchaseId)).size;
+  return `<div class="gcard${sale ? '' : ' muted'}">
+    <div class="gtop"><span class="gdate">${fDate(h.date)}</span>${sale ? payStatus(R.book.byId[o.id], h.kind) : `<span class="pill">${esc(kinds[h.kind])}</span>`}</div>
+    <b class="gname">${esc(h.customer || (sale ? 'Customer' : kinds[h.kind]))}</b>
+    <span class="sub">${esc(h.place || '')}${h.method && sale ? (h.place ? ' · ' : '') + esc(h.method) : ''}</span>
+    ${o.lines.length ? `<button type="button" class="gprod" data-salelines="${o.id}">${prods === 1 ? `<span class="notr">${esc(pn(o.lines[0]))}</span>` : `${prods} products`} · ${units} unit${units === 1 ? '' : 's'}</button>` : ''}
+    <div class="gnums">${sale ? `<div><small>Customer pays</small><b>${fEGP(m.bill)}</b>${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</div>` : ''}
+      <div><small>Profit</small><b class="${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</b></div></div>
+    <div class="gfoot">${sale ? pill(h.receivedBy) : '<span></span>'}<span class="gacts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></span></div></div>`;
+}
+function custCard(c, t) {
+  const open = c.orders.filter(o => o.balance > 0.005), owes = c.balanceEGP > 0.005;
+  return `<div class="gcard${c.overdue ? ' late' : ''}">
+    <div class="gtop"><b class="gname notr">${esc(c.name)}</b>${owes ? (c.nextDue ? `<span class="pill ${c.nextDue < t ? 'bad' : 'warn'}">Due ${fDate(c.nextDue)}</span>` : '') : '<span class="pill ok">Paid up</span>'}</div>
+    <div class="gnums"><div><small>Bought</small><b>${fEGP(c.billEGP)}</b></div><div><small>Still owes</small><b class="${c.overdue ? 'out-amt' : ''}">${owes ? fEGP(c.balanceEGP) : '—'}</b>${c.overdue ? `<span class="sub out-amt">${fEGP(c.overdue)} overdue</span>` : ''}</div></div>
+    ${open.length ? `<ul class="gopen">${open.map(o => `<li><span>${fDate(o.h.date)} · ${fAmt(o.balance, o.cur)}</span><button class="ib" data-edit="sales:${o.id}" title="Open sale">${PENCIL}</button></li>`).join('')}</ul>` : `<span class="sub">${c.orders.length} sale${c.orders.length === 1 ? '' : 's'} · nothing open</span>`}
+    ${owes ? `<div class="gfoot"><span></span><button class="btn sm" data-new="payments" ${pre({ customer: c.name, amount: Math.round(c.balanceEGP), currency: 'EGP' })}>+ Payment</button></div>` : ''}</div>`;
+}

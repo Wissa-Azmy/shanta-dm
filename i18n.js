@@ -715,3 +715,8 @@ Object.assign(AR, {
   'Total at cost': 'الإجمالي بالتكلفة', 'Carried by each of you': 'ما يتحمله كل منكما', 'Written off': 'مشطوب', 'Written off at cost': 'المشطوب بالتكلفة',
   'Stock that left without any money. Its cost goes back to whoever paid it and comes out of the profit, so you share it by the profit split.': 'مخزون خرج بدون أي مال. تعود تكلفته لمن دفعها وتُخصم من الأرباح، فتتقاسمانها حسب نسبة الأرباح.'
 });
+/* list / grid view */
+rx(/^Due (.+)$/, (m, d) => `الاستحقاق ${d}`);
+rx(/^(\d+) sales? · nothing open$/, (m, n) => `${n} عملية بيع · لا شيء مفتوح`);
+rx(/^(.+) · (\d+) units?$/, (m, a, n) => `${a} · ${n} قطعة`);
+Object.assign(AR, { 'List view': 'عرض القائمة', 'Grid view': 'عرض الشبكة', 'View': 'العرض', 'Paid up': 'مدفوع بالكامل' });
