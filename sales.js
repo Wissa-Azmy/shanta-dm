@@ -221,8 +221,8 @@ V.sales = R => {
     const b = R.book.byId[o.id];
     return (!UI.person || h.receivedBy === UI.person) && (!UI.type || (UI.type === 'unpaid' ? h.kind === 'sale' && b && b.balance > 0.005 : UI.type === 'overdue' ? b && b.overdue : h.kind === UI.type))
       && match(o.lines.map(pn).join(' '), o.extras.map(s => s.product).join(' '), h.customer, h.place, h.method, h.notes); }).sort(byDate);
-  let bill = 0, prof = 0;
-  const body = rows.map(o => { const h = o.h, m = orderMoney(o, R); bill += m.bill; prof += m.profit;
+  let bill = 0, prof = 0, costT = 0;
+  const body = rows.map(o => { const h = o.h, m = orderMoney(o, R); bill += m.bill; prof += m.profit; costT += num(m.landed) + num(m.cost);
     return `<tr><td>${fDate(h.date)}</td><td><b>${esc(h.customer || (h.kind === 'sale' ? 'Customer' : kinds[h.kind]))}</b><span class="sub">${esc(h.place || '')}${h.method && h.kind === 'sale' ? ' · ' + esc(h.method) : ''}</span></td>
       <td>${saleSummary(o, pn)}</td>
       <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</td>
@@ -232,9 +232,9 @@ V.sales = R => {
       <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
   return `<div class="toolbar">${search('Search product, customer…')}${personFilter()}<select data-ui="type"><option value="">All types</option>${[['sale', 'Sales'], ['unpaid', 'Not fully paid'], ['overdue', 'Overdue'], ['gift', 'Gifts'], ['damaged', 'Damaged / lost']].map(([v, l]) => `<option value="${v}"${UI.type === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${resetBtn("q", "person", "type")}${viewToggle('sales')}</div>
-  ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof)], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}${isGrid('sales') ? `<div class="cgrid">${rows.map(o => saleCard(o, R, pn, kinds)).join('') || '<div class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</div>'}</div>` : `<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
+  ${totBar([['Customer pays', fEGP(bill)], ['Profit', fEGP(prof) + markupTag({ profit: prof, landed: costT, cost: 0 })], ['Sales', rows.length], ['Still owed', fEGP(rows.reduce((a, o) => { const b = R.book.byId[o.id]; return a + (b && b.balanceEGP > 0 ? b.balanceEGP : 0); }, 0))]], rows.length)}${isGrid('sales') ? `<div class="cgrid">${rows.map(o => saleCard(o, R, pn, kinds)).join('') || '<div class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</div>'}</div>` : `<div class="tablewrap"><table class="t"><thead><tr><th>Date</th><th>Customer</th><th>Products</th><th class="num">Customer pays</th><th class="num">Extra costs</th><th class="num">Profit</th><th>Collected by</th><th>Status</th><th></th></tr></thead><tbody>
   ${body || '<tr><td colspan="9" class="empty">No sales yet. Press “Record sale”, or “Sell” on the Stock screen.</td></tr>'}
-  </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}</td><td colspan="3"></td></tr></tfoot></table></div>`}
+  </tbody><tfoot><tr><td colspan="3">${rows.length} sale${rows.length === 1 ? '' : 's'}</td><td class="num">${fEGP(bill)}</td><td></td><td class="num">${fEGP(prof)}${markupTag({ profit: prof, landed: costT, cost: 0 })}</td><td colspan="3"></td></tr></tfoot></table></div>`}
   <p class="note">Profit = what the customer pays, minus the products’ cost including shipping from Germany, minus extra costs like delivery and packaging.</p>`;
 };
 
