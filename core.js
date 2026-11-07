@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.07-03";
+const APP_VERSION = "2026.11.07-04";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -400,3 +400,6 @@ function downloadCSV(name, rows) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
   a.download = name; a.click();
 }
+/* markup on cost: profit as a % of everything the goods cost (products incl. shipping share, plus the sale's extra costs) */
+const markupPct = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? Math.round(m.profit / c * 100) : null; };
+const markupTag = m => { const p = markupPct(m); return p === null ? '' : `<span class="mkup ${p >= 0 ? 'up' : 'down'}" title="Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)">${p >= 0 ? '+' : ''}${p}%</span>`; };

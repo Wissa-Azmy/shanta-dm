@@ -95,7 +95,7 @@ function totalsHTML() {
     ${OR.h.payMode !== 'full' ? (() => { const now = OR.h.payMode === 'down' ? toEGP(num(OR.h.downPayment), OR.h.currency, OR.h.rate) : 0;
       return `<dt class="kvsub">Paid now</dt><dd class="kvsub">${f(now)}</dd><dt class="kvsub">On ${esc(OR.h.customer || 'the customer')}’s credit</dt><dd class="kvsub">${f(Math.max(0, t.bill - now))}${OR.h.dueDate ? ` <span class="pill warn">due ${fDate(OR.h.dueDate)}</span>` : ''}</dd>`; })() : ''}` : `<dt>Units leaving stock</dt><dd>${t.units}</dd>`}
     <dt>Product cost incl. shipping</dt><dd>${fEGP(t.landed)}</dd><dt>Extra costs we pay</dt><dd>${f(t.cost)}</dd>
-    <dt><b>${sale ? 'Profit on this sale' : 'Cost of this ' + (OR.h.kind === 'gift' ? 'gift' : 'loss')}</b></dt><dd class="${t.profit >= 0 ? 'in-amt' : 'out-amt'}"><b>${fEGP(t.profit)}</b></dd></dl>`;
+    <dt><b>${sale ? 'Profit on this sale' : 'Cost of this ' + (OR.h.kind === 'gift' ? 'gift' : 'loss')}</b></dt><dd class="${t.profit >= 0 ? 'in-amt' : 'out-amt'}"><b>${fEGP(t.profit)}</b></dd>${sale && markupPct(t) !== null ? `<dt>Markup on cost</dt><dd>${markupTag(t)}</dd>` : ''}</dl>`;
 }
 function drawOrder(err) {
   const R = calc(), h = OR.h, sale = h.kind === 'sale', cur = h.currency;
@@ -227,7 +227,7 @@ V.sales = R => {
       <td>${saleSummary(o, pn)}</td>
       <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</td>
       <td class="num">${m.cost ? fEGP(m.cost) : '—'}</td>
-      <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</td>
+      <td class="num ${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}${h.kind === 'sale' ? markupTag(m) : ''}</td>
       <td>${h.kind === 'sale' ? pill(h.receivedBy) : ''}</td>
       <td class="paycell">${h.kind !== 'sale' ? `<span class="pill">${esc(kinds[h.kind])}</span>` : payStatus(R.book.byId[o.id], h.kind)}</td>
       <td class="acts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></td></tr>`; }).join('');
@@ -455,7 +455,7 @@ function saleCard(o, R, pn, kinds) {
     <span class="sub">${esc(h.place || '')}${h.method && sale ? (h.place ? ' · ' : '') + esc(h.method) : ''}</span>
     ${o.lines.length ? `<button type="button" class="gprod" data-salelines="${o.id}">${prods === 1 ? `<span class="notr">${esc(pn(o.lines[0]))}</span>` : `${prods} products`} · ${units} unit${units === 1 ? '' : 's'}</button>` : ''}
     <div class="gnums">${sale ? `<div><small>Customer pays</small><b>${fEGP(m.bill)}</b>${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</div>` : ''}
-      <div><small>Profit</small><b class="${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</b></div></div>
+      <div><small>Profit${sale ? markupTag(m) : ''}</small><b class="${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</b></div></div>
     ${payRow}
     <div class="gfoot">${sale ? pill(h.receivedBy) : '<span></span>'}<span class="gacts">${open ? `<button class="btn sm terra" data-act="paid:${o.id}">+ Payment</button>` : ''}<button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></span></div></div>`;
 }

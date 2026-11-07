@@ -864,3 +864,10 @@ h3.lossh{margin:14px 0 4px;font-size:14px}
   .toolbar:has(.vtog)>select:nth-of-type(even){grid-column:2/-1}
   .toolbar:has(.vtog)>select:last-of-type:nth-of-type(odd){grid-column:1/-1}
 }
+/* markup on cost */
+.mkup{display:inline-block;margin-inline-start:6px;font:700 11px var(--mono);padding:1px 6px;border-radius:999px;vertical-align:1px;white-space:nowrap}
+.mkup.up{background:#e3f1e6;color:#2c6b3c}.mkup.down{background:#f8e1da;color:#a33b22}
+td.num .mkup{display:block;width:max-content;margin:3px 0 0 auto}
+[dir=rtl] td.num .mkup{margin:3px auto 0 0}
+.totbar .mkup{font-size:11.5px}
+.stocknote{margin:-4px 0 12px}

@@ -720,3 +720,10 @@ rx(/^Due (.+)$/, (m, d) => `الاستحقاق ${d}`);
 rx(/^(\d+) sales? · nothing open$/, (m, n) => `${n} عملية بيع · لا شيء مفتوح`);
 rx(/^(.+) · (\d+) units?$/, (m, a, n) => `${a} · ${n} قطعة`);
 Object.assign(AR, { 'List view': 'عرض القائمة', 'Grid view': 'عرض الشبكة', 'View': 'العرض', 'Paid up': 'مدفوع بالكامل' });
+/* stock totals and markup */
+rx(/^“Cost” is what the stock cost you: product price plus its share of shipping, customs and other box costs\. “Sells for” uses each product’s suggested price \(today’s rate \+ (.+)% markup, Settings\)\. Expected profit = sells for − cost at today’s rate\.$/, (m, p) => `«التكلفة» هي ما كلّفكما المخزون: سعر المنتج مع حصته من الشحن والجمارك وتكاليف الصندوق الأخرى. «يُباع بـ» يستخدم السعر المقترح لكل منتج (سعر صرف اليوم + هامش ${p}%، من الإعدادات). الربح المتوقع = يُباع بـ − التكلفة بسعر صرف اليوم.`);
+Object.assign(AR, {
+  'Cost of stock (€)': 'تكلفة المخزون (€)', 'Cost at purchase rate': 'التكلفة بسعر صرف الشراء', 'Cost at today’s rate': 'التكلفة بسعر صرف اليوم',
+  'Sells for (suggested)': 'يُباع بـ (مقترح)', 'Expected profit': 'الربح المتوقع', 'Markup on cost': 'الهامش على التكلفة',
+  'Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)': 'الهامش على التكلفة: الربح ÷ (تكلفة المنتجات شاملة الشحن + التكاليف الإضافية)'
+});
