@@ -727,3 +727,9 @@ Object.assign(AR, {
   'Sells for (suggested)': 'يُباع بـ (مقترح)', 'Expected profit': 'الربح المتوقع', 'Markup on cost': 'الهامش على التكلفة',
   'Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)': 'الهامش على التكلفة: الربح ÷ (تكلفة المنتجات شاملة الشحن + التكاليف الإضافية)'
 });
+rx(/^Profit is (-?\d+)% of what the customer pays(?: \(([+-]?\d+)% on top of the cost\))?$/, (m, p, k) => `الربح ${p}% مما يدفعه العميل${k ? ` (${k}% فوق التكلفة)` : ''}`);
+rx(/^(-?\d+)% of what it sells for · \+?(-?\d+)% on top of the cost$/, (m, p, k) => `${p}% من سعر البيع · ${k}% فوق التكلفة`);
+AR['Profit of what the customer pays'] = 'الربح من المبلغ الذي يدفعه العميل';
+rx(/^“Cost” is what the stock cost you: product price plus its share of shipping, customs and other box costs\. “Sells for” uses each product’s suggested price \(today’s rate \+ (.+)% markup, Settings\)\. Expected profit = sells for − cost at today’s rate; its % is the share of what the stock sells for\.$/, (m, p) => `«التكلفة» هي ما كلّفكما المخزون: سعر المنتج مع حصته من الشحن والجمارك وتكاليف الصندوق الأخرى. «يُباع بـ» يستخدم السعر المقترح لكل منتج (سعر صرف اليوم + هامش ${p}%، من الإعدادات). الربح المتوقع = يُباع بـ − التكلفة بسعر صرف اليوم؛ ونسبته هي حصته من سعر بيع المخزون.`);
+rx(/^on (.+) cost$/, (m, x) => `على تكلفة ${x}`);
+rx(/^“Cost” is what the stock cost you: product price plus its share of shipping, customs and other box costs\. “Sells for” uses each product’s suggested price \(today’s rate \+ (.+)% markup, Settings\)\. Expected profit = sells for − cost at today’s rate; its % is the markup on that cost\.$/, (m, p) => `«التكلفة» هي ما كلّفكما المخزون: سعر المنتج مع حصته من الشحن والجمارك وتكاليف الصندوق الأخرى. «يُباع بـ» يستخدم السعر المقترح لكل منتج (سعر صرف اليوم + هامش ${p}%، من الإعدادات). الربح المتوقع = يُباع بـ − التكلفة بسعر صرف اليوم؛ ونسبته هي الهامش على تلك التكلفة.`);
