@@ -876,3 +876,6 @@ dd .sub{display:block;font-size:11.5px;color:var(--muted)}
 a.stlink{text-decoration:none;cursor:pointer}
 a.stlink span{font-size:.9em;margin-inline-start:1px}
 a.stlink:hover{filter:brightness(.95)}
+/* markup tag: never stretch to the width of its box (totals cards show values as blocks) */
+.mkup,.totbar .mkup,.totbar b .mkup{display:inline-block!important;width:auto!important;max-width:max-content;flex:none}
+.totbar b .mkup{vertical-align:3px}
