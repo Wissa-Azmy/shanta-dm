@@ -441,15 +441,23 @@ document.addEventListener('click', e => {
 });
 function saleCard(o, R, pn, kinds) {
   const h = o.h, m = orderMoney(o, R), sale = h.kind === 'sale', units = o.lines.reduce((a, s) => a + num(s.qty), 0);
-  const prods = new Set(o.lines.map(s => s.purchaseId)).size;
-  return `<div class="gcard${sale ? '' : ' muted'}">
-    <div class="gtop"><span class="gdate">${fDate(h.date)}</span>${sale ? payStatus(R.book.byId[o.id], h.kind) : `<span class="pill">${esc(kinds[h.kind])}</span>`}</div>
+  const prods = new Set(o.lines.map(s => s.purchaseId)).size, b = R.book.byId[o.id];
+  /* card status: one capsule in the top row; for open sales, how much is paid (with a bar) and when it's due
+     go in their own row, and "+ Payment" in the footer */
+  const open = sale && b && b.balance > 0.005;
+  const cap = !sale ? `<span class="pill">${esc(kinds[h.kind])}</span>` : open ? `<span class="pill ${b.overdue ? 'bad' : 'warn'}">Owes ${fAmt(b.balance, b.cur)}</span>` : '<span class="pill ok">Paid</span>';
+  const pct = open && b.bill > 0 ? Math.max(0, Math.min(100, Math.round(b.collected / b.bill * 100))) : 0;
+  const payRow = open ? `<div class="gpay"><div class="gbar"><i style="width:${pct}%"></i></div>
+      <span class="sub">${fAmt(b.collected, b.cur)} of ${fAmt(b.bill, b.cur)} paid${h.dueDate ? ` · <span class="${b.overdue ? 'out-amt' : ''}">${b.overdue ? 'Overdue since' : 'Due'} ${fDate(h.dueDate)}</span>` : ''}</span></div>` : '';
+  return `<div class="gcard${sale ? '' : ' muted'}${open && b.overdue ? ' late' : ''}">
+    <div class="gtop"><span class="gdate">${fDate(h.date)}</span>${cap}</div>
     <b class="gname">${esc(h.customer || (sale ? 'Customer' : kinds[h.kind]))}</b>
     <span class="sub">${esc(h.place || '')}${h.method && sale ? (h.place ? ' · ' : '') + esc(h.method) : ''}</span>
     ${o.lines.length ? `<button type="button" class="gprod" data-salelines="${o.id}">${prods === 1 ? `<span class="notr">${esc(pn(o.lines[0]))}</span>` : `${prods} products`} · ${units} unit${units === 1 ? '' : 's'}</button>` : ''}
     <div class="gnums">${sale ? `<div><small>Customer pays</small><b>${fEGP(m.bill)}</b>${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</div>` : ''}
       <div><small>Profit</small><b class="${m.profit >= 0 ? 'in-amt' : 'out-amt'}">${fEGP(m.profit)}</b></div></div>
-    <div class="gfoot">${sale ? pill(h.receivedBy) : '<span></span>'}<span class="gacts"><button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></span></div></div>`;
+    ${payRow}
+    <div class="gfoot">${sale ? pill(h.receivedBy) : '<span></span>'}<span class="gacts">${open ? `<button class="btn sm terra" data-act="paid:${o.id}">+ Payment</button>` : ''}<button class="ib" data-edit="sales:${o.id}" title="Edit">${PENCIL}</button><button class="ib del" data-del="sales:${o.id}" title="Delete">${TRASH}</button></span></div></div>`;
 }
 function custCard(c, t) {
   const open = c.orders.filter(o => o.balance > 0.005), owes = c.balanceEGP > 0.005;
