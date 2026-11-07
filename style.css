@@ -873,3 +873,6 @@ td.num .mkup{display:block;width:max-content;margin:3px 0 0 auto}
 .stocknote{margin:-4px 0 12px}
 td.num .sub{display:block;font-size:11.5px}
 dd .sub{display:block;font-size:11.5px;color:var(--muted)}
+a.stlink{text-decoration:none;cursor:pointer}
+a.stlink span{font-size:.9em;margin-inline-start:1px}
+a.stlink:hover{filter:brightness(.95)}

@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.07-06";
+const APP_VERSION = "2026.11.07-08";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -402,6 +402,6 @@ function downloadCSV(name, rows) {
 }
 /* markup on cost: profit as a % of everything the goods cost (products incl. shipping share, plus the sale's extra costs) */
 const markupPct = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? Math.round(m.profit / c * 100) : null; };
-const markupTag = m => { const p = markupPct(m); return p === null ? '' : `<span class="mkup ${p >= 0 ? 'up' : }own'}" title="Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)">${p >= 0 ? '+' : ''}${p}%</span>`; };
+const markupTag = m => { const p = markupPct(m); return p === null ? '' : `<span class="mkup ${p >= 0 ? 'up' : 'down'}" title="Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)">${p >= 0 ? '+' : ''}${p}%</span>`; };
 /* the cost the markup is measured on, shown under the profit like the discount note under the total */
 const costNote = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? `<span class="sub">on ${fEGP(c)} cost</span>` : ''; };
