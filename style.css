@@ -879,3 +879,14 @@ a.stlink:hover{filter:brightness(.95)}
 /* markup tag: never stretch to the width of its box (totals cards show values as blocks) */
 .mkup,.totbar .mkup,.totbar b .mkup{display:inline-block!important;width:auto!important;max-width:max-content;flex:none}
 .totbar b .mkup{vertical-align:3px}
+/* totals cards: a value with a markup tag may wrap, so the tag drops under the amount instead of being cut off */
+.totbar b:has(.mkup){white-space:normal;overflow:visible;text-overflow:clip;display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px}
+.totbar b:has(.mkup) .mkup{margin:0;vertical-align:0}
+/* totals cards with a markup tag: amount stays on one line; on small screens the tag sits in the card's top corner */
+.totbar b:has(.mkup){display:block;white-space:nowrap;overflow:visible}
+@media (max-width:820px){
+  .totbar>div:has(.mkup){position:relative}
+  .totbar>div:has(.mkup)>span{padding-inline-end:46px}
+  .totbar b:has(.mkup) .mkup{position:absolute;top:7px;right:7px;margin:0}
+  [dir=rtl] .totbar b:has(.mkup) .mkup{right:auto;left:7px}
+}
