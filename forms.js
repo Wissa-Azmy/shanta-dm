@@ -170,7 +170,7 @@ function fieldHTML(f, v, i) {
   const val = v[f.k] ?? '', id = 'f_' + f.k, cls = 'f' + (f.span || f.t === 'textarea' ? ' span' : '') + (f.t === 'check' ? ' chk' : '');
   let input;
   if (f.t === 'select' || f.t === 'person') {
-    const o = f.t === 'person' ? PEOPLE.map(p => [p, pname(p)]) : optsOf(f, v);
+    const o = f.t === 'person' ? PEOPLE.map(p => [p, pname(p)]).concat(v === 'sale' ? [['sale', pname('sale')]] : []) : optsOf(f, v);
     input = `<select id="${id}" name="${f.k}" data-re="1">${o.map(([a, b]) => `<option value="${esc(a)}"${String(a) === String(val) ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
   } else if (f.t === 'check') {
     return `<div class="${cls}"><input type="checkbox" id="${id}" name="${f.k}" data-re="1"${val ? ' checked' : ''}><label for="${id}">${esc(f.l)}</label></div>`;

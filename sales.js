@@ -103,7 +103,7 @@ function drawOrder(err) {
   const lots = Object.values(R.lots).filter(l => avail(l.p.id) > 0 || OR.lines.some(x => x.purchaseId === l.p.id)).sort((a, b) => a.p.product.localeCompare(b.p.product));
   const opt = (v, l, s) => `<option value="${esc(v)}"${String(v) === String(s) ? ' selected' : ''}>${esc(l)}</option>`;
   const sel = (attr, opts, v) => `<select ${attr}>${opts.map(x => Array.isArray(x) ? x : [x, x]).map(([a, b]) => opt(a, b, v)).join('')}</select>`;
-  const people = PEOPLE.map(p => [p, pname(p)]);
+  const people = PEOPLE.map(p => [p, pname(p)]), payers = sale ? [...people, ['sale', 'From sale']] : people;
   $('#obody').innerHTML = `<div class="rhead"><div><h2>${OR.isNew ? 'New sale' : 'Edit sale'}</h2><p class="lead">Add every product the customer takes, then any extra costs such as delivery or packaging.</p></div>
     <button type="button" class="ib" data-o="close" title="Close">✕</button></div>
     <div class="fgrid rx-opts">
@@ -132,12 +132,12 @@ function drawOrder(err) {
     </tbody></table></div>
     <div class="topact" style="margin-top:8px"><button type="button" class="btn sm" data-o="scan">${SCANICON} Scan products</button><button type="button" class="btn sm ghost" data-o="add-line">+ Add product</button></div>
 
-    <h3 class="osec">Extra costs</h3>
+    <h3 class="osec">Extra costs</h3>${sale ? '<p class="note">Choose “From sale” for costs taken out of what the customer paid (e.g. free delivery the courier keeps): it lowers the sale’s profit and the money collected, and isn’t charged to either of you.</p>' : ''}
     ${OR.extras.length ? `<div class="tablewrap rx-table"><table class="t"><thead><tr><th>What</th><th>Description</th><th class="num">We pay (${cur})</th><th>Paid by</th>${sale ? `<th class="num">Customer pays (${cur})</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.extras.map((x, i) => `<tr><td>${sel(`class="cell" data-oe="${i}" data-k="category"`, EXTRA_CATS, x.category)}</td>
       <td><input class="cell" data-oe="${i}" data-k="description" value="${esc(x.description)}" placeholder="e.g. Bosta courier"></td>
       <td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-oe="${i}" data-k="cost" value="${esc(x.cost)}"></td>
-      <td>${sel(`class="cell" data-oe="${i}" data-k="paidBy"`, people, x.paidBy)}</td>
+      <td>${sel(`class="cell" data-oe="${i}" data-k="paidBy"`, payers, !sale && x.paidBy === 'sale' ? OR.h.receivedBy || 'friend' : x.paidBy)}</td>
       ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-oe="${i}" data-k="charge" value="${esc(x.charge)}"></td>` : ''}
       <td class="acts"><button type="button" class="ib del" data-o="del-extra:${i}" title="Remove">${TRASH}</button></td></tr>`).join('')}
     </tbody></table></div>` : '<p class="note">No extra costs. Add delivery, packaging or anything else this sale cost you, or that the customer pays on top.</p>'}
@@ -185,7 +185,7 @@ function saveOrder() {
   OR.extras.forEach(x => {
     const key = uid(), what = x.description || x.category;
     if (num(x.cost) > 0) db.expenses.push({ id: uid(), orderId: oid, extraKey: key, date: h.date, category: x.category, description: what, amount: num(x.cost), currency: base.currency, rate: h.rate,
-      paidBy: x.paidBy, method: 'Cash', place: h.place, shipmentId: '', notes: h.customer ? 'Sale to ' + h.customer : 'Sale' });
+      paidBy: x.paidBy === 'sale' && !sale ? (h.receivedBy || 'friend') : x.paidBy, method: 'Cash', place: h.place, shipmentId: '', notes: h.customer ? 'Sale to ' + h.customer : 'Sale' });
     if (sale && num(x.charge) > 0) db.sales.push(Object.assign({ id: uid() }, base, { extra: true, extraKey: key, purchaseId: '', product: what, category: x.category, qty: 1, unitPrice: num(x.charge) }));
   });
   commit(); odlg().close(); toast('Sale saved');
@@ -260,7 +260,8 @@ function addScanned(code) {
     if (empty) Object.assign(empty, nl); else OR.lines.push(nl);
   }
   const n = OR.lines.filter(x => ids.includes(x.purchaseId)).reduce((a, x) => a + num(x.qty), 0);
-  return { kind: 'ok', name, brand, box: shipName(l.p.shipmentId), n, unit: 'in this sale' };
+  const ln = OR.lines.find(x => x.purchaseId === l.p.id), pr = ln && ln.unitPrice !== '' ? num(ln.unitPrice) : 0;
+  return { kind: 'ok', name, brand, box: shipName(l.p.shipmentId), n, unit: 'in this sale', price: OR.h.kind === 'sale' && pr ? fAmt(pr, OR.h.currency) : '' };
 }
 function scanIntoOrder() {
   let unknown = '';

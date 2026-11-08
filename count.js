@@ -58,7 +58,7 @@ function countCode(code) {
     return { kind: 'warn', name: p ? p.product : code, brand: p ? p.brand : '', note: p ? 'Not in the selected delivered boxes, or none left' : 'This barcode isn’t linked to a product' }; }
   if (kept(x) >= x.total) return { kind: 'warn', name: x.name, brand: x.brand, note: `All ${x.total} already counted. Check for a double scan.` };
   CNT.kept[x.key] = kept(x) + 1; cntSave();
-  return { kind: 'ok', name: x.name, brand: x.brand, n: kept(x), unit: `of ${x.total} here` };
+  return { kind: 'ok', name: x.name, brand: x.brand, n: kept(x), unit: `of ${x.total} here`, price: x.lots[0] ? fEGP(suggestEGP(x.lots[0])) : '' };
 }
 function sellRest() {
   const lines = [];

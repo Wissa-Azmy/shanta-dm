@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.07-14";
+const APP_VERSION = "2026.11.08-02";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -20,8 +20,8 @@ const fEGP = x => (x < 0 ? '−' : '') + 'EGP ' + Math.round(Math.abs(x)).toLoca
 const fAmt = (a, cur) => cur === 'EUR' ? fEUR(num(a)) : fEGP(num(a));
 const fDate = d => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '—';
 const PEOPLE = ['me', 'friend'];
-const pname = p => p === 'friend' ? db.settings.friendName : db.settings.meName;
-const pill = p => `<span class="pill ${p === 'friend' ? 'friend' : 'me'}">${esc(pname(p))}</span>`;
+const pname = p => p === 'sale' ? 'From sale' : p === 'friend' ? db.settings.friendName : db.settings.meName;
+const pill = p => `<span class="pill ${p === 'sale' ? 'fromsale' : p === 'friend' ? 'friend' : 'me'}">${esc(pname(p))}</span>`;
 const rate = () => num(db.settings.rate) || 1;
 const toEUR = (amount, cur, r) => cur === 'EUR' ? num(amount) : num(amount) / (num(r) || rate());
 /* an amount in EGP: as paid when it was paid in EGP, else at the rate saved on it, else the rate of its day (rateOn below) */
@@ -258,6 +258,13 @@ function calc() {
   });
   db.expenses.forEach(e => {
     const eur = toEUR(e.amount, e.currency, e.rate), sh = R.ship[e.shipmentId];
+    if (e.paidBy === 'sale') {
+      /* paid out of the sale money (e.g. free delivery the courier keeps): it never reached either of you, so it
+         lowers the money collected by whoever collected that sale, and with it the profit; nobody is paid it back */
+      const egpS = toEGP(e.amount, e.currency || "EUR", e.rate, e.date), o = B.byId[e.orderId];
+      R.saleCostEUR = (R.saleCostEUR || 0) + eur; R.rev -= eur; R.revEGP -= egpS;
+      (R.person[o && o.h.receivedBy] || R.person.friend).received -= eur; return;
+    }
     P(e.paidBy).outlay += eur;
     const f = sh && sh.basis > 0 ? sh.consumedB / sh.basis : 1, egp = toEGP(e.amount, e.currency || "EUR", e.rate, e.date);
     P(e.paidBy).recovered += eur * f; R.recEGP += egp * f; R.spentEGP0 = (R.spentEGP0 || 0) + egp;

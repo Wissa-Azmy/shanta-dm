@@ -890,3 +890,6 @@ a.stlink:hover{filter:brightness(.95)}
   .totbar b:has(.mkup) .mkup{position:absolute;top:7px;right:7px;margin:0}
   [dir=rtl] .totbar b:has(.mkup) .mkup{right:auto;left:7px}
 }
+.pill.fromsale{background:#ece7f6;color:#5a3f8f}
+.slog .sprice{font-weight:700;color:var(--nile);font-family:var(--mono)}
+.lead .sprice{font-weight:700;color:var(--nile)}

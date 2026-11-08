@@ -734,3 +734,11 @@ rx(/^“Cost” is what the stock cost you: product price plus its share of ship
 rx(/^on (.+) cost$/, (m, x) => `على تكلفة ${x}`);
 rx(/^“Cost” is what the stock cost you: product price plus its share of shipping, customs and other box costs\. “Sells for” uses each product’s suggested price \(today’s rate \+ (.+)% markup, Settings\)\. Expected profit = sells for − cost at today’s rate; its % is the markup on that cost\.$/, (m, p) => `«التكلفة» هي ما كلّفكما المخزون: سعر المنتج مع حصته من الشحن والجمارك وتكاليف الصندوق الأخرى. «يُباع بـ» يستخدم السعر المقترح لكل منتج (سعر صرف اليوم + هامش ${p}%، من الإعدادات). الربح المتوقع = يُباع بـ − التكلفة بسعر صرف اليوم؛ ونسبته هي الهامش على تلك التكلفة.`);
 AR['Total cost'] = AR['Total cost'] || 'إجمالي التكلفة';
+Object.assign(AR, {
+  'From the sale money': 'من مال البيع',
+  'Paid by “From the sale money” for costs taken out of what the customer paid (e.g. free delivery the courier keeps): it lowers the sale’s profit and the money collected, and isn’t charged to either of you.': 'اختر «من مال البيع» للتكاليف المأخوذة مما دفعه العميل (مثل التوصيل المجاني الذي يحتفظ به المندوب): تُخصم من ربح البيع ومن المال المُحصَّل، ولا تُحسب على أي منكما.'
+});
+Object.assign(AR, { 'From sale': 'من البيع',
+  'Choose “From sale” for costs taken out of what the customer paid (e.g. free delivery the courier keeps): it lowers the sale’s profit and the money collected, and isn’t charged to either of you.': 'اختر «من البيع» للتكاليف المأخوذة مما دفعه العميل (مثل التوصيل المجاني الذي يحتفظ به المندوب): تُخصم من ربح البيع ومن المال المُحصَّل، ولا تُحسب على أي منكما.' });
+rx(/^(\d+) left in stock · (.+) suggested price$/, (m, n, p) => `${n} متبقٍ في المخزون · ${p} السعر المقترح`);
+AR['Suggested price'] = AR['Suggested price'] || 'السعر المقترح';

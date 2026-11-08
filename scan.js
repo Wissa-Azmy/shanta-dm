@@ -63,7 +63,7 @@ const Scan = {
   log(r, code) {
     const l = $('#scandlg .scanlog'); if (!l) return;
     l.querySelectorAll('.slog').forEach(x => { x.classList.remove('new'); if (code && x.dataset.code === code) x.remove(); });
-    const meta = [r.brand && `<span class="notr">${esc(r.brand)}</span>`, r.box && `<span>${esc(r.box)}</span>`].filter(Boolean).join('<i>·</i>');
+    const meta = [r.brand && `<span class="notr">${esc(r.brand)}</span>`, r.box && `<span>${esc(r.box)}</span>`, r.price && `<span class="sprice">${esc(r.price)}</span>`].filter(Boolean).join('<i>·</i>');
     l.insertAdjacentHTML('afterbegin', `<div class="slog ${r.kind === 'warn' ? 'warn' : 'ok'} new" data-code="${esc(code || '')}">
       <span class="sic">${r.kind === 'warn' ? '!' : '✓'}</span>
       <span class="sx"><b class="notr">${esc(r.name)}</b>${meta ? `<span class="sm">${meta}</span>` : ''}${r.note ? `<span class="snote">${esc(r.note)}</span>` : ''}</span>
@@ -131,7 +131,7 @@ const Scan = {
   }
 };
 /* a scan result as one line, for toasts */
-const scanText = r => typeof r !== 'object' ? r : `${r.kind === 'warn' ? '⚠' : '✓'} ${r.name} · ${r.note || r.n + (r.unit ? ' ' + r.unit : '')}`;
+const scanText = r => typeof r !== 'object' ? r : `${r.kind === 'warn' ? '⚠' : '✓'} ${r.name}${r.price ? ' · ' + r.price : ''} · ${r.note || r.n + (r.unit ? ' ' + r.unit : '')}`;
 const TORCHICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4l-3 4v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-9L7 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 7h10M12 13v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 /* ---------- what a scan finds, and linking unknown barcodes ---------- */
 const SCANICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M7 8v8M10 8v8M13 8v8M16.5 8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
@@ -184,10 +184,10 @@ function drawKnown() {
   const R = calc(), ls = eanLines(SX.code).sort((a, b) => (b.date || '').localeCompare(a.date || '')), p = ls[0];
   const left = ls.reduce((a, x) => a + Math.max(0, (R.lots[x.id] || {}).left || 0), 0);
   scanDlg('lookdlg').innerHTML = `<div class="sdbody" tabindex="-1" autofocus><div class="eyebrow">Barcode <span class="mono notr">${SX.code}</span></div>
-    <h2>${esc(p.product)}</h2><p class="lead">${esc(p.brand || '')}${p.brand ? ' · ' : ''}<b>${left} left</b> in stock</p>
-    <div class="tablewrap"><table class="t"><thead><tr><th>Shipment</th><th class="num">Left</th><th class="num">Cost incl. shipping</th></tr></thead><tbody>
+    <h2>${esc(p.product)}</h2><p class="lead">${esc(p.brand || '')}${p.brand ? ' · ' : ''}<b>${left} left</b> in stock${R.lots[p.id] && R.lots[p.id].landed ? ` · <span class="sprice">${fEGP(suggestEGP(R.lots[p.id]))}</span> suggested price` : ''}</p>
+    <div class="tablewrap"><table class="t"><thead><tr><th>Shipment</th><th class="num">Left</th><th class="num">Cost incl. shipping</th><th class="num">Suggested price</th></tr></thead><tbody>
     ${ls.map(x => { const l = R.lots[x.id] || {}; return `<tr><td>${x.shipmentId ? esc(shipName(x.shipmentId)) : '<span class="pill warn">Not shipped</span>'}<span class="sub">${fDate(x.date)}${x.product !== p.product ? ' · ' + esc(x.product) : ''}</span></td>
-      <td class="num"><b>${Math.max(0, l.left || 0)}</b><span class="sub">of ${x.qty}</span></td><td class="num">${l.landed ? fEGP(eur2egp(l.landed)) : '—'}</td></tr>`; }).join('')}
+      <td class="num"><b>${Math.max(0, l.left || 0)}</b><span class="sub">of ${x.qty}</span></td><td class="num">${l.landed ? fEGP(eur2egp(l.landed)) : '—'}</td><td class="num">${l.landed ? fEGP(suggestEGP(l)) : '—'}</td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="mact sdact">${left ? '<button type="button" class="btn" data-lx="sell">Sell</button>' : ''}<button type="button" class="btn${left ? ' ghost' : ' full'}" data-lx="again">${SCANICON} Scan another</button>
     <button type="button" class="btn ghost" data-lx="more">Link more lines</button><button type="button" class="btn ghost" data-lx="buy">+ Add purchase</button>
