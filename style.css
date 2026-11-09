@@ -939,3 +939,14 @@ a.stlink:hover{filter:brightness(.95)}
 .gbtn{display:inline-flex;align-items:center;gap:10px;justify-content:center}
 .gbtn svg{width:18px;height:18px}
 .gatebox .agsi .gbtn{width:100%}
+/* tab rows on phones: scroll sideways instead of squashing or cutting off the last tab */
+.segtabs.scrolls{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-padding-inline:28px;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%)}
+.segtabs.scrolls::-webkit-scrollbar{display:none}
+.segtabs.scrolls button{flex:none}
+.otabs{display:flex;max-width:100%}
+.otabs button{flex:none!important}
+@media(max-width:640px){
+  .otabs button{padding:7px 13px}
+  .otabs .ocnt{min-width:16px;line-height:16px;font-size:10.5px}
+}

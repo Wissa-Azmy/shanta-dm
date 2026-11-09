@@ -45,6 +45,7 @@ function render() {
   document.querySelectorAll("[data-mixed]").forEach(c => c.indeterminate = true);
   document.body.classList.toggle("hassel", !!$("#view .selbar")); placeBars();
   vf.after && vf.after();
+  showTabs();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
 }
@@ -256,3 +257,22 @@ document.addEventListener('click', e => {
   s.onerror = () => { findLoading = false; s.remove(); toast('⚠ find.js couldn’t be loaded. Check it is uploaded to the site, next to index.html.'); };
   document.body.appendChild(s);
 });
+
+/* tab rows wider than the screen scroll sideways: keep the selected tab fully in view, with a bit of the
+   next one showing so it's clear there is more. Only the row scrolls, never the page. The page is redrawn
+   when a tab is tapped, so the row starts where it was and glides to the new tab */
+const TABX = {};
+function showTabs() {
+  document.querySelectorAll('#view .segtabs').forEach((row, i) => {
+    const k = view + i;
+    row.classList.toggle('scrolls', row.scrollWidth > row.clientWidth + 1);
+    row.addEventListener('scroll', () => TABX[k] = row.scrollLeft, { passive: true });
+    if (!row.classList.contains('scrolls')) return;
+    if (TABX[k] !== undefined) row.scrollLeft = TABX[k];
+    const b = row.querySelector('button.on'); if (!b) return;
+    const r = row.getBoundingClientRect(), x = b.getBoundingClientRect(), pad = 28;
+    const d = x.left < r.left + pad ? x.left - r.left - pad : x.right > r.right - pad ? x.right - r.right + pad : 0;
+    if (d) row.scrollBy({ left: d, behavior: TABX[k] === undefined ? 'auto' : 'smooth' });
+  });
+}
+window.addEventListener('resize', () => showTabs());
