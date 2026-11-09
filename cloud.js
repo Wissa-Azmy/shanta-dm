@@ -129,6 +129,18 @@ const Cloud = {
     this.cfg = { fs: 1, email, ledger: CLOUD.ledger }; this.saveCfg();
     await this.start();
   },
+  /* Google: the account comes back from Google's own button as a token (works where third-party cookies are
+     blocked); a popup is the fallback. Access is still decided by the email list in the rules */
+  async connectGoogle(idToken) {
+    let f; try { f = await fb(); } catch (e) { throw new Error(netMsg); }
+    const popup = () => { const pr = new f.U.GoogleAuthProvider(); pr.setCustomParameters({ prompt: 'select_account' }); return f.U.signInWithPopup(f.auth, pr); };
+    try { await (idToken ? f.U.signInWithCredential(f.auth, f.U.GoogleAuthProvider.credential(idToken)) : popup()); }
+    catch (e) { throw new Error(/popup-closed|cancelled-popup/.test(e.code || '') ? 'The Google window closed before signing you in. Try again.' : /operation-not-allowed/.test(e.code || '') ? 'Google sign-in is not enabled yet (Authentication → Sign-in method).' : authMsg(e.code || e.message)); }
+    const email = f.auth.currentUser && f.auth.currentUser.email;
+    if (this.legacy() && this.cfg.ledger !== CLOUD.ledger) this.base = null;
+    this.cfg = { fs: 1, email, ledger: CLOUD.ledger, via: 'google' }; this.saveCfg();
+    await this.start();
+  },
   async disconnect() {
     this.stopListen();
     /* forget the login first, so the sign-out isn't mistaken for an expired login */
@@ -574,6 +586,7 @@ service cloud.firestore {
     return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
       <p class="note">Sign in so you and ${esc(db.settings.friendName)} work on the same numbers from any phone or laptop.</p>
       <form class="fgrid" data-login="cl">${this.loginFields('cl')}<div class="f span"><button class="btn" style="align-self:flex-start">Sign in</button></div></form>
+      <div class="gor"><span>or</span></div><div class="agsi" data-agsi="cl"></div>
       <div class="err" id="cl_msg"${this.msg ? '' : ' hidden'}>${esc(this.msg)}</div>
       ${this.adminHTML()}</div>`;
   },
@@ -680,6 +693,7 @@ function showGate(msg) {
   const g = document.createElement('div'); g.id = 'gate';
   g.innerHTML = `<div class="gatebox"><div class="logo">€<span>⇄</span>£E</div><h1>Shanta dm</h1><p class="note">${esc(msg || 'Sign in to open the shared ledger')}</p>
     <form data-login="g">${Cloud.loginFields('g')}<button class="btn">Sign in</button></form>
+    <div class="gor"><span>or</span></div><div class="agsi" data-agsi="g"></div>
     <div class="err" id="g_msg" hidden></div>
     <button type="button" class="linkbtn" data-act="cloud-skip">Use without signing in on this device</button></div>`;
   document.body.appendChild(g);
@@ -688,3 +702,54 @@ function showGate(msg) {
 function hideGate() { const g = $('#gate'); if (g) g.remove(); }
 if (Cloud.legacy()) { localStorage.removeItem('shanta-offline'); showGate('The app now uses a new, faster database. Please sign in once more; nothing is lost.'); }
 else if (!Cloud.on() && !localStorage.getItem('shanta-offline')) showGate();
+
+/* ---------- Sign in with Google ----------
+   Google's own button needs the Web client ID. It is in Settings → Online shop, and also in the shop's
+   public settings, so a new device can show the button before anyone has signed in. */
+const AGSI_KEY = 'shanta-gid';
+async function adminGid() {
+  const s = (typeof db !== 'undefined' && db.settings && db.settings.shopGoogleId) || localStorage.getItem(AGSI_KEY);
+  if (s) return s;
+  try { const f = await fb(), d = await within(f.S.getDoc(f.S.doc(f.fs, 'shop', 'settings')), 8000, offlineMsg);
+    const v = d.exists() && d.data().googleClientId; if (v) { localStorage.setItem(AGSI_KEY, v); return v; } } catch (e) { }
+  return '';
+}
+const agsiScript = () => agsiScript.p || (agsiScript.p = new Promise((ok, no) => { const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => { agsiScript.p = null; no(new Error('gsi')); }; document.head.appendChild(s); }));
+function agsiMsg(el, m) {
+  const g = el.dataset.agsi === 'g' ? $('#g_msg') : null;
+  if (g) { g.textContent = m; g.hidden = !m; } else Cloud.set('off', m);
+}
+async function agsiDone(el, token) {
+  el.innerHTML = '<p class="note">Signing in…</p>'; agsiMsg(el, '');
+  try {
+    await Cloud.connectGoogle(token);
+    localStorage.removeItem('shanta-offline'); hideGate();
+    toast('Welcome, ' + userName(Cloud.cfg.email)); render();
+  } catch (x) {
+    console.warn(x);
+    if (!Cloud.on()) { agsiMsg(el, x.message); delete el.dataset.on; agsiMount(); }
+    else { hideGate(); Cloud.set('error', x.message); render(); }
+  }
+}
+async function agsiMount() {
+  const els = [...document.querySelectorAll('[data-agsi]:not([data-on])')]; if (!els.length) return;
+  els.forEach(el => el.dataset.on = '1');
+  const fallback = el => { el.innerHTML = `<button type="button" class="btn ghost gbtn">${'<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.7l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>'}Sign in with Google</button>`;
+    el.querySelector('button').onclick = () => agsiDone(el, null); };
+  const gid = await adminGid();
+  if (!gid) return els.forEach(fallback);
+  try { await agsiScript(); } catch (e) { return els.forEach(fallback); }
+  const id = window.google.accounts.id;
+  els.forEach(el => {
+    if (!document.body.contains(el)) return;
+    /* one callback for the whole page: the button that was tapped last receives the account */
+    id.initialize({ client_id: gid, callback: r => agsiDone(agsiMount.last || el, r.credential), ux_mode: 'popup', auto_select: false, use_fedcm_for_button: true });
+    el.addEventListener('pointerdown', () => agsiMount.last = el, true);
+    id.renderButton(el, { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', logo_alignment: 'center',
+      locale: document.documentElement.lang === 'ar' ? 'ar' : 'en', width: Math.min(400, Math.max(220, el.clientWidth || 320)) });
+  });
+}
+/* the sign-in boxes are redrawn often (Settings, the opening screen): add the button whenever one appears */
+new MutationObserver(() => { if (document.querySelector('[data-agsi]:not([data-on])')) agsiMount(); }).observe(document.body, { childList: true, subtree: true });
+agsiMount();

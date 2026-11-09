@@ -791,3 +791,6 @@ Object.assign(AR, { 'number not checked': 'الرقم غير مؤكد', 'Signed 
 rx(/^(.+) \(not checked\)$/, (m, p) => `${p} (غير مؤكد)`);
 Object.assign(AR, { 'Google sign-in client ID': 'معرّف عميل تسجيل الدخول عبر Google',
   'Firebase → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID. Without it, Google sign-in may not work in browsers that block third-party cookies.': 'Firebase ← Authentication ← Sign-in method ← Google ← Web SDK configuration ← Web client ID. بدونه قد لا يعمل تسجيل الدخول عبر Google في المتصفحات التي تحظر ملفات تعريف الارتباط الخارجية.' });
+Object.assign(AR, { 'or': 'أو', 'Sign in with Google': 'تسجيل الدخول باستخدام Google', 'Signing in…': 'جارٍ تسجيل الدخول…',
+  'The Google window closed before signing you in. Try again.': 'أُغلقت نافذة Google قبل تسجيل دخولك. حاول مرة أخرى.',
+  'Google sign-in is not enabled yet (Authentication → Sign-in method).': 'تسجيل الدخول عبر Google غير مفعّل بعد (Authentication ← Sign-in method).' });

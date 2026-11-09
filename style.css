@@ -931,3 +931,11 @@ a.stlink:hover{filter:brightness(.95)}
   .scusts li.scust{flex-direction:column}
   .scact{align-items:stretch;width:100%}
 }
+/* Sign in with Google, under the email form */
+.gor{display:flex;align-items:center;gap:10px;margin:14px 0 10px;color:var(--muted);font-size:12.5px;grid-column:1/-1}
+.gor::before,.gor::after{content:"";flex:1;border-top:1px dashed var(--line)}
+.agsi{display:flex;justify-content:center;min-height:44px}
+#cloudcard .agsi{justify-content:flex-start}
+.gbtn{display:inline-flex;align-items:center;gap:10px;justify-content:center}
+.gbtn svg{width:18px;height:18px}
+.gatebox .agsi .gbtn{width:100%}
