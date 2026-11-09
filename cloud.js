@@ -495,9 +495,21 @@ const Cloud = {
     return `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /ledgers/{path=**} {
-      allow read, write: if request.auth != null
+    function admin() {
+      return request.auth != null
         && request.auth.token.email in [${list}];
+    }
+    match /ledgers/{path=**} {
+      allow read, write: if admin();
+    }
+    // online shop: anyone can read the catalog, only you two change it
+    match /catalog/{id} {
+      allow read: if true;
+      allow write: if admin();
+    }
+    match /shop/{id} {
+      allow read: if true;
+      allow write: if admin();
     }
   }
 }`;
@@ -529,7 +541,7 @@ service cloud.firestore {
       <div class="fgrid">
         <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none"></div>
         <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none"></div>
-        <div class="f span"><textarea id="cl_rules" readonly rows="11" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
+        <div class="f span"><textarea id="cl_rules" readonly rows="22" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
       </div>
       <p class="note">Forgotten password: in Firebase open Users, click ⋮ next to the person and choose Reset password; they get an email to set a new one. Nothing in the ledger is lost.</p></details>`;
   }

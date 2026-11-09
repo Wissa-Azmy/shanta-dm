@@ -893,3 +893,10 @@ a.stlink:hover{filter:brightness(.95)}
 .pill.fromsale{background:#ece7f6;color:#5a3f8f}
 .slog .sprice{font-weight:700;color:var(--nile);font-family:var(--mono)}
 .lead .sprice{font-weight:700;color:var(--nile)}
+/* online shop card in Settings */
+#shopcard .f.chk{padding-top:8px}
+#shopcard .topact{margin:6px 0 4px}
+.shoplist{max-height:360px;overflow:auto;margin:6px 0 10px}
+.shoplist .shrow{display:flex;gap:10px;align-items:flex-start;min-width:0;cursor:pointer}
+.shoplist .shrow input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--nile)}
+.shoplist .shrow>span{min-width:0}

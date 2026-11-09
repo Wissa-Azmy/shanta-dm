@@ -742,3 +742,23 @@ Object.assign(AR, { 'From sale': 'من البيع',
   'Choose “From sale” for costs taken out of what the customer paid (e.g. free delivery the courier keeps): it lowers the sale’s profit and the money collected, and isn’t charged to either of you.': 'اختر «من البيع» للتكاليف المأخوذة مما دفعه العميل (مثل التوصيل المجاني الذي يحتفظ به المندوب): تُخصم من ربح البيع ومن المال المُحصَّل، ولا تُحسب على أي منكما.' });
 rx(/^(\d+) left in stock · (.+) suggested price$/, (m, n, p) => `${n} متبقٍ في المخزون · ${p} السعر المقترح`);
 AR['Suggested price'] = AR['Suggested price'] || 'السعر المقترح';
+/* online shop card */
+Object.assign(AR, {
+  'Online shop': 'المتجر الإلكتروني', 'Customers browse the shop at this address:': 'يتصفح العملاء المتجر على هذا العنوان:',
+  'The shop only gets names, prices and how many are in Egypt; costs, profit and partners never leave this app.': 'المتجر يحصل فقط على الأسماء والأسعار والكمية الموجودة في مصر؛ التكاليف والأرباح والشركاء لا تخرج من هذا التطبيق أبدًا.',
+  'Shop name': 'اسم المتجر', 'WhatsApp for orders': 'واتساب الطلبات', 'Orders and requests arrive here as WhatsApp messages.': 'تصل الطلبات وطلبات المنتجات إلى هنا كرسائل واتساب.',
+  'Down payment on requests (%)': 'العربون على طلبات المنتجات (%)',
+  'Asked when a customer requests a product that isn’t in Egypt. A change applies to new requests only.': 'يُطلب عندما يطلب العميل منتجًا غير موجود في مصر. التغيير يسري على الطلبات الجديدة فقط.',
+  'Shop is open for orders': 'المتجر مفتوح للطلبات', 'Update the shop after every change (sales, counts, moves, prices)': 'حدّث المتجر بعد كل تغيير (المبيعات، الجرد، النقل، الأسعار)',
+  'Not published yet.': 'لم يُنشر بعد.', 'Publish now': 'انشر الآن', 'Publishing…': 'جارٍ النشر…', 'Open the shop ↗': 'افتح المتجر ↗',
+  'Request only': 'بالطلب فقط', 'Look for missing photos again': 'ابحث عن الصور الناقصة مرة أخرى', 'No products yet.': 'لا توجد منتجات بعد.',
+  'First time only: the Firestore rules need the shop part. In Shared online ledger → Admin, type both emails, copy the rules and publish them in Firebase.': 'في المرة الأولى فقط: قواعد Firestore تحتاج إلى جزء المتجر. في «الدفتر المشترك على الإنترنت ← الإدارة» اكتب البريدين وانسخ القواعد وانشرها في Firebase.',
+  'Sign in to the shared ledger (the live one, not a backup) to publish the shop.': 'سجّل الدخول إلى الدفتر المشترك (الحالي وليس نسخة احتياطية) لنشر المتجر.',
+  'The shop can’t be published yet: the Firestore rules need the shop part. Open Settings → Shared online ledger → Admin, type both emails, copy the rules, paste them in Firebase → Firestore Database → Rules and press Publish.': 'لا يمكن نشر المتجر بعد: قواعد Firestore تحتاج إلى جزء المتجر. افتح الإعدادات ← الدفتر المشترك على الإنترنت ← الإدارة، اكتب البريدين، انسخ القواعد، والصقها في Firebase ← Firestore Database ← Rules ثم اضغط Publish.'
+});
+rx(/^Products in the shop \((\d+) of (\d+)\)$/, (m, a, b) => `المنتجات في المتجر (${a} من ${b})`);
+rx(/^Last published (.+) · (\d+) products, (\d+) in stock$/, (m, d, n, k) => `آخر نشر ${d} · ${n} منتج، ${k} في المخزون`);
+rx(/^Shop updated: (\d+) products, (\d+) in stock$/, (m, n, k) => `تم تحديث المتجر: ${n} منتج، ${k} في المخزون`);
+rx(/^Looking up product photos… (\d+) of (\d+)$/, (m, a, b) => `جارٍ البحث عن صور المنتجات… ${a} من ${b}`);
+rx(/^(\d+) in Egypt$/, (m, n) => `${n} في مصر`);
+rx(/^Untick a product to hide it from the shop\. Prices follow the suggested price \(today’s rate \+ (.+)% markup\)\.$/, (m, p) => `ألغِ تحديد المنتج لإخفائه من المتجر. الأسعار تتبع السعر المقترح (سعر صرف اليوم + ${p}% هامش).`);
