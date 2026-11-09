@@ -37,7 +37,7 @@ button,input,select{font:inherit;color:inherit}
 .frow::-webkit-scrollbar{display:none}
 .chip{all:unset;cursor:pointer;flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13.5px}
 .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.frow select{flex:none;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13.5px;max-width:180px}
+.frow select{flex:none;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background-color:var(--card);font-size:13.5px;max-width:180px}
 
 /* products */
 .grid{max-width:1180px;margin:0 auto;padding:14px 16px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
@@ -186,3 +186,11 @@ body.locked{overflow:hidden}
 .gbtn{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:14.5px}
 .gbtn svg{width:18px;height:18px;flex:none}
 .gbtn[disabled]{opacity:.55;cursor:default}
+
+/* dropdowns: the same drawn arrow as Shanta, with room for it on the correct side.
+   The browser's own arrow sits flush against the edge and ignores padding, so it is hidden.
+   The #_ keeps these rules above any later padding/background shorthand. */
+select:not(#_){-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236c716a' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:11px 7px;padding-right:32px;padding-left:12px;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;cursor:pointer}
+[dir=rtl] select:not(#_){background-position:left 12px center;padding-left:32px;padding-right:12px}
+/* phones: 16px text so iPhone Safari doesn't zoom in when a dropdown or field is tapped */
+@media(max-width:640px){ .frow select,#q,.fl input,.inrow input{font-size:16px} .frow select{max-width:200px} }
