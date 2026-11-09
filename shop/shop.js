@@ -37,16 +37,30 @@ const W = {
     payNow: p => `Pay now by InstaPay (${p}%)`, payLater: 'On delivery', reqDown: p => `Down payment on requests (${p}%)`,
     reqNote: 'You pay the rest of a request when it arrives and you confirm it. You can cancel any time before.',
     place: 'Place order', placing: 'Sending…', need: 'Please fill in your name and address.', needPhone: 'Please enter a mobile number we can reach, e.g. 01012345678.',
-    done: 'Thank you! Your order is in.', doneSub: 'We confirm it soon. Follow it under “My orders”.',
+    done: 'Thank you! Your order is in.', doneSub: 'Here is what happens next. You can come back to it any time under “My orders” (the person icon at the top).',
     payBox: 'Pay by InstaPay', payTo: 'Send to', amount: 'Amount', ref: 'Write in the transfer note', copy: 'Copy', copied: 'Copied',
     upload: 'Upload the screenshot', uploading: 'Uploading…', proofSent: 'Screenshot sent ✓ We’ll check it.', replace: 'Replace',
     proofOk: 'Screenshot sent', tooBig: 'That picture couldn’t be read. Try a screenshot instead.',
     mine: 'My orders', noOrders: 'No orders yet.', signinMine: 'Sign in to see your orders.', yourCredit: 'Your credit',
     creditNote: 'Comes off your next order automatically.', creditRefund: 'Ask for it as a refund', creditAsked: 'Refund asked. We’ll send it to',
-    st: { new: 'Waiting for confirmation', newPay: 'Waiting for your down payment', confirmed: 'Confirmed, being prepared', out: 'Out for delivery', delivered: 'Delivered',
-      requested: 'Requested · we’ll tell you when it’s here', offered: 'It’s here! Please confirm within 24 hours', declined: 'Declined', cancelled: 'Cancelled' },
-    paid: 'paid ✓', notPaid: 'not paid yet', checkingPay: 'screenshot sent, we’re checking',
-    cancel: 'Cancel', cancelAsk: 'Cancel this order?', confirmOffer: 'Yes, I still want it', keep: 'Keep it',
+    st: { new: 'Being confirmed', newPay: 'Waiting for your down payment', confirmed: 'Confirmed, being prepared', out: 'Out for delivery', delivered: 'Delivered',
+      requested: 'Requested', offered: 'It’s here, please confirm', declined: 'Declined', cancelled: 'Cancelled' },
+    paid: 'paid ✓', notPaid: 'not paid yet', checkingPay: 'Checking your payment',
+    cancel: 'Cancel order', cancelReq: 'Cancel request', cancelAsk: 'Cancel this order?', cancelAskPaid: a => `Cancel this order? You choose next whether your ${a} comes back to your InstaPay or stays as credit.`, confirmOffer: 'Yes, I still want it', keep: 'Keep it',
+    next: 'What happens next', steps: { sent: 'Sent', pay: 'Down payment', check: 'Payment check', confirmed: 'Confirmed', out: 'On the way', delivered: 'Delivered', requested: 'Requested', arrives: 'Arrives in Egypt', yours: 'You confirm' },
+    nx: {
+      pay: a => `<b>Send ${a} by InstaPay</b> using the details below, then upload a screenshot of the transfer. We confirm your order as soon as it arrives.`,
+      check: '<b>Nothing more to do.</b> We got your screenshot and are checking the transfer, usually within a few hours. Your order is then confirmed here, and we may message you on WhatsApp.',
+      confirm: '<b>Nothing to do.</b> We’re checking stock and will confirm your order soon, usually within a few hours.',
+      prep: '<b>Your order is confirmed</b> and being packed. We’ll tell you when it leaves.',
+      out: '<b>Your order is on the way.</b> The courier will call you before arriving.',
+      rest: a => `Pay <b>${a}</b> to the courier, in cash or by InstaPay.`, noRest: 'Everything is paid; there is nothing to pay on delivery.',
+      delivered: 'Delivered. Thank you for ordering from us!',
+      requested: '<b>We’ll bring it with the next box from Germany.</b> When it arrives we’ll ask you here (and on WhatsApp) to confirm. You pay the rest only then.',
+      reqPay: a => `<b>To reserve it, send the ${a} down payment by InstaPay</b> and upload the screenshot below.`,
+      reqCheck: '<b>Nothing more to do.</b> We got your screenshot and are checking the down payment. We’ll bring the product with the next box.',
+      offered: '<b>It’s here!</b> Tap “Yes, I still want it” within 24 hours and we’ll deliver it like a normal order.',
+      cancelled: 'You cancelled this order.', declined: 'We couldn’t fill this order.' },
     refundQ: a => `What should we do with your ${a} down payment?`, refundTo: 'Refund to my InstaPay', refundInput: 'Your InstaPay address or number',
     asCredit: 'Keep as credit', refundChosen: p => `Refund to ${p}`, creditChosen: 'Kept as credit', refundDone: 'Refund sent ✓', creditDone: 'Added to your credit ✓',
     why: 'Message from the shop', wa: 'Questions? WhatsApp us', declinedNote: 'Sorry, we couldn’t fill this one.',
@@ -74,16 +88,30 @@ const W = {
     payNow: p => `ادفع الآن عبر InstaPay (${p}%)`, payLater: 'عند الاستلام', reqDown: p => `عربون طلبات المنتجات (${p}%)`,
     reqNote: 'تدفع باقي ثمن طلب المنتج عند وصوله وتأكيدك له. يمكنك الإلغاء في أي وقت قبل ذلك.',
     place: 'أرسل الطلب', placing: 'جارٍ الإرسال…', need: 'من فضلك اكتب الاسم والعنوان.', needPhone: 'من فضلك اكتب رقم موبايل يمكننا التواصل معك عليه، مثل 01012345678.',
-    done: 'شكرًا! وصلنا طلبك.', doneSub: 'سنؤكده قريبًا. تابعه من «طلباتي».',
+    done: 'شكرًا! وصلنا طلبك.', doneSub: 'هذا ما سيحدث بعد ذلك. يمكنك الرجوع إليه في أي وقت من «طلباتي» (أيقونة الشخص بالأعلى).',
     payBox: 'الدفع عبر InstaPay', payTo: 'حوّل إلى', amount: 'المبلغ', ref: 'اكتب في ملاحظة التحويل', copy: 'نسخ', copied: 'تم النسخ',
     upload: 'ارفع صورة التحويل', uploading: 'جارٍ الرفع…', proofSent: 'تم إرسال الصورة ✓ سنراجعها.', replace: 'استبدال',
     proofOk: 'تم إرسال الصورة', tooBig: 'تعذّرت قراءة الصورة. جرّب لقطة شاشة.',
     mine: 'طلباتي', noOrders: 'لا توجد طلبات بعد.', signinMine: 'سجّل الدخول لترى طلباتك.', yourCredit: 'رصيدك',
     creditNote: 'يُخصم تلقائيًا من طلبك القادم.', creditRefund: 'اطلب استرداده', creditAsked: 'طلبت الاسترداد. سنرسله إلى',
     st: { new: 'في انتظار التأكيد', newPay: 'في انتظار العربون', confirmed: 'تم التأكيد ونجهّزه', out: 'في الطريق إليك', delivered: 'تم التوصيل',
-      requested: 'تم الطلب · سنخبرك عند وصوله', offered: 'وصل! من فضلك أكّد خلال 24 ساعة', declined: 'مرفوض', cancelled: 'ملغي' },
-    paid: 'مدفوع ✓', notPaid: 'لم يُدفع بعد', checkingPay: 'أرسلت الصورة، نراجعها',
-    cancel: 'إلغاء', cancelAsk: 'إلغاء هذا الطلب؟', confirmOffer: 'نعم، ما زلت أريده', keep: 'احتفظ به',
+      requested: 'تم الطلب', offered: 'وصل، من فضلك أكّد', declined: 'مرفوض', cancelled: 'ملغي' },
+    paid: 'مدفوع ✓', notPaid: 'لم يُدفع بعد', checkingPay: 'نراجع دفعتك',
+    cancel: 'إلغاء الطلب', cancelReq: 'إلغاء طلب المنتج', cancelAsk: 'إلغاء هذا الطلب؟', cancelAskPaid: a => `إلغاء هذا الطلب؟ ستختار بعدها هل يعود مبلغ ${a} إلى InstaPay الخاص بك أم يبقى كرصيد.`, confirmOffer: 'نعم، ما زلت أريده', keep: 'احتفظ به',
+    next: 'ماذا سيحدث بعد ذلك', steps: { sent: 'أُرسل', pay: 'العربون', check: 'مراجعة الدفع', confirmed: 'تم التأكيد', out: 'في الطريق', delivered: 'تم التوصيل', requested: 'تم الطلب', arrives: 'يصل إلى مصر', yours: 'تؤكد أنت' },
+    nx: {
+      pay: a => `<b>حوّل ${a} عبر InstaPay</b> باستخدام البيانات بالأسفل، ثم ارفع صورة التحويل. نؤكد طلبك فور وصول المبلغ.`,
+      check: '<b>لا شيء مطلوب منك.</b> وصلتنا الصورة ونراجع التحويل، عادةً خلال ساعات قليلة. بعدها يظهر طلبك هنا مؤكدًا، وقد نراسلك على واتساب.',
+      confirm: '<b>لا شيء مطلوب منك.</b> نراجع المخزون وسنؤكد طلبك قريبًا، عادةً خلال ساعات قليلة.',
+      prep: '<b>تم تأكيد طلبك</b> ونجهّزه الآن. سنخبرك عند خروجه للتوصيل.',
+      out: '<b>طلبك في الطريق.</b> سيتصل بك المندوب قبل الوصول.',
+      rest: a => `ادفع <b>${a}</b> للمندوب، نقدًا أو عبر InstaPay.`, noRest: 'تم دفع كل شيء؛ لا يوجد ما تدفعه عند الاستلام.',
+      delivered: 'تم التوصيل. شكرًا لطلبك منا!',
+      requested: '<b>سنحضره مع الشحنة القادمة من ألمانيا.</b> عند وصوله سنطلب منك هنا (وعلى واتساب) أن تؤكد. تدفع الباقي حينها فقط.',
+      reqPay: a => `<b>لحجزه، حوّل العربون ${a} عبر InstaPay</b> وارفع صورة التحويل بالأسفل.`,
+      reqCheck: '<b>لا شيء مطلوب منك.</b> وصلتنا الصورة ونراجع العربون. سنحضر المنتج مع الشحنة القادمة.',
+      offered: '<b>وصل!</b> اضغط «نعم، ما زلت أريده» خلال 24 ساعة وسنوصله لك كطلب عادي.',
+      cancelled: 'ألغيت هذا الطلب.', declined: 'لم نتمكن من تنفيذ هذا الطلب.' },
     refundQ: a => `ماذا نفعل بعربونك (${a})؟`, refundTo: 'استرداد إلى InstaPay الخاص بي', refundInput: 'عنوان أو رقم InstaPay الخاص بك',
     asCredit: 'احتفظ به كرصيد', refundChosen: p => `استرداد إلى ${p}`, creditChosen: 'محفوظ كرصيد', refundDone: 'تم الاسترداد ✓', creditDone: 'أُضيف إلى رصيدك ✓',
     why: 'رسالة من المتجر', wa: 'أسئلة؟ راسلنا على واتساب', declinedNote: 'نعتذر، لم نتمكن من تنفيذ هذا الطلب.',
@@ -262,29 +290,68 @@ function cartHTML() {
 }
 function payBox(o) {
   if (!(num(o.down) > 0) || o.downPaid || !openFor(o)) return '';
+  if (o.proof) return `<p class="ok proofok">${t('proofSent')} <button type="button" class="linkbtn" data-proof="${esc(o.id)}">${t('replace')}</button></p>`;
   const cp = (v, l) => `<div class="cp"><small>${l}</small><b dir="ltr">${esc(v)}</b><button type="button" class="linkbtn" data-copy="${esc(v)}">${t('copy')}</button></div>`;
   return `<div class="paybox"><h4>${t('payBox')}</h4>${SET.instapay ? cp(SET.instapay, t('payTo')) : ''}${cp(String(Math.round(num(o.down))), t('amount') + ' (EGP)')}${cp('#' + o.code, t('ref'))}
-    ${o.proof ? `<p class="ok">${t('proofSent')} <button type="button" class="linkbtn" data-proof="${esc(o.id)}">${t('replace')}</button></p>`
-      : `<button type="button" class="btn full" data-proof="${esc(o.id)}"${P.busy === 'proof:' + o.id ? ' disabled' : ''}>${P.busy === 'proof:' + o.id ? t('uploading') : t('upload')}</button>`}</div>`;
+    <button type="button" class="btn full" data-proof="${esc(o.id)}"${P.busy === 'proof:' + o.id ? ' disabled' : ''}>${P.busy === 'proof:' + o.id ? t('uploading') : t('upload')}</button></div>`;
+}
+/* where the order is, as steps: done, now (the customer acts), wait (we act), todo.
+   The down payment steps only show when there is one */
+function stepsOf(o) {
+  const S = W[LANG].steps, dp = num(o.down) > 0, st = o.status, paid = !!o.downPaid, sent = paid || !!o.proof;
+  const ready = !dp || paid;
+  const at = {
+    sent: 'done', requested: 'done',
+    pay: sent ? 'done' : 'now',
+    check: paid ? 'done' : o.proof ? 'wait' : 'todo',
+    confirmed: ['confirmed', 'out', 'delivered'].includes(st) ? 'done' : st === 'new' && ready ? 'wait' : 'todo',
+    out: st === 'delivered' ? 'done' : st === 'out' ? 'now' : 'todo',
+    delivered: st === 'delivered' ? 'done' : 'todo',
+    arrives: st === 'offered' ? 'done' : st === 'requested' && ready ? 'wait' : 'todo',
+    yours: st === 'offered' ? 'now' : 'todo'
+  };
+  const keys = o.kind === 'request' && st !== 'new' && !['confirmed', 'out', 'delivered'].includes(st)
+    ? ['requested', ...(dp ? ['pay'] : []), 'arrives', 'yours']
+    : ['sent', ...(dp ? ['pay', 'check'] : []), 'confirmed', 'out', 'delivered'];
+  return keys.map(k => [S[k], at[k]]);
+}
+/* one short paragraph: what the customer does now, or that there is nothing to do */
+function nextOf(o) {
+  const N = W[LANG].nx, dp = num(o.down) > 0, due = money(num(o.down));
+  const rest = Math.max(0, num(o.total) - (o.downPaid ? num(o.down) : 0));
+  const pay = rest > 0 ? N.rest(money(rest)) : N.noRest;
+  if (o.status === 'cancelled') return N.cancelled;
+  if (o.status === 'declined') return N.declined + (o.declineMsg ? ` ${t('why')}: “${esc(o.declineMsg)}”` : '');
+  if (o.status === 'delivered') return N.delivered;
+  if (o.status === 'offered') return N.offered;
+  if (o.status === 'requested') return dp && !o.downPaid ? (o.proof ? N.reqCheck : N.reqPay(due)) : N.requested;
+  if (o.status === 'out') return `${N.out} ${pay}`;
+  if (o.status === 'confirmed') return `${N.prep} ${pay}`;
+  if (dp && !o.downPaid) return o.proof ? N.check : N.pay(due);
+  return `${N.confirm} ${pay}`;
 }
 function orderHTML(o) {
-  const S = W[LANG].st, label = o.status === 'new' && num(o.down) > 0 && !o.downPaid ? S.newPay : S[o.status] || o.status;
+  const S = W[LANG].st, label = o.status === 'new' && num(o.down) > 0 && !o.downPaid ? (o.proof ? t('checkingPay') : S.newPay) : S[o.status] || o.status;
   const cls = { new: 'warn', offered: 'warn', confirmed: 'ok', out: 'ok', delivered: 'ok', declined: 'bad', cancelled: 'bad', requested: '' }[o.status] || '';
-  const back = (o.downPaid || o.proof) ? num(o.down) : 0, act = [];
-  if (o.status === 'offered') act.push(`<button type="button" class="btn" data-mine="take:${o.id}">${t('confirmOffer')}</button>`);
-  if (openFor(o) && P.cancelling !== o.id) act.push(`<button type="button" class="btn ghost" data-mine="cancel:${o.id}">${t('cancel')}</button>`);
+  const back = (o.downPaid || o.proof) ? num(o.down) : 0, closed = ['declined', 'cancelled'].includes(o.status);
   let refund = '';
   const choose = `<p class="note"><b>${t('refundQ', money(back))}</b></p><div class="inrow"><input id="refto-${esc(o.id)}" placeholder="${t('refundInput')}" dir="ltr" value="${esc(ME.instapay || '')}"><button type="button" class="btn" data-mine="${P.cancelling === o.id ? 'cxrefund' : 'refund'}:${o.id}">${t('refundTo')}</button></div>
     <button type="button" class="btn ghost full" data-mine="${P.cancelling === o.id ? 'cxcredit' : 'credit'}:${o.id}">${t('asCredit')}</button>`;
-  if (P.cancelling === o.id) refund = back ? choose + `<button type="button" class="linkbtn" data-mine="nocx:${o.id}">${t('keep')}</button>` : '';
-  else if (['declined', 'cancelled'].includes(o.status) && back) refund = o.refundDone ? `<p class="ok">${o.refund === 'credit' ? t('creditDone') : t('refundDone')}</p>`
-    : o.refund ? `<p class="note">${o.refund === 'credit' ? t('creditChosen') : t('refundChosen', `<span dir="ltr">${esc(o.refundTo || '')}</span>`)}</p>` : choose;
+  if (P.cancelling === o.id) refund = back ? `<div class="refbox">${choose}<button type="button" class="linkbtn" data-mine="nocx:${o.id}">${t('keep')}</button></div>` : '';
+  else if (closed && back) refund = `<div class="refbox">${o.refundDone ? `<p class="ok">${o.refund === 'credit' ? t('creditDone') : t('refundDone')}</p>`
+    : o.refund ? `<p class="note">${o.refund === 'credit' ? t('creditChosen') : t('refundChosen', `<span dir="ltr">${esc(o.refundTo || '')}</span>`)}</p>` : choose}</div>`;
+  const steps = closed ? '' : `<ol class="steps">${stepsOf(o).map(([l, s]) => `<li class="${s}"><i></i><span>${l}</span></li>`).join('')}</ol>`;
+  const take = o.status === 'offered' ? `<button type="button" class="btn full" data-mine="take:${o.id}">${t('confirmOffer')}</button>` : '';
+  const cancel = openFor(o) && P.cancelling !== o.id ? `<button type="button" class="linkbtn cxl" data-mine="cancel:${o.id}">${o.kind === 'request' ? t('cancelReq') : t('cancel')}</button>` : '';
   return `<article class="mo"><div class="moh"><b>#${esc(o.code)}</b><span class="pill ${cls}">${label}</span></div><small class="sub">${when(o.createdAt)}</small>
+    ${steps}
+    <div class="next ${closed ? 'closed' : ''}">${closed ? '' : `<small>${t('next')}</small>`}<p>${nextOf(o)}</p></div>
+    ${take}${payBox(o)}${refund}
+    <details class="mod"${o.status === 'delivered' || closed ? '' : ' open'}><summary>${t('items', (o.lines || []).reduce((a, l) => a + num(l.qty), 0))} · ${money(num(o.total))}</summary>
     <ul class="cl">${(o.lines || []).map(l => `<li><div class="li"><b>${num(l.qty)} × <bdi>${esc(l.name)}</bdi></b><small><bdi>${esc(l.brand || '')}</bdi></small></div><b class="lt">${money(num(l.qty) * num(l.price))}</b></li>`).join('')}</ul>
     ${num(o.delivery) ? row(t('delivery'), money(num(o.delivery))) : ''}${num(o.creditUsed) ? row(t('credit'), '−' + money(num(o.creditUsed))) : ''}${row(t('total'), money(num(o.total)), 'big')}
-    ${num(o.down) > 0 ? row(o.kind === 'request' ? t('reqDown', num(o.downPct)) : t('payNow', num(o.downPct)), `${money(num(o.down))} · ${o.downPaid ? t('paid') : o.proof ? t('checkingPay') : t('notPaid')}`, 'down') : ''}
-    ${o.status === 'declined' ? `<p class="note">${o.declineMsg ? `${t('why')}: “${esc(o.declineMsg)}”` : t('declinedNote')}</p>` : ''}
-    ${payBox(o)}${refund}${act.length && P.cancelling !== o.id ? `<div class="moact">${act.join('')}</div>` : ''}</article>`;
+    ${num(o.down) > 0 ? row(o.kind === 'request' ? t('reqDown', num(o.downPct)) : t('payNow', num(o.downPct)), `${money(num(o.down))} · ${o.downPaid ? t('paid') : o.proof ? t('checkingPay') : t('notPaid')}`, 'down') : ''}</details>
+    ${cancel}</article>`;
 }
 function doneHTML() {
   const list = P.placed.map(p => MINE.find(o => o.id === p.id) || p);
@@ -455,7 +522,7 @@ document.addEventListener('click', e => {
       S.updateDoc(S.doc(fs, 'customers', USER.uid), { creditRefundTo: v, creditRefundAt: now }).then(() => { P.creditAsk = false; drawPanel(); }).catch(x => { P.err = errMsg(x); drawPanel(); }); return; }
     if (!o) return;
     if (act === 'take') return updMine(id, { status: 'new' });
-    if (act === 'cancel') { if (!confirm(t('cancelAsk'))) return; if ((o.downPaid || o.proof) && num(o.down) > 0) { P.cancelling = id; return drawPanel(); } return updMine(id, { status: 'cancelled', cancelledAt: now }); }
+    if (act === 'cancel') { const paidBack = (o.downPaid || o.proof) && num(o.down) > 0; if (!confirm(paidBack ? t('cancelAskPaid', money(num(o.down))) : t('cancelAsk'))) return; if ((o.downPaid || o.proof) && num(o.down) > 0) { P.cancelling = id; return drawPanel(); } return updMine(id, { status: 'cancelled', cancelledAt: now }); }
     if (act === 'nocx') { P.cancelling = ''; return drawPanel(); }
     if (act === 'cxrefund' || act === 'refund') { const v = refTo(); if (!v) { const i = document.getElementById('refto-' + id); if (i) i.focus(); return; }
       return updMine(id, Object.assign({ refund: 'refund', refundTo: v }, act === 'cxrefund' ? { status: 'cancelled', cancelledAt: now } : {})); }
