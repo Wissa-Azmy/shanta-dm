@@ -13,6 +13,8 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 const num = v => +v || 0;
 const REQ_MAX = 10;
 const GICON = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.7l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
+const KORD = '<svg viewBox="0 0 24 24"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.8" fill="currentColor"/><circle cx="17" cy="17.5" r="1.8" fill="currentColor"/></svg>';
+const KREQ = '<svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
 
 /* ---- words ---- */
 let LANG = localStorage.getItem('shop-lang') || (/^ar/i.test(navigator.language || '') ? 'ar' : 'en');
@@ -47,6 +49,8 @@ const W = {
       requested: 'Requested', offered: 'It’s here, please confirm', declined: 'Declined', cancelled: 'Cancelled' },
     paid: 'paid ✓', notPaid: 'not paid yet', checkingPay: 'Checking your payment',
     cancel: 'Cancel order', cancelReq: 'Cancel request', cancelAsk: 'Cancel this order?', cancelAskPaid: a => `Cancel this order? You choose next whether your ${a} comes back to your InstaPay or stays as credit.`, confirmOffer: 'Yes, I still want it', keep: 'Keep it',
+    kOrder: 'Order', kOrderSub: 'In stock in Egypt · delivered to you', kReq: 'Request', kReqSub: 'Not in Egypt yet · comes with the next box from Germany',
+    together: c => `Placed together with #${c}`,
     next: 'What happens next', steps: { sent: 'Sent', pay: 'Down payment', check: 'Payment check', confirmed: 'Confirmed', out: 'On the way', delivered: 'Delivered', requested: 'Requested', arrives: 'Arrives in Egypt', yours: 'You confirm' },
     nx: {
       pay: a => `<b>Send ${a} by InstaPay</b> using the details below, then upload a screenshot of the transfer. We confirm your order as soon as it arrives.`,
@@ -98,6 +102,8 @@ const W = {
       requested: 'تم الطلب', offered: 'وصل، من فضلك أكّد', declined: 'مرفوض', cancelled: 'ملغي' },
     paid: 'مدفوع ✓', notPaid: 'لم يُدفع بعد', checkingPay: 'نراجع دفعتك',
     cancel: 'إلغاء الطلب', cancelReq: 'إلغاء طلب المنتج', cancelAsk: 'إلغاء هذا الطلب؟', cancelAskPaid: a => `إلغاء هذا الطلب؟ ستختار بعدها هل يعود مبلغ ${a} إلى InstaPay الخاص بك أم يبقى كرصيد.`, confirmOffer: 'نعم، ما زلت أريده', keep: 'احتفظ به',
+    kOrder: 'طلب', kOrderSub: 'متوفر في مصر · يصلك بالتوصيل', kReq: 'طلب منتج', kReqSub: 'غير موجود في مصر بعد · يصل مع الشحنة القادمة من ألمانيا',
+    together: c => `أُرسل مع الطلب #${c}`,
     next: 'ماذا سيحدث بعد ذلك', steps: { sent: 'أُرسل', pay: 'العربون', check: 'مراجعة الدفع', confirmed: 'تم التأكيد', out: 'في الطريق', delivered: 'تم التوصيل', requested: 'تم الطلب', arrives: 'يصل إلى مصر', yours: 'تؤكد أنت' },
     nx: {
       pay: a => `<b>حوّل ${a} عبر InstaPay</b> باستخدام البيانات بالأسفل، ثم ارفع صورة التحويل. نؤكد طلبك فور وصول المبلغ.`,
@@ -295,7 +301,7 @@ function payBox(o) {
   return `<div class="paybox"><h4>${t('payBox')}</h4>${SET.instapay ? cp(SET.instapay, t('payTo')) : ''}${cp(String(Math.round(num(o.down))), t('amount') + ' (EGP)')}${cp('#' + o.code, t('ref'))}
     <button type="button" class="btn full" data-proof="${esc(o.id)}"${P.busy === 'proof:' + o.id ? ' disabled' : ''}>${P.busy === 'proof:' + o.id ? t('uploading') : t('upload')}</button></div>`;
 }
-/* where the order is, as steps: done, now (the customer acts), wait (we act), todo.
+/* where the order is, as steps: done, now (the customer acts), wait (we act), later (not reached yet).
    The down payment steps only show when there is one */
 function stepsOf(o) {
   const S = W[LANG].steps, dp = num(o.down) > 0, st = o.status, paid = !!o.downPaid, sent = paid || !!o.proof;
@@ -303,12 +309,12 @@ function stepsOf(o) {
   const at = {
     sent: 'done', requested: 'done',
     pay: sent ? 'done' : 'now',
-    check: paid ? 'done' : o.proof ? 'wait' : 'todo',
-    confirmed: ['confirmed', 'out', 'delivered'].includes(st) ? 'done' : st === 'new' && ready ? 'wait' : 'todo',
-    out: st === 'delivered' ? 'done' : st === 'out' ? 'now' : 'todo',
-    delivered: st === 'delivered' ? 'done' : 'todo',
-    arrives: st === 'offered' ? 'done' : st === 'requested' && ready ? 'wait' : 'todo',
-    yours: st === 'offered' ? 'now' : 'todo'
+    check: paid ? 'done' : o.proof ? 'wait' : 'later',
+    confirmed: ['confirmed', 'out', 'delivered'].includes(st) ? 'done' : st === 'new' && ready ? 'wait' : 'later',
+    out: st === 'delivered' ? 'done' : st === 'out' ? 'now' : 'later',
+    delivered: st === 'delivered' ? 'done' : 'later',
+    arrives: st === 'offered' ? 'done' : st === 'requested' && ready ? 'wait' : 'later',
+    yours: st === 'offered' ? 'now' : 'later'
   };
   const keys = o.kind === 'request' && st !== 'new' && !['confirmed', 'out', 'delivered'].includes(st)
     ? ['requested', ...(dp ? ['pay'] : []), 'arrives', 'yours']
@@ -343,7 +349,9 @@ function orderHTML(o) {
   const steps = closed ? '' : `<ol class="steps">${stepsOf(o).map(([l, s]) => `<li class="${s}"><i></i><span>${l}</span></li>`).join('')}</ol>`;
   const take = o.status === 'offered' ? `<button type="button" class="btn full" data-mine="take:${o.id}">${t('confirmOffer')}</button>` : '';
   const cancel = openFor(o) && P.cancelling !== o.id ? `<button type="button" class="linkbtn cxl" data-mine="cancel:${o.id}">${o.kind === 'request' ? t('cancelReq') : t('cancel')}</button>` : '';
-  return `<article class="mo"><div class="moh"><b>#${esc(o.code)}</b><span class="pill ${cls}">${label}</span></div><small class="sub">${when(o.createdAt)}</small>
+  const req = o.kind === 'request', mate = o.group && [...MINE, ...P.placed].find(x => x.group === o.group && x.id !== o.id);
+  const kind = `<div class="kind"><span class="kic" aria-hidden="true">${req ? KREQ : KORD}</span><span><b>${req ? t('kReq') : t('kOrder')}</b><small>${req ? t('kReqSub') : t('kOrderSub')}</small></span></div>`;
+  return `<article class="mo ${req ? 'isreq' : 'isord'}">${kind}<div class="moh"><b>#${esc(o.code)}</b><span class="pill ${cls}">${label}</span></div><small class="sub">${when(o.createdAt)}${mate ? ` · ${t('together', esc(mate.code))}` : ''}</small>
     ${steps}
     <div class="next ${closed ? 'closed' : ''}">${closed ? '' : `<small>${t('next')}</small>`}<p>${nextOf(o)}</p></div>
     ${take}${payBox(o)}${refund}
