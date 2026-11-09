@@ -12,6 +12,7 @@ const ls = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null'
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
 const num = v => +v || 0;
 const REQ_MAX = 10;
+const GICON = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.7l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
 
 /* ---- words ---- */
 let LANG = localStorage.getItem('shop-lang') || (/^ar/i.test(navigator.language || '') ? 'ar' : 'en');
@@ -27,7 +28,7 @@ const W = {
     requests: 'Requests', reqSub: 'Not in Egypt now; we bring them with the next box', reqOnly: n => `${n} in stock, the rest as a request`,
     gone: 'No longer in the shop', remove: 'Remove', close: 'Close', added: 'Added to the cart', requested: 'Added as a request',
     items: n => n === 1 ? '1 item' : `${n} items`, view: 'View cart',
-    signin: 'Sign in with your mobile', signinSub: 'We text you a code. No password.', phone: 'Mobile number', sendCode: 'Send code',
+    signin: 'Sign in with your mobile', signinSub: 'We text you a code, or use your Google account. No password.', or: 'or', google: 'Continue with Google', phoneNeed: 'Your mobile number, so the courier can reach you.', phone: 'Mobile number', sendCode: 'Send code',
     code: 'Code from the SMS', checkCode: 'Sign in', sentTo: p => `We sent a code to ${p}.`, changeNum: 'Change number', signedAs: p => `Signed in as ${p}`, signout: 'Sign out',
     sending: 'Sending…', checking: 'Checking…',
     details: 'Delivery details', name: 'Name', address: 'Area and address', note: 'Note (optional)',
@@ -35,7 +36,7 @@ const W = {
     goods: 'Products', delivery: 'Delivery', free: 'Free', credit: 'Your credit', total: 'Total', reqTotal: 'Requests total',
     payNow: p => `Pay now by InstaPay (${p}%)`, payLater: 'On delivery', reqDown: p => `Down payment on requests (${p}%)`,
     reqNote: 'You pay the rest of a request when it arrives and you confirm it. You can cancel any time before.',
-    place: 'Place order', placing: 'Sending…', need: 'Please fill in your name and address.',
+    place: 'Place order', placing: 'Sending…', need: 'Please fill in your name and address.', needPhone: 'Please enter a mobile number we can reach, e.g. 01012345678.',
     done: 'Thank you! Your order is in.', doneSub: 'We confirm it soon. Follow it under “My orders”.',
     payBox: 'Pay by InstaPay', payTo: 'Send to', amount: 'Amount', ref: 'Write in the transfer note', copy: 'Copy', copied: 'Copied',
     upload: 'Upload the screenshot', uploading: 'Uploading…', proofSent: 'Screenshot sent ✓ We’ll check it.', replace: 'Replace',
@@ -64,7 +65,7 @@ const W = {
     requests: 'طلبات المنتجات', reqSub: 'غير موجود في مصر الآن؛ نحضره مع الشحنة القادمة', reqOnly: n => `${n} متوفر، والباقي كطلب`,
     gone: 'لم يعد في المتجر', remove: 'إزالة', close: 'إغلاق', added: 'أُضيف إلى السلة', requested: 'أُضيف كطلب',
     items: n => n === 1 ? 'منتج واحد' : `${n} منتجات`, view: 'اعرض السلة',
-    signin: 'سجّل الدخول برقم موبايلك', signinSub: 'نرسل لك كودًا في رسالة. بدون كلمة سر.', phone: 'رقم الموبايل', sendCode: 'أرسل الكود',
+    signin: 'سجّل الدخول برقم موبايلك', signinSub: 'نرسل لك كودًا في رسالة، أو استخدم حساب Google. بدون كلمة سر.', or: 'أو', google: 'المتابعة باستخدام Google', phoneNeed: 'رقم موبايلك ليتواصل معك المندوب.', phone: 'رقم الموبايل', sendCode: 'أرسل الكود',
     code: 'الكود من الرسالة', checkCode: 'تسجيل الدخول', sentTo: p => `أرسلنا كودًا إلى ${p}.`, changeNum: 'غيّر الرقم', signedAs: p => `مسجّل باسم ${p}`, signout: 'تسجيل الخروج',
     sending: 'جارٍ الإرسال…', checking: 'جارٍ التحقق…',
     details: 'بيانات التوصيل', name: 'الاسم', address: 'المنطقة والعنوان', note: 'ملاحظة (اختياري)',
@@ -72,7 +73,7 @@ const W = {
     goods: 'المنتجات', delivery: 'التوصيل', free: 'مجاني', credit: 'رصيدك', total: 'الإجمالي', reqTotal: 'إجمالي الطلبات',
     payNow: p => `ادفع الآن عبر InstaPay (${p}%)`, payLater: 'عند الاستلام', reqDown: p => `عربون طلبات المنتجات (${p}%)`,
     reqNote: 'تدفع باقي ثمن طلب المنتج عند وصوله وتأكيدك له. يمكنك الإلغاء في أي وقت قبل ذلك.',
-    place: 'أرسل الطلب', placing: 'جارٍ الإرسال…', need: 'من فضلك اكتب الاسم والعنوان.',
+    place: 'أرسل الطلب', placing: 'جارٍ الإرسال…', need: 'من فضلك اكتب الاسم والعنوان.', needPhone: 'من فضلك اكتب رقم موبايل يمكننا التواصل معك عليه، مثل 01012345678.',
     done: 'شكرًا! وصلنا طلبك.', doneSub: 'سنؤكده قريبًا. تابعه من «طلباتي».',
     payBox: 'الدفع عبر InstaPay', payTo: 'حوّل إلى', amount: 'المبلغ', ref: 'اكتب في ملاحظة التحويل', copy: 'نسخ', copied: 'تم النسخ',
     upload: 'ارفع صورة التحويل', uploading: 'جارٍ الرفع…', proofSent: 'تم إرسال الصورة ✓ سنراجعها.', replace: 'استبدال',
@@ -131,7 +132,7 @@ function listen() {
   if (!USER) return;
   const { S, fs } = FBX;
   unsub.push(S.onSnapshot(S.doc(fs, 'customers', USER.uid), d => { CUST = d.exists() ? d.data() : null;
-    if (CUST) { ['name', 'address'].forEach(k => { if (!ME[k] && CUST[k]) ME[k] = CUST[k]; }); save('shop-me', ME); } draw(); }, e => console.warn(e)));
+    if (CUST) { ['name', 'address'].forEach(k => { if (!ME[k] && CUST[k]) ME[k] = CUST[k]; }); if (!ME.phone && CUST.phone) ME.phone = CUST.phone.replace(/^[+]20/, '0'); save('shop-me', ME); } draw(); }, e => console.warn(e)));
   unsub.push(S.onSnapshot(S.query(S.collection(fs, 'orders'), S.where('uid', '==', USER.uid)), q => {
     MINE = q.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); draw(); }, e => console.warn(e)));
 }
@@ -229,11 +230,13 @@ function lineHTML(x) {
 }
 const row = (l, v, cls) => `<p class="tot${cls ? ' ' + cls : ''}"><span>${l}</span><b>${v}</b></p>`;
 function signinHTML() {
-  if (USER) return `<p class="signed">${t('signedAs', `<span dir="ltr">${esc(USER.phoneNumber || '')}</span>`)} <button type="button" class="linkbtn" data-act="signout">${t('signout')}</button></p>`;
+  if (USER) return `<p class="signed">${t('signedAs', `<span dir="ltr">${esc(USER.phoneNumber || USER.email || '')}</span>`)} <button type="button" class="linkbtn" data-act="signout">${t('signout')}</button></p>`;
   if (P.conf) return `<section><h3>${t('signin')}</h3><p class="note">${t('sentTo', `<span dir="ltr">${esc(P.phone)}</span>`)} <button type="button" class="linkbtn" data-act="renum">${t('changeNum')}</button></p>
     <div class="inrow"><input id="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${t('code')}" dir="ltr"><button type="button" class="btn" data-act="code"${P.busy ? ' disabled' : ''}>${P.busy === 'code' ? t('checking') : t('checkCode')}</button></div>${errHTML()}</section>`;
   return `<section><h3>${t('signin')}<small>${t('signinSub')}</small></h3>
-    <div class="inrow"><input id="phonein" type="tel" inputmode="tel" autocomplete="tel" placeholder="01012345678" value="${esc(P.phone)}" dir="ltr"><button type="button" class="btn" id="sendcode" data-act="send"${P.busy ? ' disabled' : ''}>${P.busy === 'send' ? t('sending') : t('sendCode')}</button></div>${errHTML()}</section>`;
+    <div class="inrow"><input id="phonein" type="tel" inputmode="tel" autocomplete="tel" placeholder="01012345678" value="${esc(P.phone)}" dir="ltr"><button type="button" class="btn" id="sendcode" data-act="send"${P.busy ? ' disabled' : ''}>${P.busy === 'send' ? t('sending') : t('sendCode')}</button></div>${errHTML()}
+    <div class="or"><span>${t('or')}</span></div>
+    <button type="button" class="gbtn" data-act="google"${P.busy ? ' disabled' : ''}>${GICON}${P.busy === 'google' ? t('checking') : t('google')}</button></section>`;
 }
 function cartHTML() {
   const L = lines(), open = SET.open !== false;
@@ -245,7 +248,7 @@ function cartHTML() {
     ${L.r.length ? `<section class="rq"><h3>${t('requests')}<small>${t('reqSub')}</small></h3><ul class="cl">${L.r.map(lineHTML).join('')}</ul></section>` : ''}
     ${L.gone.length ? `<p class="note">${t('gone')}: ${L.gone.length} <button type="button" class="linkbtn" data-act="dropgone">${t('remove')}</button></p>` : ''}
     ${signinHTML()}
-    ${USER ? `<section><h3>${t('details')}</h3><div class="fg">${f('name', t('name'), 'text', 'autocomplete="name"')}${f('address', t('address'), 'text', 'autocomplete="street-address"')}${f('note', t('note'), 'text')}</div></section>
+    ${USER ? `<section><h3>${t('details')}</h3><div class="fg">${f('name', t('name'), 'text', 'autocomplete="name"')}${USER.phoneNumber ? '' : f('phone', t('phone'), 'tel', 'autocomplete="tel" inputmode="tel" dir="ltr" placeholder="01012345678"')}${f('address', t('address'), 'text', 'autocomplete="street-address"')}${f('note', t('note'), 'text')}</div></section>
     ${L.o.length && SET.instapay ? `<section><h3>${t('payHow')}</h3><div class="pms">${m('cod', t('cod'), t('codSub'))}${m('instapay', t('insta'), t('instaSub'))}</div></section>` : ''}
     <section class="sum">
       ${L.o.length ? row(t('goods'), money(L.og)) + row(t('delivery'), L.od ? money(L.od) : t('free')) + (L.oc ? row(t('credit'), '−' + money(L.oc)) : '') + row(t('total'), money(L.ot), 'big')
@@ -342,6 +345,15 @@ async function sendCode() {
   } catch (e) { console.warn(e); P.err = errMsg(e); try { sendCode.v && sendCode.v.clear(); } catch (x) { } sendCode.v = null; $('#recap').innerHTML = ''; }
   P.busy = ''; drawPanel(); const c = $('#codein'); if (c) c.focus();
 }
+/* Google: free, but the phone number is typed in at checkout, not checked */
+async function google() {
+  P.busy = 'google'; P.err = ''; drawPanel();
+  try { const { U, auth } = await fbx(); const pr = new U.GoogleAuthProvider(); pr.setCustomParameters({ prompt: 'select_account' });
+    try { await U.signInWithPopup(auth, pr); }
+    catch (e) { if (/popup-blocked|operation-not-supported/.test(e && e.code || '')) return U.signInWithRedirect(auth, pr); throw e; } }
+  catch (e) { console.warn(e); if (!/popup-closed|cancelled-popup/.test(e && e.code || '')) P.err = errMsg(e); }
+  P.busy = ''; draw();
+}
 async function checkCode() {
   const c = ($('#codein').value || '').replace(/\D/g, ''); if (c.length < 6) { P.err = t('errs').code; return drawPanel(); }
   P.busy = 'code'; P.err = ''; drawPanel();
@@ -356,16 +368,18 @@ const pack = a => a.map(x => ({ id: x.p.id, name: x.p.name, brand: x.p.brand || 
 async function place() {
   const L = lines();
   if (!String(ME.name || '').trim() || !String(ME.address || '').trim()) { P.err = t('need'); return drawPanel(); }
+  const phone = USER.phoneNumber || e164(ME.phone);
+  if (!/^[+][0-9]{10,15}$/.test(phone)) { P.err = t('needPhone'); return drawPanel(); }
   P.busy = 'place'; P.err = ''; drawPanel();
   try {
     const { S, fs } = FBX, now = new Date().toISOString(), b = S.writeBatch(fs), out = [];
-    const base = { uid: USER.uid, phone: USER.phoneNumber, name: ME.name.trim(), address: ME.address.trim(), note: String(ME.note || '').trim(), lang: LANG, createdAt: now };
+    const base = { uid: USER.uid, phone, verified: !!USER.phoneNumber, email: USER.email || '', name: ME.name.trim(), address: ME.address.trim(), note: String(ME.note || '').trim(), lang: LANG, createdAt: now };
     const group = newCode();
     if (L.o.length) out.push(Object.assign({}, base, { kind: 'order', status: 'new', method: L.method, lines: pack(L.o), goods: L.og, delivery: L.od, creditUsed: L.oc, total: L.ot, downPct: L.opct, down: L.odown, group, code: group }));
     if (L.r.length) out.push(Object.assign({}, base, { kind: 'request', status: 'requested', method: L.method, lines: pack(L.r), goods: L.rg, delivery: L.rd, creditUsed: L.rc, total: L.rt, downPct: L.rpct, down: L.rdown, group, code: L.o.length ? newCode() : group }));
     const cref = S.doc(fs, 'customers', USER.uid);
-    if (!CUST) b.set(cref, { name: base.name, phone: USER.phoneNumber, address: base.address, createdAt: now, updatedAt: now });
-    else if (CUST.name !== base.name || CUST.address !== base.address) b.update(cref, { name: base.name, address: base.address, updatedAt: now });
+    if (!CUST) b.set(cref, { name: base.name, phone, verified: base.verified, email: base.email, address: base.address, createdAt: now, updatedAt: now });
+    else if (CUST.name !== base.name || CUST.address !== base.address || (!base.verified && CUST.phone !== phone)) b.update(cref, Object.assign({ name: base.name, address: base.address, updatedAt: now }, base.verified ? {} : { phone }));
     P.placed = out.map(o => { const r = S.doc(S.collection(fs, 'orders')); b.set(r, o); return Object.assign({ id: r.id }, o); });
     await b.commit();
     Object.keys(CART).forEach(k => delete CART[k]); save('shop-cart', CART); delete ME.note; save('shop-me', ME);
@@ -436,6 +450,7 @@ document.addEventListener('click', e => {
   if (act === 'dropgone') { lines().gone.forEach(id => delete CART[id]); save('shop-cart', CART); draw(); }
   if (act === 'send') sendCode();
   if (act === 'code') checkCode();
+  if (act === 'google') google();
   if (act === 'renum') { P.conf = null; P.err = ''; drawPanel(); }
   if (act === 'signout') { FBX && FBX.U.signOut(FBX.auth); P.conf = null; }
   if (act === 'place') place();

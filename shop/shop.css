@@ -181,3 +181,8 @@ body.locked{overflow:hidden}
   .pms{grid-template-columns:1fr}
   .moh .pill{white-space:normal;text-align:end}
 }
+.or{display:flex;align-items:center;gap:10px;margin:12px 0 8px;color:var(--muted);font-size:12.5px}
+.or::before,.or::after{content:"";flex:1;border-top:1px dashed var(--line)}
+.gbtn{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:14.5px}
+.gbtn svg{width:18px;height:18px;flex:none}
+.gbtn[disabled]{opacity:.55;cursor:default}

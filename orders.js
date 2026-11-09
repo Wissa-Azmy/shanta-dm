@@ -144,7 +144,7 @@ function ordCard(o, R) {
   return `<div class="card sord${ordNeeds(o) ? ' needs' : ''}">
     <div class="sohead"><div><b class="notr">${esc(o.name || 'Customer')}</b> <span class="mono">#${esc(o.code || '')}</span><span class="sub">${esc(fDateTime(ordTime(o)))} · ${agoTxt(ordTime(o))}</span></div>
       <div class="sopills"><span class="pill ${st[1]}">${st[0]}</span><span class="pill">${o.method === 'instapay' ? 'InstaPay' : 'Cash on delivery'}</span>${o.kind === 'request' ? '<span class="pill warn">Request</span>' : ''}</div></div>
-    <p class="note"><a href="tel:${esc(o.phone)}" class="mono notr" dir="ltr">${esc(o.phone)}</a>${o.address ? ` · <span class="notr">${esc(o.address)}</span>` : ''}${o.note ? `<br>“<span class="notr">${esc(o.note)}</span>”` : ''}${num(c.credit) > 0 ? `<br>Credit balance: ${fEGP(num(c.credit))}` : ''}</p>
+    <p class="note"><a href="tel:${esc(o.phone)}" class="mono notr" dir="ltr">${esc(o.phone)}</a>${o.verified === false ? ' <span class="pill warn" title="Signed in with Google; the number was typed in, not checked by SMS">number not checked</span>' : ''}${o.address ? ` · <span class="notr">${esc(o.address)}</span>` : ''}${o.note ? `<br>“<span class="notr">${esc(o.note)}</span>”` : ''}${num(c.credit) > 0 ? `<br>Credit balance: ${fEGP(num(c.credit))}` : ''}</p>
     <ul class="mini">${(o.lines || []).map(line).join('')}
       ${num(o.delivery) ? `<li><span>Delivery</span><span>${fEGP(num(o.delivery))}</span></li>` : ''}
       ${num(o.creditUsed) ? `<li><span>Paid from credit</span><span>−${fEGP(num(o.creditUsed))}</span></li>` : ''}
@@ -158,7 +158,7 @@ function ordCard(o, R) {
 function custRow(c) {
   const log = (c.creditLog || []).slice().sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 4);
   const n = ShopOrd.orders.filter(o => o.uid === c.id).length, dp = c.downPct === undefined || c.downPct === null || c.downPct === '' ? '' : String(num(c.downPct));
-  return `<li class="scust"><span><b class="notr">${esc(c.name || '—')}</b><span class="sub"><span class="mono notr" dir="ltr">${esc(c.phone || '')}</span> · ${n} order${n === 1 ? '' : 's'}</span>
+  return `<li class="scust"><span><b class="notr">${esc(c.name || '—')}</b><span class="sub"><span class="mono notr" dir="ltr">${esc(c.phone || '')}</span>${c.verified === false ? ' (not checked)' : ''}${c.email ? ` · <span class="notr">${esc(c.email)}</span>` : ''} · ${n} order${n === 1 ? '' : 's'}</span>
       ${custNeeds(c) ? `<span class="note"><b>Asked for the credit as a refund</b> to <span class="mono notr" dir="ltr">${esc(c.creditRefundTo || '')}</span></span>` : ''}
       ${log.length ? `<span class="sub">${log.map(x => `${esc(fDate((x.at || '').slice(0, 10)))}: ${x.amount > 0 ? '+' : ''}${fEGP(x.amount)} <span class="notr">${esc(x.why || '')}</span>`).join('<br>')}</span>` : ''}</span>
     <span class="scact"><span class="sub">Credit</span><b>${fEGP(num(c.credit))}</b>

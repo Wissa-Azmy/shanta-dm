@@ -787,3 +787,5 @@ rx(/^only (\d+) in Egypt$/, (m, n) => `${n} فقط في مصر`); rx(/^(\d+) in 
 rx(/^Down payment (\d+)%$/, (m, n) => `العربون ${n}%`); rx(/^shop asks (\d+)% now$/, (m, n) => `المتجر يطلب ${n}% الآن`); rx(/^(\d+)% down payment$/, (m, n) => `عربون ${n}%`);
 rx(/^New shop (order|request) from (.+)$/, (m, k, n) => `${k === 'order' ? 'طلب' : 'طلب منتج'} جديد من المتجر من ${n}`);
 rx(/^Order #(\w+) confirmed$/, (m, c) => `تم تأكيد الطلب #${c}`);
+Object.assign(AR, { 'number not checked': 'الرقم غير مؤكد', 'Signed in with Google; the number was typed in, not checked by SMS': 'سجّل الدخول عبر Google؛ الرقم مكتوب يدويًا ولم يُتحقق منه برسالة' });
+rx(/^(.+) \(not checked\)$/, (m, p) => `${p} (غير مؤكد)`);

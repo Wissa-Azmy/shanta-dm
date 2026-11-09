@@ -511,29 +511,40 @@ service cloud.firestore {
       allow read: if true;
       allow write: if admin();
     }
-    // shop customers: signed in with their phone; credit and down payment are yours to set
+    // shop customers: signed in with their phone (verified by SMS) or Google (number typed in, not verified);
+    // credit and down payment are yours to set
     function me(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
     function changes() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
+    function smsPhone() {
+      return request.auth.token.get('phone_number', '');
+    }
+    // the SMS-checked number, or for Google customers a typed one marked unverified
+    function okPhone() {
+      return smsPhone() != ''
+        ? request.resource.data.phone == smsPhone() && request.resource.data.verified == true
+        : request.resource.data.phone is string && request.resource.data.phone.matches('^[+][0-9]{10,15}$') && request.resource.data.verified == false;
+    }
     match /customers/{uid} {
       allow read: if admin() || me(uid);
       allow create: if me(uid)
-        && request.resource.data.phone == request.auth.token.phone_number
-        && request.resource.data.keys().hasOnly(['name', 'phone', 'address', 'createdAt', 'updatedAt']);
+        && okPhone()
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'verified', 'email', 'address', 'createdAt', 'updatedAt']);
       allow update: if admin() || (me(uid)
-        && changes().hasOnly(['name', 'address', 'updatedAt', 'creditRefundTo', 'creditRefundAt']));
+        && changes().hasOnly(['name', 'address', 'phone', 'updatedAt', 'creditRefundTo', 'creditRefundAt'])
+        && (!changes().hasAny(['phone']) || (smsPhone() == '' && request.resource.data.phone.matches('^[+][0-9]{10,15}$'))));
       allow delete: if admin();
     }
     match /orders/{id} {
       allow read: if admin() || (request.auth != null && resource.data.uid == request.auth.uid);
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.phone == request.auth.token.phone_number
+        && okPhone()
         && request.resource.data.status in ['new', 'requested']
-        && request.resource.data.keys().hasOnly(['uid', 'phone', 'name', 'address', 'note', 'lang', 'kind', 'status', 'method',
+        && request.resource.data.keys().hasOnly(['uid', 'phone', 'verified', 'email', 'name', 'address', 'note', 'lang', 'kind', 'status', 'method',
              'lines', 'goods', 'delivery', 'creditUsed', 'total', 'downPct', 'down', 'group', 'code', 'createdAt'])
         && (request.resource.data.creditUsed == 0
             || request.resource.data.creditUsed <= get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.get('credit', 0))
@@ -576,7 +587,7 @@ service cloud.firestore {
       <div class="fgrid">
         <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none"></div>
         <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none"></div>
-        <div class="f span"><textarea id="cl_rules" readonly rows="30" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
+        <div class="f span"><textarea id="cl_rules" readonly rows="40" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
       </div>
       <p class="note">Forgotten password: in Firebase open Users, click ⋮ next to the person and choose Reset password; they get an email to set a new one. Nothing in the ledger is lost.</p></details>`;
   }
