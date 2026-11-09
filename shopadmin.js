@@ -37,7 +37,7 @@ const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: 
 const shopSettingsDoc = () => { const s = db.settings;
   const pct = v => Math.max(0, Math.min(100, num(v)));
   return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), instapay: String(s.shopInstapay || '').trim(), reqDownPct: pct(s.shopReqDown),
-    downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
+    downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), googleClientId: String(s.shopGoogleId || '').trim(), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
 /* a product photo by barcode; nothing is remembered when offline, so it is tried again next time */
 async function shopImg(ean) {
   let u = '';
@@ -109,6 +109,7 @@ function shopCardHTML() {
     <p class="note">Customers browse the shop at this address:</p><p class="note"><a href="${esc(url)}" target="_blank" rel="noopener" class="notr" dir="ltr">${esc(url)}</a></p><p class="note">The shop only gets names, prices and how many are in Egypt; costs, profit and partners never leave this app.</p>
     <div class="fgrid">${f('shopName', 'Shop name', 'text')}${f('shopWhatsapp', 'WhatsApp for questions', 'tel', 'dir="ltr" placeholder="01012345678"', 'Customers can message you here from the shop.')}</div>
     <div class="fgrid">${f('shopInstapay', 'InstaPay address', 'text', 'dir="ltr" placeholder="name@instapay"', 'Shown to customers who pay a down payment or pay by InstaPay.')}${f('shopDelivery', 'Delivery fee (EGP)', 'number', 'step="5" min="0"', '0 = free delivery. Added to every order.')}</div>
+    ${f('shopGoogleId', 'Google sign-in client ID', 'text', 'dir="ltr" placeholder="1234567890-abc….apps.googleusercontent.com" autocomplete="off"', 'Firebase → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID. Without it, Google sign-in may not work in browsers that block third-party cookies.')}
     <div class="fgrid">${f('shopDownCod', 'Down payment, cash on delivery (%)', 'number', 'step="1" min="0" max="100"', 'Paid by InstaPay before you confirm; the rest to the courier.')}${f('shopDownInsta', 'Down payment, InstaPay orders (%)', 'number', 'step="1" min="0" max="100"', '100 = paid in full upfront.')}</div>
     ${f('shopReqDown', 'Down payment on requests (%)', 'number', 'step="1" min="0" max="100"', 'Asked when a customer requests a product that isn’t in Egypt. A change applies to new requests only.')}
     <div class="f chk"><input type="checkbox" id="sh_open" data-set="shopOpen"${s.shopOpen !== false ? ' checked' : ''}><label for="sh_open">Shop is open for orders</label></div>

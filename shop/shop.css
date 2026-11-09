@@ -194,3 +194,22 @@ select:not(#_){-webkit-appearance:none;appearance:none;background-image:url("dat
 [dir=rtl] select:not(#_){background-position:left 12px center;padding-left:32px;padding-right:12px}
 /* phones: 16px text so iPhone Safari doesn't zoom in when a dropdown or field is tapped */
 @media(max-width:640px){ .frow select,#q,.fl input,.inrow input{font-size:16px} .frow select{max-width:200px} }
+
+/* Arabic page, English product names: every line keeps the page's alignment */
+.li b,.li small,.pb h3,.pb small{text-align:start}
+.li .split{display:block;color:var(--terra);font-weight:600}
+.cl li{align-items:center}
+.cl .li{display:flex;flex-direction:column;gap:2px}
+.cl .lt{white-space:nowrap}
+/* phone numbers and codes are typed left to right but line up with the rest of the form */
+[dir=rtl] input[dir=ltr]{text-align:right}
+[dir=rtl] input[dir=ltr]:placeholder-shown{direction:ltr;text-align:right}
+/* sign-in box */
+.inrow{align-items:stretch}
+.inrow .btn{display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.gsi{display:flex;justify-content:center;min-height:44px}
+.gwait{text-align:center;padding:10px 0}
+#pbody h3{text-align:start}
+.fl span{text-align:start}
+.tot span{text-align:start}
+.tot b{white-space:nowrap}

@@ -789,3 +789,5 @@ rx(/^New shop (order|request) from (.+)$/, (m, k, n) => `${k === 'order' ? 'طل
 rx(/^Order #(\w+) confirmed$/, (m, c) => `تم تأكيد الطلب #${c}`);
 Object.assign(AR, { 'number not checked': 'الرقم غير مؤكد', 'Signed in with Google; the number was typed in, not checked by SMS': 'سجّل الدخول عبر Google؛ الرقم مكتوب يدويًا ولم يُتحقق منه برسالة' });
 rx(/^(.+) \(not checked\)$/, (m, p) => `${p} (غير مؤكد)`);
+Object.assign(AR, { 'Google sign-in client ID': 'معرّف عميل تسجيل الدخول عبر Google',
+  'Firebase → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID. Without it, Google sign-in may not work in browsers that block third-party cookies.': 'Firebase ← Authentication ← Sign-in method ← Google ← Web SDK configuration ← Web client ID. بدونه قد لا يعمل تسجيل الدخول عبر Google في المتصفحات التي تحظر ملفات تعريف الارتباط الخارجية.' });

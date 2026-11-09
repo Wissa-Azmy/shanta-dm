@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.09-04";
+const APP_VERSION = "2026.11.09-05";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -96,7 +96,7 @@ if (!matchMedia('(hover: hover) and (pointer: fine)').matches && window.HTMLDial
 /* ---------- data ---------- */
 const DEFAULT_DB = () => ({
   app: 'shanta-ledger', version: 1,
-  settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo', shopName: 'Shanta', shopWhatsapp: '', shopReqDown: 20, shopDownCod: 0, shopDownInsta: 100, shopDelivery: 0, shopInstapay: '', shopOpen: true, shopAuto: true },
+  settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo', shopName: 'Shanta', shopWhatsapp: '', shopReqDown: 20, shopDownCod: 0, shopDownInsta: 100, shopDelivery: 0, shopInstapay: '', shopGoogleId: '', shopOpen: true, shopAuto: true },
   shipments: [], purchases: [], sales: [], payments: [], expenses: [], transfers: [],
   meta: { created: new Date().toISOString(), updatedAt: null, savedAt: null }
 });

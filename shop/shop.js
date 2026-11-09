@@ -28,7 +28,7 @@ const W = {
     requests: 'Requests', reqSub: 'Not in Egypt now; we bring them with the next box', reqOnly: n => `${n} in stock, the rest as a request`,
     gone: 'No longer in the shop', remove: 'Remove', close: 'Close', added: 'Added to the cart', requested: 'Added as a request',
     items: n => n === 1 ? '1 item' : `${n} items`, view: 'View cart',
-    signin: 'Sign in with your mobile', signinSub: 'We text you a code, or use your Google account. No password.', or: 'or', google: 'Continue with Google', phoneNeed: 'Your mobile number, so the courier can reach you.', phone: 'Mobile number', sendCode: 'Send code',
+    signin: 'Sign in with your mobile', signinSub: 'We text you a code, or use your Google account. No password.', or: 'or', google: 'Continue with Google', gClosed: 'The Google window closed before signing you in. Try again, or use the SMS code.', phoneNeed: 'Your mobile number, so the courier can reach you.', phone: 'Mobile number', sendCode: 'Send code',
     code: 'Code from the SMS', checkCode: 'Sign in', sentTo: p => `We sent a code to ${p}.`, changeNum: 'Change number', signedAs: p => `Signed in as ${p}`, signout: 'Sign out',
     sending: 'Sending…', checking: 'Checking…',
     details: 'Delivery details', name: 'Name', address: 'Area and address', note: 'Note (optional)',
@@ -65,7 +65,7 @@ const W = {
     requests: 'طلبات المنتجات', reqSub: 'غير موجود في مصر الآن؛ نحضره مع الشحنة القادمة', reqOnly: n => `${n} متوفر، والباقي كطلب`,
     gone: 'لم يعد في المتجر', remove: 'إزالة', close: 'إغلاق', added: 'أُضيف إلى السلة', requested: 'أُضيف كطلب',
     items: n => n === 1 ? 'منتج واحد' : `${n} منتجات`, view: 'اعرض السلة',
-    signin: 'سجّل الدخول برقم موبايلك', signinSub: 'نرسل لك كودًا في رسالة، أو استخدم حساب Google. بدون كلمة سر.', or: 'أو', google: 'المتابعة باستخدام Google', phoneNeed: 'رقم موبايلك ليتواصل معك المندوب.', phone: 'رقم الموبايل', sendCode: 'أرسل الكود',
+    signin: 'سجّل الدخول برقم موبايلك', signinSub: 'نرسل لك كودًا في رسالة، أو استخدم حساب Google. بدون كلمة سر.', or: 'أو', google: 'المتابعة باستخدام Google', gClosed: 'أُغلقت نافذة Google قبل تسجيل دخولك. حاول مرة أخرى أو استخدم كود الرسالة.', phoneNeed: 'رقم موبايلك ليتواصل معك المندوب.', phone: 'رقم الموبايل', sendCode: 'أرسل الكود',
     code: 'الكود من الرسالة', checkCode: 'تسجيل الدخول', sentTo: p => `أرسلنا كودًا إلى ${p}.`, changeNum: 'غيّر الرقم', signedAs: p => `مسجّل باسم ${p}`, signout: 'تسجيل الخروج',
     sending: 'جارٍ الإرسال…', checking: 'جارٍ التحقق…',
     details: 'بيانات التوصيل', name: 'الاسم', address: 'المنطقة والعنوان', note: 'ملاحظة (اختياري)',
@@ -179,7 +179,7 @@ function card(p) {
   return `<article class="pc" data-id="${esc(p.id)}">
     <div class="ph">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ini',textContent:this.dataset.i}))" data-i="${initials(p)}">` : `<span class="ini">${initials(p)}</span>`}
       <span class="stag ${p.store === 'Rossmann' ? 'ross' : 'dm'}">${esc(p.store || 'dm')}</span></div>
-    <div class="pb"><small dir="auto">${esc(p.brand || '')}</small><h3 dir="auto">${esc(p.name)}</h3>
+    <div class="pb"><small><bdi>${esc(p.brand || '')}</bdi></small><h3><bdi>${esc(p.name)}</bdi></h3>
       <div class="pr"><b>${money(num(p.price))}</b>${p.size ? `<span dir="ltr">${esc(p.size)}</span>` : ''}</div>
       ${stockLine(p)}${stepper(p)}</div></article>`;
 }
@@ -224,7 +224,7 @@ const waLink = () => SET.whatsapp ? `<a class="walink" href="https://wa.me/${esc
 const head = title => `<div class="dh"><h2>${title}</h2><button type="button" class="x" data-act="close" aria-label="${t('close')}">×</button></div>`;
 const errHTML = () => P.err ? `<p class="err">${esc(P.err)}</p>` : '';
 function lineHTML(x) {
-  return `<li><div class="li"><b dir="auto">${esc(x.p.name)}</b><small dir="auto">${esc(x.p.brand || '')} · ${money(num(x.p.price))}${x.split ? ' · ' + t('reqOnly', x.p.avail | 0) : ''}</small></div>
+  return `<li><div class="li"><b><bdi>${esc(x.p.name)}</bdi></b><small>${x.p.brand ? `<bdi>${esc(x.p.brand)}</bdi> · ` : ''}<bdi>${money(num(x.p.price))}</bdi>${x.split ? `<span class="split">${t('reqOnly', x.p.avail | 0)}</span>` : ''}</small></div>
     ${x.split ? `<b class="lq">× ${x.q}</b>` : `<div class="step sm"><button type="button" data-q="${esc(x.p.id)}:-1" aria-label="${t('less')}">−</button><b>${x.q}</b><button type="button" data-q="${esc(x.p.id)}:1" aria-label="${t('more')}"${(CART[x.p.id] | 0) >= maxFor(x.p) ? ' disabled' : ''}>+</button></div>`}
     <b class="lt">${money(x.q * num(x.p.price))}</b></li>`;
 }
@@ -236,7 +236,7 @@ function signinHTML() {
   return `<section><h3>${t('signin')}<small>${t('signinSub')}</small></h3>
     <div class="inrow"><input id="phonein" type="tel" inputmode="tel" autocomplete="tel" placeholder="01012345678" value="${esc(P.phone)}" dir="ltr"><button type="button" class="btn" id="sendcode" data-act="send"${P.busy ? ' disabled' : ''}>${P.busy === 'send' ? t('sending') : t('sendCode')}</button></div>${errHTML()}
     <div class="or"><span>${t('or')}</span></div>
-    <button type="button" class="gbtn" data-act="google"${P.busy ? ' disabled' : ''}>${GICON}${P.busy === 'google' ? t('checking') : t('google')}</button></section>`;
+    ${P.busy === 'google' ? `<p class="note gwait"><span class="spin"></span>${t('checking')}</p>` : SET.googleClientId ? '<div id="gsi" class="gsi"></div>' : `<button type="button" class="gbtn" data-act="google"${P.busy ? ' disabled' : ''}>${GICON}${t('google')}</button>`}</section>`;
 }
 function cartHTML() {
   const L = lines(), open = SET.open !== false;
@@ -280,7 +280,7 @@ function orderHTML(o) {
   else if (['declined', 'cancelled'].includes(o.status) && back) refund = o.refundDone ? `<p class="ok">${o.refund === 'credit' ? t('creditDone') : t('refundDone')}</p>`
     : o.refund ? `<p class="note">${o.refund === 'credit' ? t('creditChosen') : t('refundChosen', `<span dir="ltr">${esc(o.refundTo || '')}</span>`)}</p>` : choose;
   return `<article class="mo"><div class="moh"><b>#${esc(o.code)}</b><span class="pill ${cls}">${label}</span></div><small class="sub">${when(o.createdAt)}</small>
-    <ul class="cl">${(o.lines || []).map(l => `<li><div class="li"><b dir="auto">${num(l.qty)} × ${esc(l.name)}</b><small dir="auto">${esc(l.brand || '')}</small></div><b class="lt">${money(num(l.qty) * num(l.price))}</b></li>`).join('')}</ul>
+    <ul class="cl">${(o.lines || []).map(l => `<li><div class="li"><b>${num(l.qty)} × <bdi>${esc(l.name)}</bdi></b><small><bdi>${esc(l.brand || '')}</bdi></small></div><b class="lt">${money(num(l.qty) * num(l.price))}</b></li>`).join('')}</ul>
     ${num(o.delivery) ? row(t('delivery'), money(num(o.delivery))) : ''}${num(o.creditUsed) ? row(t('credit'), '−' + money(num(o.creditUsed))) : ''}${row(t('total'), money(num(o.total)), 'big')}
     ${num(o.down) > 0 ? row(o.kind === 'request' ? t('reqDown', num(o.downPct)) : t('payNow', num(o.downPct)), `${money(num(o.down))} · ${o.downPaid ? t('paid') : o.proof ? t('checkingPay') : t('notPaid')}`, 'down') : ''}
     ${o.status === 'declined' ? `<p class="note">${o.declineMsg ? `${t('why')}: “${esc(o.declineMsg)}”` : t('declinedNote')}</p>` : ''}
@@ -311,6 +311,7 @@ function drawPanel() {
   p.hidden = false; document.body.classList.add('locked'); $('.sheet').scrollTop = sc;
   const el = keep ? document.getElementById(keep[0]) : keepMe ? $(`[data-me="${keepMe}"]`) : null;
   if (el) { el.focus(); try { el.setSelectionRange(keep ? keep[1] : el.value.length, keep ? keep[1] : el.value.length); } catch (e) { } }
+  mountGsi();
 }
 function draw() {
   document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
@@ -346,12 +347,31 @@ async function sendCode() {
   P.busy = ''; drawPanel(); const c = $('#codein'); if (c) c.focus();
 }
 /* Google: free, but the phone number is typed in at checkout, not checked */
-async function google() {
+/* Google's own button (Google Identity Services): the account comes straight back to this page as a token,
+   so it works even where the browser blocks the Firebase sign-in window from passing the result back */
+const gsiLoad = () => gsiLoad.p || (gsiLoad.p = new Promise((ok, no) => { const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = ok; s.onerror = () => { gsiLoad.p = null; no(new Error('gsi')); }; document.head.appendChild(s); }));
+async function mountGsi() {
+  const el = $('#gsi'); if (!el || !SET.googleClientId) return;
+  try { await gsiLoad(); } catch (e) { el.innerHTML = `<button type="button" class="gbtn" data-act="google">${GICON}${t('google')}</button>`; return; }
+  const id = window.google.accounts.id;
+  if (mountGsi.cid !== SET.googleClientId) { mountGsi.cid = SET.googleClientId;
+    id.initialize({ client_id: SET.googleClientId, callback: gsiDone, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true, use_fedcm_for_button: true }); }
+  if (!document.body.contains(el)) return;
+  id.renderButton(el, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', logo_alignment: 'center', locale: LANG, width: Math.min(400, Math.max(200, el.clientWidth || 300)) });
+}
+async function gsiDone(r) {
+  P.busy = 'google'; P.err = ''; drawPanel();
+  try { const { U, auth } = await fbx(); await U.signInWithCredential(auth, U.GoogleAuthProvider.credential(r.credential)); }
+  catch (e) { console.warn(e); P.err = errMsg(e); }
+  P.busy = ''; draw();
+}
+async function googlePopup() {
   P.busy = 'google'; P.err = ''; drawPanel();
   try { const { U, auth } = await fbx(); const pr = new U.GoogleAuthProvider(); pr.setCustomParameters({ prompt: 'select_account' });
     try { await U.signInWithPopup(auth, pr); }
     catch (e) { if (/popup-blocked|operation-not-supported/.test(e && e.code || '')) return U.signInWithRedirect(auth, pr); throw e; } }
-  catch (e) { console.warn(e); if (!/popup-closed|cancelled-popup/.test(e && e.code || '')) P.err = errMsg(e); }
+  catch (e) { console.warn(e); P.err = /popup-closed|cancelled-popup/.test(e && e.code || '') ? t('gClosed') : errMsg(e); }
   P.busy = ''; draw();
 }
 async function checkCode() {
@@ -450,7 +470,7 @@ document.addEventListener('click', e => {
   if (act === 'dropgone') { lines().gone.forEach(id => delete CART[id]); save('shop-cart', CART); draw(); }
   if (act === 'send') sendCode();
   if (act === 'code') checkCode();
-  if (act === 'google') google();
+  if (act === 'google') googlePopup();
   if (act === 'renum') { P.conf = null; P.err = ''; drawPanel(); }
   if (act === 'signout') { FBX && FBX.U.signOut(FBX.auth); P.conf = null; }
   if (act === 'place') place();
