@@ -60,6 +60,10 @@ function openOrder(id, preset) {
     /* lines worked out elsewhere (the Egypt stock count): purchase, quantity and price given */
     if (preset && preset.lines && preset.lines.length) OR.lines = preset.lines.map(x => Object.assign({}, x));
     if (preset && preset.notes) OR.h.notes = preset.notes;
+    /* a shop order: customer, payment and delivery filled in, and told the sale's id once it is saved */
+    if (preset && preset.h) Object.assign(OR.h, preset.h);
+    if (preset && preset.extras) OR.extras = preset.extras.map(x => Object.assign({}, x));
+    if (preset && preset.onSave) OR.after = preset.onSave;
   }
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
 }
@@ -188,7 +192,9 @@ function saveOrder() {
       paidBy: x.paidBy === 'sale' && !sale ? (h.receivedBy || 'friend') : x.paidBy, method: 'Cash', place: h.place, shipmentId: '', notes: h.customer ? 'Sale to ' + h.customer : 'Sale' });
     if (sale && num(x.charge) > 0) db.sales.push(Object.assign({ id: uid() }, base, { extra: true, extraKey: key, purchaseId: '', product: what, category: x.category, qty: 1, unitPrice: num(x.charge) }));
   });
+  const after = OR.after;
   commit(); odlg().close(); toast('Sale saved');
+  if (after) after(oid);
 }
 function deleteOrder(oid) {
   const paid = db.payments.filter(p => p.orderId === oid);

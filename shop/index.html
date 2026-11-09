@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png?v=2">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png?v=2">
 <meta name="theme-color" content="#f7f2e8">
-<link rel="stylesheet" href="shop.css?v=2026.11.09-01">
+<link rel="stylesheet" href="shop.css?v=2026.11.09-02">
 </head>
 <body>
 <div class="airmail"></div>
@@ -17,7 +17,8 @@
     <div class="brand"><div class="logo">dm<span>→</span>EG</div><div><b id="sname">Shanta</b><small id="stag"></small></div></div>
     <div class="tact">
       <button type="button" class="lang" id="langbtn"></button>
-      <button type="button" class="cartbtn" id="cartbtn" aria-label="Cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L21 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20.5" r="1.3" fill="currentColor"/><circle cx="17.5" cy="20.5" r="1.3" fill="currentColor"/></svg><span id="cartn"></span></button>
+      <button type="button" class="iconbtn" id="mebtn" aria-label="My orders"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="men" hidden></span></button>
+      <button type="button" class="cartbtn" id="cartbtn" aria-label="Cart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L21 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20.5" r="1.3" fill="currentColor"/><circle cx="17.5" cy="20.5" r="1.3" fill="currentColor"/></svg><span id="cartn" hidden></span></button>
     </div>
   </div>
   <div class="filters" id="filters"></div>
@@ -25,8 +26,10 @@
 <div id="banner"></div>
 <main id="grid" class="grid" aria-live="polite"></main>
 <div id="cartbar"></div>
-<dialog id="cart"><div id="cartbody"></div></dialog>
+<div id="panel" class="panel" hidden><div class="sheet" role="dialog" aria-modal="true"><div id="pbody"></div></div></div>
+<input type="file" id="proofin" accept="image/*" hidden>
+<div id="recap"></div>
 <div id="toast"></div>
-<script src="shop.js?v=2026.11.09-01" type="module"></script>
+<script src="shop.js?v=2026.11.09-02" type="module"></script>
 </body>
 </html>

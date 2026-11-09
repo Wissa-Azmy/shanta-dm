@@ -40,10 +40,11 @@ function render() {
     view === 'overview' && db.purchases.length ? `<button class="btn ghost" data-new="purchases">+ Purchase</button><button class="btn ghost" data-new="expenses">+ Expense</button><button class="btn" data-new="sales">+ Sale</button>` : '';
   if (chart) { chart.destroy(); chart = null; }
   const R = calc();
-  $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : V[view](R));
+  const vf = V[view] || V.overview; /* a page added by a later script (Orders) may not be loaded yet */
+  $("#view").innerHTML = Cloud.bannerHTML() + (Cloud.loading() ? Cloud.loadingHTML() : vf(R));
   document.querySelectorAll("[data-mixed]").forEach(c => c.indeterminate = true);
   document.body.classList.toggle("hassel", !!$("#view .selbar")); placeBars();
-  V[view].after && V[view].after();
+  vf.after && vf.after();
   renderFile();
   document.title = 'Shanta dm · ' + n[2];
 }

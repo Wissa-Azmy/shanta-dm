@@ -82,16 +82,13 @@ button,input,select{font:inherit;color:inherit}
 .cb .go{margin-inline-start:auto;font-weight:600;color:#bfe3d9}
 
 /* cart */
-#cart{border:0;padding:0;border-radius:16px;width:min(560px,100vw - 20px);max-height:calc(100dvh - 30px);background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25)}
-#cart::backdrop{background:rgba(29,42,37,.45)}
-#cartbody{padding:16px 18px 20px}
 .dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .dh h2{margin:0;font:700 24px var(--display)}
 .x{all:unset;cursor:pointer;font-size:26px;width:36px;height:36px;display:grid;place-items:center;border-radius:8px}
-#cartbody section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
-#cartbody section.rq{border-color:var(--gold);background:#fffaf0}
-#cartbody h3{margin:0 0 6px;font-size:15px}
-#cartbody h3 small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
+#pbody section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
+#pbody section.rq{border-color:var(--gold);background:#fffaf0}
+#pbody h3{margin:0 0 6px;font-size:15px}
+#pbody h3 small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
 .cl{list-style:none;margin:0;padding:0}
 .cl li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dotted var(--line)}
 .cl .li{flex:1;min-width:0}
@@ -111,7 +108,7 @@ button,input,select{font:inherit;color:inherit}
 .linkbtn{all:unset;cursor:pointer;display:block;margin:12px auto 0;color:var(--nile);text-decoration:underline;font-size:14px;text-align:center}
 .note .linkbtn{display:inline;margin:0 6px}
 
-#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:999px;font-size:14px;transition:.2s;z-index:20;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:999px;font-size:14px;transition:.2s;z-index:40;white-space:nowrap}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 
 @media(max-width:640px){
@@ -121,9 +118,66 @@ button,input,select{font:inherit;color:inherit}
   .pb{padding:8px 10px 10px}
   .pb h3{font-size:13.5px}
   .fg{grid-template-columns:1fr}
-  #cart{width:100vw;max-width:100vw;max-height:92dvh;margin:auto 0 0;border-radius:18px 18px 0 0}
-  #cartbody{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+
   .step.sm,.cl .lq{width:96px}
   .cl .lt{min-width:66px}
 }
 @media(min-width:900px){ #cartbar{display:none} body.hasbar{padding-bottom:0} }
+
+/* account button */
+.iconbtn{all:unset;cursor:pointer;position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.iconbtn svg{width:22px;height:22px}
+.iconbtn span{position:absolute;top:-5px;inset-inline-end:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--terra);color:#fff;font:700 11px/20px var(--mono);text-align:center}
+body.locked{overflow:hidden}
+
+/* the panel (cart, order sent, my orders): a plain overlay, not a modal dialog, so the reCAPTCHA check can show above it */
+.panel{position:fixed;inset:0;z-index:30;background:rgba(29,42,37,.45);display:flex;align-items:center;justify-content:center;padding:15px}
+.panel[hidden]{display:none}
+.sheet{width:min(560px,100%);max-height:calc(100dvh - 30px);overflow:auto;overscroll-behavior:contain;background:var(--paper);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+#pbody{padding:16px 18px 22px}
+#pbody hr{border:0;border-top:1px dashed var(--line);margin:10px 0}
+.tot.big{font-size:16px}
+.tot.big b{font-size:19px}
+.inrow{display:flex;gap:8px;margin-top:6px}
+.inrow input{flex:1;min-width:0;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:16px}
+.inrow input:focus{outline:2px solid var(--nile);outline-offset:-1px;border-color:transparent}
+.inrow .btn{margin:0;flex:none}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn.big{padding:13px;font-size:16px}
+.signed{font-size:13.5px;color:var(--muted);margin:12px 2px 0}
+.signed .linkbtn{display:inline;margin:0 6px}
+.pms{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pm{display:flex;gap:8px;align-items:flex-start;padding:10px;border:1.5px solid var(--line);border-radius:10px;cursor:pointer;background:#fff}
+.pm.on{border-color:var(--nile);background:var(--nile-soft)}
+.pm input{accent-color:var(--nile);margin-top:3px}
+.pm b{display:block;font-size:14px}
+.pm small{color:var(--muted);font-size:12px}
+.sum .tot{font-weight:500}
+.sum .tot.big{font-weight:700}
+.walink{display:block;text-align:center;margin:14px 0 0;color:var(--nile);font-size:13.5px}
+.paybox{margin-top:10px;padding:12px;border-radius:10px;background:var(--gold-soft);border:1px solid var(--gold)}
+.paybox h4{margin:0 0 6px;font-size:14.5px}
+.cp{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px dotted rgba(185,138,46,.5)}
+.cp small{flex:none;width:44%;color:#6b5420;font-size:12px}
+.cp b{flex:1;min-width:0;overflow-wrap:anywhere;font:700 15px var(--mono)}
+.cp .linkbtn{display:inline;margin:0;flex:none}
+.paybox .ok,#pbody .ok{color:var(--nile);font-weight:600;font-size:13.5px;margin:8px 0 0}
+.mo{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
+.moh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.moh b{font:700 15px var(--mono)}
+.mo .sub{color:var(--muted);font-size:12px}
+.moact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.moact .btn{margin:0}
+.mo .linkbtn{margin-top:8px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--paper2);white-space:nowrap}
+.pill.ok{background:var(--nile-soft);color:var(--nile)}
+.pill.warn{background:var(--gold-soft);color:#86621a}
+.pill.bad{background:var(--terra-soft);color:#9b3f1b}
+.credit{border-color:var(--nile)!important;background:var(--nile-soft)!important}
+@media(max-width:640px){
+  .panel{padding:0;align-items:flex-end}
+  .sheet{width:100%;max-height:94dvh;border-radius:18px 18px 0 0}
+  #pbody{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+  .pms{grid-template-columns:1fr}
+  .moh .pill{white-space:normal;text-align:end}
+}

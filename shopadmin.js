@@ -16,6 +16,7 @@ const shopSize = t => { const m = String(t || '').match(/(?<![\d.,])(\d+(?:[.,]\
 const waNumber = v => { const d = String(v || '').replace(/\D/g, ''); return /^01\d{9}$/.test(d) ? '2' + d : d.replace(/^00/, ''); };
 function shopItems(R = calc()) {
   const hid = db.settings.shopHidden || [], m = new Map();
+  const held = typeof shopHeld === 'function' ? shopHeld() : {};
   const where = l => { const s = db.shipments.find(x => x.id === l.p.shipmentId); return !s || s.status === 'Packing' ? 'de' : s.status === 'Delivered' ? 'eg' : 'way'; };
   Object.values(R.lots).forEach(l => {
     const k = l.p.ean || 'n:' + grpKey(l.p);
@@ -26,13 +27,17 @@ function shopItems(R = calc()) {
     x.lots.sort((a, b) => (a.p.date || '').localeCompare(b.p.date || ''));
     const l = x.lots.find(l => l.left > 0 && where(l) === 'eg') || x.lots[x.lots.length - 1];
     x.price = suggestEGP(l); x.hidden = hid.includes(x.key);
-    x.status = x.eg > 0 ? 'in' : x.way > 0 ? 'way' : 'request';
+    /* units in shop orders not yet turned into a sale are held, so two customers can't buy the last one */
+    x.held = Math.min(x.eg, held[x.id] || 0); x.avail = x.eg - x.held;
+    x.status = x.avail > 0 ? 'in' : x.way > 0 ? 'way' : 'request';
     return x;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
-const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.eg, status: x.status, img: ShopPub.imgs[x.ean] || '' });
+const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, status: x.status, img: ShopPub.imgs[x.ean] || '' });
 const shopSettingsDoc = () => { const s = db.settings;
-  return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), reqDownPct: Math.max(0, Math.min(100, num(s.shopReqDown))), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
+  const pct = v => Math.max(0, Math.min(100, num(v)));
+  return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), instapay: String(s.shopInstapay || '').trim(), reqDownPct: pct(s.shopReqDown),
+    downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
 /* a product photo by barcode; nothing is remembered when offline, so it is tried again next time */
 async function shopImg(ean) {
   let u = '';
@@ -102,7 +107,9 @@ function shopCardHTML() {
   const stt = { in: ['In Egypt', 'ok'], way: ['On the way', 'warn'], request: ['Request only', ''] };
   return `<div class="card" id="shopcard"><h3>Online shop</h3>
     <p class="note">Customers browse the shop at this address:</p><p class="note"><a href="${esc(url)}" target="_blank" rel="noopener" class="notr" dir="ltr">${esc(url)}</a></p><p class="note">The shop only gets names, prices and how many are in Egypt; costs, profit and partners never leave this app.</p>
-    <div class="fgrid">${f('shopName', 'Shop name', 'text')}${f('shopWhatsapp', 'WhatsApp for orders', 'tel', 'dir="ltr" placeholder="01012345678"', 'Orders and requests arrive here as WhatsApp messages.')}</div>
+    <div class="fgrid">${f('shopName', 'Shop name', 'text')}${f('shopWhatsapp', 'WhatsApp for questions', 'tel', 'dir="ltr" placeholder="01012345678"', 'Customers can message you here from the shop.')}</div>
+    <div class="fgrid">${f('shopInstapay', 'InstaPay address', 'text', 'dir="ltr" placeholder="name@instapay"', 'Shown to customers who pay a down payment or pay by InstaPay.')}${f('shopDelivery', 'Delivery fee (EGP)', 'number', 'step="5" min="0"', '0 = free delivery. Added to every order.')}</div>
+    <div class="fgrid">${f('shopDownCod', 'Down payment, cash on delivery (%)', 'number', 'step="1" min="0" max="100"', 'Paid by InstaPay before you confirm; the rest to the courier.')}${f('shopDownInsta', 'Down payment, InstaPay orders (%)', 'number', 'step="1" min="0" max="100"', '100 = paid in full upfront.')}</div>
     ${f('shopReqDown', 'Down payment on requests (%)', 'number', 'step="1" min="0" max="100"', 'Asked when a customer requests a product that isn’t in Egypt. A change applies to new requests only.')}
     <div class="f chk"><input type="checkbox" id="sh_open" data-set="shopOpen"${s.shopOpen !== false ? ' checked' : ''}><label for="sh_open">Shop is open for orders</label></div>
     <div class="f chk"><input type="checkbox" id="sh_auto" data-set="shopAuto"${s.shopAuto !== false ? ' checked' : ''}><label for="sh_auto">Update the shop after every change (sales, counts, moves, prices)</label></div>

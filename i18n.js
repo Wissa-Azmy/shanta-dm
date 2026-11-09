@@ -762,3 +762,28 @@ rx(/^Shop updated: (\d+) products, (\d+) in stock$/, (m, n, k) => `تم تحدي
 rx(/^Looking up product photos… (\d+) of (\d+)$/, (m, a, b) => `جارٍ البحث عن صور المنتجات… ${a} من ${b}`);
 rx(/^(\d+) in Egypt$/, (m, n) => `${n} في مصر`);
 rx(/^Untick a product to hide it from the shop\. Prices follow the suggested price \(today’s rate \+ (.+)% markup\)\.$/, (m, p) => `ألغِ تحديد المنتج لإخفائه من المتجر. الأسعار تتبع السعر المقترح (سعر صرف اليوم + ${p}% هامش).`);
+/* shop orders page and shop settings (step 2) */
+Object.assign(AR, {
+  'Orders': 'الطلبات', 'From the online shop': 'من المتجر الإلكتروني', 'New': 'جديدة', 'In progress': 'قيد التنفيذ', 'Requests': 'طلبات المنتجات', 'Closed': 'مغلقة', 'Customers': 'العملاء',
+  'Confirmed': 'مؤكد', 'Out for delivery': 'في الطريق للتوصيل', 'Delivered': 'تم التوصيل', 'Requested': 'مطلوب', 'Offered, waiting for customer': 'عُرض، في انتظار العميل',
+  'Declined': 'مرفوض', 'Cancelled by customer': 'ألغاه العميل', 'Cash on delivery': 'الدفع عند الاستلام', 'Request': 'طلب منتج',
+  'Confirm → sale': 'تأكيد ← بيع', 'Decline': 'رفض', 'Open sale': 'افتح البيع', 'Record payment': 'سجّل دفعة', 'Offer: it’s here': 'اعرضه: وصل', 'Withdraw offer': 'اسحب العرض',
+  'Down payment received': 'تم استلام العربون', 'Down payment not received': 'لم يُستلم العربون', 'Refund sent': 'تم الاسترداد', 'Add as credit': 'أضفه كرصيد', 'WhatsApp': 'واتساب',
+  'Delivery': 'التوصيل', 'Paid from credit': 'مدفوع من الرصيد', 'Total to pay': 'الإجمالي المطلوب', 'received': 'مستلم', 'proof sent': 'أُرسل الإيصال', 'not paid': 'لم يُدفع',
+  'InstaPay proof · tap to enlarge': 'إيصال InstaPay · اضغط للتكبير', 'Shop customers': 'عملاء المتجر', 'Shop default': 'إعداد المتجر', 'Adjust credit': 'عدّل الرصيد', 'Credit': 'الرصيد',
+  'No customers yet.': 'لا يوجد عملاء بعد.', 'No new orders.': 'لا توجد طلبات جديدة.', 'Nothing being prepared or delivered.': 'لا شيء قيد التجهيز أو التوصيل.', 'No open requests.': 'لا توجد طلبات منتجات مفتوحة.', 'No closed orders yet.': 'لا توجد طلبات مغلقة بعد.',
+  'Wanted products': 'المنتجات المطلوبة', 'Your shopping list for the next dm order: what customers asked for and are waiting on.': 'قائمة مشترياتك لطلب dm القادم: ما طلبه العملاء وينتظرونه.',
+  'Shop orders': 'طلبات المتجر', 'Sign in to the shared online ledger (Settings) to see orders from the online shop.': 'سجّل الدخول إلى الدفتر المشترك (الإعدادات) لترى طلبات المتجر الإلكتروني.', 'Loading shop orders…': 'جارٍ تحميل طلبات المتجر…',
+  'Everyone who signed in to the shop with their phone. Set a down payment for one customer (0% for people you trust, 100% after a refused delivery); it overrides the shop’s settings. Credit is money you hold for them; it comes off their next order automatically.': 'كل من سجّل الدخول إلى المتجر برقم موبايله. حدّد عربونًا لعميل بعينه (0% لمن تثق بهم، 100% بعد رفض استلام)؛ يتجاوز إعدادات المتجر. الرصيد مال تحتفظ به لهم ويُخصم تلقائيًا من طلبهم القادم.',
+  'Asked for the credit as a refund': 'طلب استرداد الرصيد', 'The customer wants it as credit.': 'العميل يريده رصيدًا.', 'Waiting for the customer to choose refund or credit.': 'في انتظار اختيار العميل بين الاسترداد والرصيد.',
+  'InstaPay address': 'عنوان InstaPay', 'Shown to customers who pay a down payment or pay by InstaPay.': 'يظهر للعملاء الذين يدفعون عربونًا أو يدفعون عبر InstaPay.',
+  'Delivery fee (EGP)': 'رسوم التوصيل (ج.م)', '0 = free delivery. Added to every order.': '0 = توصيل مجاني. تُضاف إلى كل طلب.',
+  'Down payment, cash on delivery (%)': 'العربون، الدفع عند الاستلام (%)', 'Paid by InstaPay before you confirm; the rest to the courier.': 'يُدفع عبر InstaPay قبل التأكيد؛ والباقي للمندوب.',
+  'Down payment, InstaPay orders (%)': 'العربون، طلبات InstaPay (%)', '100 = paid in full upfront.': '100 = الدفع كاملًا مقدمًا.',
+  'WhatsApp for questions': 'واتساب للأسئلة', 'Customers can message you here from the shop.': 'يمكن للعملاء مراسلتك هنا من المتجر.'
+});
+rx(/^(\d+) min ago$/, (m, n) => `منذ ${n} دقيقة`); rx(/^(\d+) h ago$/, (m, n) => `منذ ${n} ساعة`); rx(/^(\d+) days ago$/, (m, n) => `منذ ${n} يوم`);
+rx(/^only (\d+) in Egypt$/, (m, n) => `${n} فقط في مصر`); rx(/^(\d+) in Egypt now$/, (m, n) => `${n} في مصر الآن`); rx(/^(\d+) wanted$/, (m, n) => `${n} مطلوب`);
+rx(/^Down payment (\d+)%$/, (m, n) => `العربون ${n}%`); rx(/^shop asks (\d+)% now$/, (m, n) => `المتجر يطلب ${n}% الآن`); rx(/^(\d+)% down payment$/, (m, n) => `عربون ${n}%`);
+rx(/^New shop (order|request) from (.+)$/, (m, k, n) => `${k === 'order' ? 'طلب' : 'طلب منتج'} جديد من المتجر من ${n}`);
+rx(/^Order #(\w+) confirmed$/, (m, c) => `تم تأكيد الطلب #${c}`);

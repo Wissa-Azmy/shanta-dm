@@ -1,14 +1,16 @@
 /* ---------- Shanta Shop: what customers see ----------
-   Reads the public catalog that Shanta publishes (catalog/<product>, shop/settings) and nothing else.
-   Products in Egypt go in the cart as an order; products that aren't in Egypt can be requested. The cart
-   stays on the phone. For now an order is sent as a WhatsApp message to the shop; sign-in, InstaPay
-   and orders inside Shanta come in the next release. */
+   Reads the public catalog Shanta publishes (catalog/<product>, shop/settings). Customers sign in with their
+   mobile number and an SMS code, then place orders that land in Shanta's Orders page (orders/<id>).
+   Products in Egypt go in the order; the rest becomes a request. Down payments are paid by InstaPay and
+   the customer uploads a screenshot. Their profile and credit are in customers/<uid>; only the two admins
+   can change credit or the down payment a customer is asked for. */
 const FB_VER = '13.1.0', FB = s => `https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${s}.js`;
 const CFG = { apiKey: 'AIzaSyAa9fTvt1RxGFDGf1rWFLBB_gvVlaOkphM', authDomain: 'shanta-dm.firebaseapp.com', projectId: 'shanta-dm' };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (e) { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
+const num = v => +v || 0;
 const REQ_MAX = 10;
 
 /* ---- words ---- */
@@ -22,15 +24,34 @@ const W = {
     loading: 'Loading products…', loadErr: 'Couldn’t load the shop. Check your internet connection.', retry: 'Try again',
     empty: 'The shop is being stocked. Check back soon.', closed: 'The shop isn’t taking orders right now. You can still look around.',
     cart: 'Your cart', cartEmpty: 'Your cart is empty.', keepShopping: 'Keep shopping', order: 'Order', orderSub: 'In Egypt, delivered to you',
-    requests: 'Requests', reqSub: 'Not in Egypt now; we bring them with the next box', total: 'Total', reqTotal: 'Requests total',
-    down: p => `Down payment ${p}%`, downNote: p => `We confirm requests on WhatsApp first. The ${p}% down payment is paid by InstaPay after we confirm; the rest when it arrives.`,
-    pay: 'Pay on delivery, or by InstaPay; we send the details on WhatsApp.', reqOnly: (n, a) => `${n} in stock, the rest as a request`,
-    gone: 'No longer in the shop', remove: 'Remove', details: 'Your details', name: 'Name', phone: 'Mobile number', address: 'Area and address',
-    note: 'Note (optional)', send: 'Send on WhatsApp', noWa: 'Ordering opens soon.', need: 'Please fill in your name, mobile number and address.',
-    sent: 'Sent your order? Clear the cart', cleared: 'Cart cleared', added: 'Added to the cart', requested: 'Added as a request',
-    items: n => n === 1 ? '1 item' : `${n} items`, view: 'View cart', close: 'Close',
-    msgHead: shop => `New order · ${shop}`, msgOrder: 'Order (in Egypt)', msgReq: p => `Requests (not in Egypt, ${p}% down payment)`,
-    msgTotal: 'Total', msgDown: 'Down payment', msgName: 'Name', msgPhone: 'Mobile', msgAddr: 'Address', msgNote: 'Note'
+    requests: 'Requests', reqSub: 'Not in Egypt now; we bring them with the next box', reqOnly: n => `${n} in stock, the rest as a request`,
+    gone: 'No longer in the shop', remove: 'Remove', close: 'Close', added: 'Added to the cart', requested: 'Added as a request',
+    items: n => n === 1 ? '1 item' : `${n} items`, view: 'View cart',
+    signin: 'Sign in with your mobile', signinSub: 'We text you a code. No password.', phone: 'Mobile number', sendCode: 'Send code',
+    code: 'Code from the SMS', checkCode: 'Sign in', sentTo: p => `We sent a code to ${p}.`, changeNum: 'Change number', signedAs: p => `Signed in as ${p}`, signout: 'Sign out',
+    sending: 'Sending…', checking: 'Checking…',
+    details: 'Delivery details', name: 'Name', address: 'Area and address', note: 'Note (optional)',
+    payHow: 'How do you want to pay?', cod: 'Cash on delivery', codSub: 'Pay the courier when it arrives', insta: 'InstaPay', instaSub: 'Transfer before delivery',
+    goods: 'Products', delivery: 'Delivery', free: 'Free', credit: 'Your credit', total: 'Total', reqTotal: 'Requests total',
+    payNow: p => `Pay now by InstaPay (${p}%)`, payLater: 'On delivery', reqDown: p => `Down payment on requests (${p}%)`,
+    reqNote: 'You pay the rest of a request when it arrives and you confirm it. You can cancel any time before.',
+    place: 'Place order', placing: 'Sending…', need: 'Please fill in your name and address.',
+    done: 'Thank you! Your order is in.', doneSub: 'We confirm it soon. Follow it under “My orders”.',
+    payBox: 'Pay by InstaPay', payTo: 'Send to', amount: 'Amount', ref: 'Write in the transfer note', copy: 'Copy', copied: 'Copied',
+    upload: 'Upload the screenshot', uploading: 'Uploading…', proofSent: 'Screenshot sent ✓ We’ll check it.', replace: 'Replace',
+    proofOk: 'Screenshot sent', tooBig: 'That picture couldn’t be read. Try a screenshot instead.',
+    mine: 'My orders', noOrders: 'No orders yet.', signinMine: 'Sign in to see your orders.', yourCredit: 'Your credit',
+    creditNote: 'Comes off your next order automatically.', creditRefund: 'Ask for it as a refund', creditAsked: 'Refund asked. We’ll send it to',
+    st: { new: 'Waiting for confirmation', newPay: 'Waiting for your down payment', confirmed: 'Confirmed, being prepared', out: 'Out for delivery', delivered: 'Delivered',
+      requested: 'Requested · we’ll tell you when it’s here', offered: 'It’s here! Please confirm within 24 hours', declined: 'Declined', cancelled: 'Cancelled' },
+    paid: 'paid ✓', notPaid: 'not paid yet', checkingPay: 'screenshot sent, we’re checking',
+    cancel: 'Cancel', cancelAsk: 'Cancel this order?', confirmOffer: 'Yes, I still want it', keep: 'Keep it',
+    refundQ: a => `What should we do with your ${a} down payment?`, refundTo: 'Refund to my InstaPay', refundInput: 'Your InstaPay address or number',
+    asCredit: 'Keep as credit', refundChosen: p => `Refund to ${p}`, creditChosen: 'Kept as credit', refundDone: 'Refund sent ✓', creditDone: 'Added to your credit ✓',
+    why: 'Message from the shop', wa: 'Questions? WhatsApp us', declinedNote: 'Sorry, we couldn’t fill this one.',
+    errs: { phone: 'Check the mobile number.', code: 'That code isn’t right. Check the SMS and try again.', many: 'Too many tries. Wait a few minutes and try again.',
+      off: 'Sign-in by SMS isn’t switched on yet. Please message us on WhatsApp.', net: 'No connection. Check your internet and try again.',
+      closed: 'The shop isn’t taking orders right now.', gen: 'Something went wrong. Please try again.' }
   },
   ar: {
     tag: 'منتجات dm وRossmann الألمانية، في مصر', search: 'ابحث عن منتج أو ماركة', all: 'الكل', inStock: 'متوفر', canReq: 'بالطلب',
@@ -40,31 +61,62 @@ const W = {
     loading: 'جارٍ تحميل المنتجات…', loadErr: 'تعذّر تحميل المتجر. تحقق من اتصال الإنترنت.', retry: 'حاول مرة أخرى',
     empty: 'نجهّز المتجر الآن. عُد قريبًا.', closed: 'المتجر لا يستقبل طلبات حاليًا. يمكنك التصفح.',
     cart: 'سلتك', cartEmpty: 'سلتك فارغة.', keepShopping: 'تابع التسوق', order: 'الطلب', orderSub: 'موجود في مصر، يصلك بالتوصيل',
-    requests: 'طلبات المنتجات', reqSub: 'غير موجود في مصر الآن؛ نحضره مع الشحنة القادمة', total: 'الإجمالي', reqTotal: 'إجمالي الطلبات',
-    down: p => `العربون ${p}%`, downNote: p => `نؤكد طلبات المنتجات على واتساب أولًا. يُدفع العربون ${p}% عبر InstaPay بعد التأكيد، والباقي عند الوصول.`,
-    pay: 'الدفع عند الاستلام أو عبر InstaPay؛ نرسل التفاصيل على واتساب.', reqOnly: (n, a) => `${n} متوفر، والباقي كطلب`,
-    gone: 'لم يعد في المتجر', remove: 'إزالة', details: 'بياناتك', name: 'الاسم', phone: 'رقم الموبايل', address: 'المنطقة والعنوان',
-    note: 'ملاحظة (اختياري)', send: 'أرسل على واتساب', noWa: 'الطلب متاح قريبًا.', need: 'من فضلك اكتب الاسم ورقم الموبايل والعنوان.',
-    sent: 'أرسلت طلبك؟ أفرغ السلة', cleared: 'تم إفراغ السلة', added: 'أُضيف إلى السلة', requested: 'أُضيف كطلب',
-    items: n => n === 1 ? 'منتج واحد' : `${n} منتجات`, view: 'اعرض السلة', close: 'إغلاق',
-    msgHead: shop => `طلب جديد · ${shop}`, msgOrder: 'الطلب (موجود في مصر)', msgReq: p => `طلبات المنتجات (غير موجودة في مصر، عربون ${p}%)`,
-    msgTotal: 'الإجمالي', msgDown: 'العربون', msgName: 'الاسم', msgPhone: 'الموبايل', msgAddr: 'العنوان', msgNote: 'ملاحظة'
+    requests: 'طلبات المنتجات', reqSub: 'غير موجود في مصر الآن؛ نحضره مع الشحنة القادمة', reqOnly: n => `${n} متوفر، والباقي كطلب`,
+    gone: 'لم يعد في المتجر', remove: 'إزالة', close: 'إغلاق', added: 'أُضيف إلى السلة', requested: 'أُضيف كطلب',
+    items: n => n === 1 ? 'منتج واحد' : `${n} منتجات`, view: 'اعرض السلة',
+    signin: 'سجّل الدخول برقم موبايلك', signinSub: 'نرسل لك كودًا في رسالة. بدون كلمة سر.', phone: 'رقم الموبايل', sendCode: 'أرسل الكود',
+    code: 'الكود من الرسالة', checkCode: 'تسجيل الدخول', sentTo: p => `أرسلنا كودًا إلى ${p}.`, changeNum: 'غيّر الرقم', signedAs: p => `مسجّل باسم ${p}`, signout: 'تسجيل الخروج',
+    sending: 'جارٍ الإرسال…', checking: 'جارٍ التحقق…',
+    details: 'بيانات التوصيل', name: 'الاسم', address: 'المنطقة والعنوان', note: 'ملاحظة (اختياري)',
+    payHow: 'كيف تحب أن تدفع؟', cod: 'الدفع عند الاستلام', codSub: 'ادفع للمندوب عند الوصول', insta: 'InstaPay', instaSub: 'تحويل قبل التوصيل',
+    goods: 'المنتجات', delivery: 'التوصيل', free: 'مجاني', credit: 'رصيدك', total: 'الإجمالي', reqTotal: 'إجمالي الطلبات',
+    payNow: p => `ادفع الآن عبر InstaPay (${p}%)`, payLater: 'عند الاستلام', reqDown: p => `عربون طلبات المنتجات (${p}%)`,
+    reqNote: 'تدفع باقي ثمن طلب المنتج عند وصوله وتأكيدك له. يمكنك الإلغاء في أي وقت قبل ذلك.',
+    place: 'أرسل الطلب', placing: 'جارٍ الإرسال…', need: 'من فضلك اكتب الاسم والعنوان.',
+    done: 'شكرًا! وصلنا طلبك.', doneSub: 'سنؤكده قريبًا. تابعه من «طلباتي».',
+    payBox: 'الدفع عبر InstaPay', payTo: 'حوّل إلى', amount: 'المبلغ', ref: 'اكتب في ملاحظة التحويل', copy: 'نسخ', copied: 'تم النسخ',
+    upload: 'ارفع صورة التحويل', uploading: 'جارٍ الرفع…', proofSent: 'تم إرسال الصورة ✓ سنراجعها.', replace: 'استبدال',
+    proofOk: 'تم إرسال الصورة', tooBig: 'تعذّرت قراءة الصورة. جرّب لقطة شاشة.',
+    mine: 'طلباتي', noOrders: 'لا توجد طلبات بعد.', signinMine: 'سجّل الدخول لترى طلباتك.', yourCredit: 'رصيدك',
+    creditNote: 'يُخصم تلقائيًا من طلبك القادم.', creditRefund: 'اطلب استرداده', creditAsked: 'طلبت الاسترداد. سنرسله إلى',
+    st: { new: 'في انتظار التأكيد', newPay: 'في انتظار العربون', confirmed: 'تم التأكيد ونجهّزه', out: 'في الطريق إليك', delivered: 'تم التوصيل',
+      requested: 'تم الطلب · سنخبرك عند وصوله', offered: 'وصل! من فضلك أكّد خلال 24 ساعة', declined: 'مرفوض', cancelled: 'ملغي' },
+    paid: 'مدفوع ✓', notPaid: 'لم يُدفع بعد', checkingPay: 'أرسلت الصورة، نراجعها',
+    cancel: 'إلغاء', cancelAsk: 'إلغاء هذا الطلب؟', confirmOffer: 'نعم، ما زلت أريده', keep: 'احتفظ به',
+    refundQ: a => `ماذا نفعل بعربونك (${a})؟`, refundTo: 'استرداد إلى InstaPay الخاص بي', refundInput: 'عنوان أو رقم InstaPay الخاص بك',
+    asCredit: 'احتفظ به كرصيد', refundChosen: p => `استرداد إلى ${p}`, creditChosen: 'محفوظ كرصيد', refundDone: 'تم الاسترداد ✓', creditDone: 'أُضيف إلى رصيدك ✓',
+    why: 'رسالة من المتجر', wa: 'أسئلة؟ راسلنا على واتساب', declinedNote: 'نعتذر، لم نتمكن من تنفيذ هذا الطلب.',
+    errs: { phone: 'تحقق من رقم الموبايل.', code: 'الكود غير صحيح. راجع الرسالة وحاول مرة أخرى.', many: 'محاولات كثيرة. انتظر بضع دقائق وحاول مرة أخرى.',
+      off: 'تسجيل الدخول بالرسائل غير مفعّل بعد. راسلنا على واتساب من فضلك.', net: 'لا يوجد اتصال. تحقق من الإنترنت وحاول مرة أخرى.',
+      closed: 'المتجر لا يستقبل طلبات حاليًا.', gen: 'حدث خطأ. حاول مرة أخرى.' }
   }
 };
 const t = (k, ...a) => { const v = W[LANG][k] ?? W.en[k] ?? k; return typeof v === 'function' ? v(...a) : v; };
 const money = n => LANG === 'ar' ? `${Math.round(n).toLocaleString('en-US')} ج.م` : `EGP ${Math.round(n).toLocaleString('en-US')}`;
+const when = iso => iso ? new Date(iso).toLocaleString(LANG === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
 /* ---- state ---- */
-let CAT = [], BY = {}, SET = { name: 'Shanta', reqDownPct: 20, open: true, lowStock: 2 }, STATE = 'loading';
+let CAT = [], BY = {}, SET = { name: 'Shanta', reqDownPct: 20, downCod: 0, downInsta: 100, deliveryFee: 0, open: true, lowStock: 2 }, STATE = 'loading';
 const CART = ls('shop-cart', {});           // product id → units
-const ME = ls('shop-me', {});               // name, phone, address, note
+const ME = ls('shop-me', {});               // name, address, note, method
 const UI = { q: '', avail: '', cat: '', brand: '', sort: 'name' };
+const P = { mode: '', busy: '', err: '', phone: '', conf: null, placed: [], cancelling: '', refundFor: '', creditAsk: false };
+let FBX = null, USER = null, CUST = null, MINE = [], unsub = [];
 
+async function fbx() {
+  if (FBX) return FBX;
+  const [A, U, S] = await Promise.all([import(FB('app')), import(FB('auth')), import(FB('firestore'))]);
+  /* its own app name: signing in or out here never touches Shanta's admin login on the same site */
+  const app = A.getApps().find(a => a.name === 'shop') || A.initializeApp(CFG, 'shop');
+  const auth = U.getAuth(app); auth.languageCode = LANG;
+  FBX = { U, S, app, auth, fs: S.getFirestore(app) };
+  U.onAuthStateChanged(auth, u => { USER = u; listen(); draw(); });
+  return FBX;
+}
 async function load() {
   STATE = 'loading'; draw();
   try {
-    const [A, S] = await Promise.all([import(FB('app')), import(FB('firestore-lite'))]);
-    const app = A.getApps().length ? A.getApp() : A.initializeApp(CFG), fs = S.getFirestore(app);
+    const { S, fs } = await fbx();
     const [cat, st] = await Promise.all([S.getDocs(S.collection(fs, 'catalog')), S.getDoc(S.doc(fs, 'shop', 'settings'))]);
     CAT = []; cat.forEach(d => CAT.push(Object.assign({ id: d.id }, d.data())));
     BY = {}; CAT.forEach(p => BY[p.id] = p);
@@ -73,9 +125,21 @@ async function load() {
   } catch (e) { console.warn(e); STATE = 'error'; }
   draw();
 }
+/* the signed-in customer's profile and orders, live */
+function listen() {
+  unsub.forEach(u => u()); unsub = []; CUST = null; MINE = [];
+  if (!USER) return;
+  const { S, fs } = FBX;
+  unsub.push(S.onSnapshot(S.doc(fs, 'customers', USER.uid), d => { CUST = d.exists() ? d.data() : null;
+    if (CUST) { ['name', 'address'].forEach(k => { if (!ME[k] && CUST[k]) ME[k] = CUST[k]; }); save('shop-me', ME); } draw(); }, e => console.warn(e)));
+  unsub.push(S.onSnapshot(S.query(S.collection(fs, 'orders'), S.where('uid', '==', USER.uid)), q => {
+    MINE = q.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); draw(); }, e => console.warn(e)));
+}
 
 /* ---- cart: units in Egypt go in the order, the rest is a request ---- */
-const maxFor = p => p.status === 'in' ? Math.max(0, p.avail | 0) : REQ_MAX;
+const maxFor = p => p.status === 'in' ? (p.avail | 0) + REQ_MAX : REQ_MAX;   // beyond the stock in Egypt, the extra units are requested
+const pctOf = (v, d) => { const c = CUST && CUST.downPct; return c !== undefined && c !== null && c !== '' ? num(c) : num(v ?? d); };
+const downOf = (total, pct) => pct >= 100 ? total : Math.min(total, Math.ceil(total * pct / 100 / 5) * 5);
 function lines() {
   const o = [], r = [], gone = [];
   Object.entries(CART).forEach(([id, q]) => {
@@ -85,32 +149,37 @@ function lines() {
     if (ord) o.push({ p, q: ord });
     if (q - ord) r.push({ p, q: q - ord, split: ord > 0 });
   });
-  const sum = a => a.reduce((s, x) => s + x.q * (+x.p.price || 0), 0);
-  const pct = Math.max(0, Math.min(100, +SET.reqDownPct || 0)), rt = sum(r);
-  return { o, r, gone, ot: sum(o), rt, pct, down: Math.ceil(rt * pct / 100 / 5) * 5, n: Object.values(CART).reduce((s, q) => s + (q | 0), 0) };
+  const sum = a => a.reduce((s, x) => s + x.q * num(x.p.price), 0);
+  const method = SET.instapay && ME.method === 'instapay' ? 'instapay' : 'cod';
+  const fee = num(SET.deliveryFee), credit = Math.max(0, num(CUST && CUST.credit));
+  /* delivery and credit go on the order; on the request when there are only requests */
+  const og = sum(o), rg = sum(r), od = o.length ? fee : 0, rd = !o.length && r.length ? fee : 0;
+  const oc = Math.min(credit, og + od), rc = o.length ? 0 : Math.min(credit, rg + rd);
+  const ot = og + od - oc, rt = rg + rd - rc;
+  const opct = pctOf(method === 'cod' ? SET.downCod : SET.downInsta, method === 'cod' ? 0 : 100), rpct = pctOf(SET.reqDownPct, 20);
+  return { o, r, gone, method, og, rg, od, rd, oc, rc, ot, rt, opct, rpct, odown: downOf(ot, opct), rdown: downOf(rt, rpct), n: Object.values(CART).reduce((s, q) => s + (q | 0), 0) };
 }
 function setQty(id, q) {
-  const p = BY[id]; q = Math.max(0, q | 0);
-  if (p) q = Math.min(q, maxFor(p));
+  const p = BY[id]; q = Math.max(0, Math.min(q | 0, p ? maxFor(p) : 0));
   if (q) CART[id] = q; else delete CART[id];
   save('shop-cart', CART);
 }
 
-/* ---- drawing ---- */
+/* ---- products ---- */
 const initials = p => esc(String(p.brand || p.name || '?').trim().slice(0, 2).toUpperCase());
-const stockLine = p => p.status === 'in' ? ((p.avail | 0) <= (+SET.lowStock || 2) ? `<span class="st low">${t('left', p.avail | 0)}</span>` : `<span class="st ok">${t('avail')}</span>`)
+const stockLine = p => p.status === 'in' ? ((p.avail | 0) <= (num(SET.lowStock) || 2) ? `<span class="st low">${t('left', p.avail | 0)}</span>` : `<span class="st ok">${t('avail')}</span>`)
   : p.status === 'way' ? `<span class="st way">${t('way')}</span>` : `<span class="st req">${t('soldOut')}</span>`;
 function stepper(p) {
-  const q = CART[p.id] | 0, max = maxFor(p);
+  const q = CART[p.id] | 0;
   if (!q) return p.status === 'in' ? `<button type="button" class="btn" data-add="${esc(p.id)}">${t('add')}</button>` : `<button type="button" class="btn req" data-add="${esc(p.id)}">${t('request')}</button>`;
-  return `<div class="step"><button type="button" data-q="${esc(p.id)}:-1" aria-label="${t('less')}">−</button><b>${q}</b><button type="button" data-q="${esc(p.id)}:1" aria-label="${t('more')}"${q >= max ? ' disabled' : ''}>+</button></div>`;
+  return `<div class="step"><button type="button" data-q="${esc(p.id)}:-1" aria-label="${t('less')}">−</button><b>${q}</b><button type="button" data-q="${esc(p.id)}:1" aria-label="${t('more')}"${q >= maxFor(p) ? ' disabled' : ''}>+</button></div>`;
 }
 function card(p) {
   return `<article class="pc" data-id="${esc(p.id)}">
     <div class="ph">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ini',textContent:this.dataset.i}))" data-i="${initials(p)}">` : `<span class="ini">${initials(p)}</span>`}
       <span class="stag ${p.store === 'Rossmann' ? 'ross' : 'dm'}">${esc(p.store || 'dm')}</span></div>
     <div class="pb"><small dir="auto">${esc(p.brand || '')}</small><h3 dir="auto">${esc(p.name)}</h3>
-      <div class="pr"><b>${money(+p.price || 0)}</b>${p.size ? `<span dir="ltr">${esc(p.size)}</span>` : ''}</div>
+      <div class="pr"><b>${money(num(p.price))}</b>${p.size ? `<span dir="ltr">${esc(p.size)}</span>` : ''}</div>
       ${stockLine(p)}${stepper(p)}</div></article>`;
 }
 function filtersHTML() {
@@ -125,8 +194,7 @@ function filtersHTML() {
       <select data-f="sort">${opt('name', t('sortName'), UI.sort)}${opt('low', t('sortLow'), UI.sort)}${opt('high', t('sortHigh'), UI.sort)}</select></div>`;
 }
 function shown() {
-  const q = UI.q.trim().toLowerCase();
-  const rank = p => p.status === 'in' ? 0 : p.status === 'way' ? 1 : 2;
+  const q = UI.q.trim().toLowerCase(), rank = p => p.status === 'in' ? 0 : p.status === 'way' ? 1 : 2;
   return CAT.filter(p => (!q || `${p.name} ${p.brand} ${p.category} ${p.ean}`.toLowerCase().includes(q))
     && (!UI.avail || (UI.avail === 'in' ? p.status === 'in' : p.status !== 'in'))
     && (!UI.cat || p.category === UI.cat) && (!UI.brand || p.brand === UI.brand))
@@ -137,54 +205,199 @@ function drawGrid() {
   if (STATE === 'loading') { g.innerHTML = `<p class="msg"><span class="spin"></span>${t('loading')}</p>`; return; }
   if (STATE === 'error') { g.innerHTML = `<p class="msg">${t('loadErr')}<br><button type="button" class="btn ghost" data-act="retry">${t('retry')}</button></p>`; return; }
   if (!CAT.length) { g.innerHTML = `<p class="msg">${t('empty')}</p>`; return; }
-  const list = shown();
-  g.innerHTML = list.map(card).join('') || `<p class="msg">${t('nothing')}<br><button type="button" class="btn ghost" data-act="clear">${t('clear')}</button></p>`;
+  g.innerHTML = shown().map(card).join('') || `<p class="msg">${t('nothing')}<br><button type="button" class="btn ghost" data-act="clear">${t('clear')}</button></p>`;
 }
+const openFor = o => ['new', 'requested', 'offered'].includes(o.status);
+const mineNeeds = () => MINE.filter(o => o.status === 'offered' || (openFor(o) && num(o.down) > 0 && !o.downPaid && !o.proof)
+  || (['declined', 'cancelled'].includes(o.status) && (o.downPaid || o.proof) && num(o.down) > 0 && !o.refund && !o.refundDone)).length;
 function drawBar() {
   const L = lines(), b = $('#cartbar');
-  $('#cartn').textContent = L.n ? L.n : ''; $('#cartn').hidden = !L.n;
-  b.innerHTML = L.n ? `<button type="button" class="cb" data-act="cart"><span>${t('items', L.n)}</span><b>${money(L.ot + L.rt)}</b><span class="go">${t('view')}</span></button>` : '';
-  document.body.classList.toggle('hasbar', !!L.n);
+  $('#cartn').textContent = L.n || ''; $('#cartn').hidden = !L.n;
+  const n = mineNeeds(); $('#men').textContent = n || ''; $('#men').hidden = !n;
+  b.innerHTML = L.n && P.mode !== 'cart' ? `<button type="button" class="cb" data-act="cart"><span>${t('items', L.n)}</span><b>${money(L.og + L.rg)}</b><span class="go">${t('view')}</span></button>` : '';
+  document.body.classList.toggle('hasbar', !!L.n && P.mode !== 'cart');
+}
+
+/* ---- the panel: cart & checkout, order sent, my orders ---- */
+const waLink = () => SET.whatsapp ? `<a class="walink" href="https://wa.me/${esc(SET.whatsapp)}" target="_blank" rel="noopener">${t('wa')}</a>` : '';
+const head = title => `<div class="dh"><h2>${title}</h2><button type="button" class="x" data-act="close" aria-label="${t('close')}">×</button></div>`;
+const errHTML = () => P.err ? `<p class="err">${esc(P.err)}</p>` : '';
+function lineHTML(x) {
+  return `<li><div class="li"><b dir="auto">${esc(x.p.name)}</b><small dir="auto">${esc(x.p.brand || '')} · ${money(num(x.p.price))}${x.split ? ' · ' + t('reqOnly', x.p.avail | 0) : ''}</small></div>
+    ${x.split ? `<b class="lq">× ${x.q}</b>` : `<div class="step sm"><button type="button" data-q="${esc(x.p.id)}:-1" aria-label="${t('less')}">−</button><b>${x.q}</b><button type="button" data-q="${esc(x.p.id)}:1" aria-label="${t('more')}"${(CART[x.p.id] | 0) >= maxFor(x.p) ? ' disabled' : ''}>+</button></div>`}
+    <b class="lt">${money(x.q * num(x.p.price))}</b></li>`;
+}
+const row = (l, v, cls) => `<p class="tot${cls ? ' ' + cls : ''}"><span>${l}</span><b>${v}</b></p>`;
+function signinHTML() {
+  if (USER) return `<p class="signed">${t('signedAs', `<span dir="ltr">${esc(USER.phoneNumber || '')}</span>`)} <button type="button" class="linkbtn" data-act="signout">${t('signout')}</button></p>`;
+  if (P.conf) return `<section><h3>${t('signin')}</h3><p class="note">${t('sentTo', `<span dir="ltr">${esc(P.phone)}</span>`)} <button type="button" class="linkbtn" data-act="renum">${t('changeNum')}</button></p>
+    <div class="inrow"><input id="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${t('code')}" dir="ltr"><button type="button" class="btn" data-act="code"${P.busy ? ' disabled' : ''}>${P.busy === 'code' ? t('checking') : t('checkCode')}</button></div>${errHTML()}</section>`;
+  return `<section><h3>${t('signin')}<small>${t('signinSub')}</small></h3>
+    <div class="inrow"><input id="phonein" type="tel" inputmode="tel" autocomplete="tel" placeholder="01012345678" value="${esc(P.phone)}" dir="ltr"><button type="button" class="btn" id="sendcode" data-act="send"${P.busy ? ' disabled' : ''}>${P.busy === 'send' ? t('sending') : t('sendCode')}</button></div>${errHTML()}</section>`;
+}
+function cartHTML() {
+  const L = lines(), open = SET.open !== false;
+  if (!L.n) return head(t('cart')) + `<p class="msg">${t('cartEmpty')}</p><button type="button" class="btn full" data-act="close">${t('keepShopping')}</button>` + waLink();
+  const f = (k, l, type, extra) => `<label class="fl"><span>${l}</span><input data-me="${k}" type="${type}" value="${esc(ME[k] || '')}" ${extra || ''}></label>`;
+  const m = (v, l, s) => `<label class="pm${L.method === v ? ' on' : ''}"><input type="radio" name="pm" data-method="${v}"${L.method === v ? ' checked' : ''}><span><b>${l}</b><small>${s}</small></span></label>`;
+  return head(t('cart')) + `
+    ${L.o.length ? `<section><h3>${t('order')}<small>${t('orderSub')}</small></h3><ul class="cl">${L.o.map(lineHTML).join('')}</ul></section>` : ''}
+    ${L.r.length ? `<section class="rq"><h3>${t('requests')}<small>${t('reqSub')}</small></h3><ul class="cl">${L.r.map(lineHTML).join('')}</ul></section>` : ''}
+    ${L.gone.length ? `<p class="note">${t('gone')}: ${L.gone.length} <button type="button" class="linkbtn" data-act="dropgone">${t('remove')}</button></p>` : ''}
+    ${signinHTML()}
+    ${USER ? `<section><h3>${t('details')}</h3><div class="fg">${f('name', t('name'), 'text', 'autocomplete="name"')}${f('address', t('address'), 'text', 'autocomplete="street-address"')}${f('note', t('note'), 'text')}</div></section>
+    ${L.o.length && SET.instapay ? `<section><h3>${t('payHow')}</h3><div class="pms">${m('cod', t('cod'), t('codSub'))}${m('instapay', t('insta'), t('instaSub'))}</div></section>` : ''}
+    <section class="sum">
+      ${L.o.length ? row(t('goods'), money(L.og)) + row(t('delivery'), L.od ? money(L.od) : t('free')) + (L.oc ? row(t('credit'), '−' + money(L.oc)) : '') + row(t('total'), money(L.ot), 'big')
+        + (L.odown > 0 ? row(t('payNow', L.opct), money(L.odown), 'down') + (L.ot - L.odown > 0 ? row(t('payLater'), money(L.ot - L.odown)) : '') : '') : ''}
+      ${L.r.length ? (L.o.length ? '<hr>' : '') + row(t('reqTotal'), money(L.rg)) + (L.rd ? row(t('delivery'), money(L.rd)) : '') + (L.rc ? row(t('credit'), '−' + money(L.rc)) : '')
+        + (L.rdown > 0 ? row(t('reqDown', L.rpct), money(L.rdown), 'down') : '') + `<p class="note">${t('reqNote')}</p>` : ''}
+    </section>
+    ${P.err && USER ? errHTML() : ''}
+    ${open ? `<button type="button" class="btn full big" data-act="place"${P.busy ? ' disabled' : ''}>${P.busy === 'place' ? t('placing') : t('place')}</button>` : `<p class="banner">${t('closed')}</p>`}` : ''}
+    ${waLink()}`;
+}
+function payBox(o) {
+  if (!(num(o.down) > 0) || o.downPaid || !openFor(o)) return '';
+  const cp = (v, l) => `<div class="cp"><small>${l}</small><b dir="ltr">${esc(v)}</b><button type="button" class="linkbtn" data-copy="${esc(v)}">${t('copy')}</button></div>`;
+  return `<div class="paybox"><h4>${t('payBox')}</h4>${SET.instapay ? cp(SET.instapay, t('payTo')) : ''}${cp(String(Math.round(num(o.down))), t('amount') + ' (EGP)')}${cp('#' + o.code, t('ref'))}
+    ${o.proof ? `<p class="ok">${t('proofSent')} <button type="button" class="linkbtn" data-proof="${esc(o.id)}">${t('replace')}</button></p>`
+      : `<button type="button" class="btn full" data-proof="${esc(o.id)}"${P.busy === 'proof:' + o.id ? ' disabled' : ''}>${P.busy === 'proof:' + o.id ? t('uploading') : t('upload')}</button>`}</div>`;
+}
+function orderHTML(o) {
+  const S = W[LANG].st, label = o.status === 'new' && num(o.down) > 0 && !o.downPaid ? S.newPay : S[o.status] || o.status;
+  const cls = { new: 'warn', offered: 'warn', confirmed: 'ok', out: 'ok', delivered: 'ok', declined: 'bad', cancelled: 'bad', requested: '' }[o.status] || '';
+  const back = (o.downPaid || o.proof) ? num(o.down) : 0, act = [];
+  if (o.status === 'offered') act.push(`<button type="button" class="btn" data-mine="take:${o.id}">${t('confirmOffer')}</button>`);
+  if (openFor(o) && P.cancelling !== o.id) act.push(`<button type="button" class="btn ghost" data-mine="cancel:${o.id}">${t('cancel')}</button>`);
+  let refund = '';
+  const choose = `<p class="note"><b>${t('refundQ', money(back))}</b></p><div class="inrow"><input id="refto-${esc(o.id)}" placeholder="${t('refundInput')}" dir="ltr" value="${esc(ME.instapay || '')}"><button type="button" class="btn" data-mine="${P.cancelling === o.id ? 'cxrefund' : 'refund'}:${o.id}">${t('refundTo')}</button></div>
+    <button type="button" class="btn ghost full" data-mine="${P.cancelling === o.id ? 'cxcredit' : 'credit'}:${o.id}">${t('asCredit')}</button>`;
+  if (P.cancelling === o.id) refund = back ? choose + `<button type="button" class="linkbtn" data-mine="nocx:${o.id}">${t('keep')}</button>` : '';
+  else if (['declined', 'cancelled'].includes(o.status) && back) refund = o.refundDone ? `<p class="ok">${o.refund === 'credit' ? t('creditDone') : t('refundDone')}</p>`
+    : o.refund ? `<p class="note">${o.refund === 'credit' ? t('creditChosen') : t('refundChosen', `<span dir="ltr">${esc(o.refundTo || '')}</span>`)}</p>` : choose;
+  return `<article class="mo"><div class="moh"><b>#${esc(o.code)}</b><span class="pill ${cls}">${label}</span></div><small class="sub">${when(o.createdAt)}</small>
+    <ul class="cl">${(o.lines || []).map(l => `<li><div class="li"><b dir="auto">${num(l.qty)} × ${esc(l.name)}</b><small dir="auto">${esc(l.brand || '')}</small></div><b class="lt">${money(num(l.qty) * num(l.price))}</b></li>`).join('')}</ul>
+    ${num(o.delivery) ? row(t('delivery'), money(num(o.delivery))) : ''}${num(o.creditUsed) ? row(t('credit'), '−' + money(num(o.creditUsed))) : ''}${row(t('total'), money(num(o.total)), 'big')}
+    ${num(o.down) > 0 ? row(o.kind === 'request' ? t('reqDown', num(o.downPct)) : t('payNow', num(o.downPct)), `${money(num(o.down))} · ${o.downPaid ? t('paid') : o.proof ? t('checkingPay') : t('notPaid')}`, 'down') : ''}
+    ${o.status === 'declined' ? `<p class="note">${o.declineMsg ? `${t('why')}: “${esc(o.declineMsg)}”` : t('declinedNote')}</p>` : ''}
+    ${payBox(o)}${refund}${act.length && P.cancelling !== o.id ? `<div class="moact">${act.join('')}</div>` : ''}</article>`;
+}
+function doneHTML() {
+  const list = P.placed.map(p => MINE.find(o => o.id === p.id) || p);
+  return head(t('done')) + `<p class="note">${t('doneSub')}</p>${errHTML()}${list.map(orderHTML).join('')}
+    <button type="button" class="btn ghost full" data-act="close">${t('keepShopping')}</button>${waLink()}`;
+}
+function mineHTML() {
+  if (!USER) return head(t('mine')) + `<p class="note">${t('signinMine')}</p>` + signinHTML() + waLink();
+  const c = num(CUST && CUST.credit), asked = CUST && CUST.creditRefundAt && (!CUST.creditRefundDoneAt || CUST.creditRefundDoneAt < CUST.creditRefundAt);
+  return head(t('mine')) + signinHTML()
+    + (c > 0 ? `<section class="credit"><p class="tot big"><span>${t('yourCredit')}</span><b>${money(c)}</b></p><p class="note">${t('creditNote')}</p>
+      ${asked ? `<p class="note">${t('creditAsked')} <span dir="ltr">${esc(CUST.creditRefundTo || '')}</span></p>`
+        : P.creditAsk ? `<div class="inrow"><input id="credto" placeholder="${t('refundInput')}" dir="ltr" value="${esc(ME.instapay || '')}"><button type="button" class="btn" data-mine="credref:">${t('refundTo')}</button></div>`
+        : `<button type="button" class="linkbtn" data-mine="credask:">${t('creditRefund')}</button>`}</section>` : '')
+    + errHTML() + (MINE.length ? MINE.map(orderHTML).join('') : `<p class="msg">${t('noOrders')}</p>`) + waLink();
+}
+function drawPanel() {
+  const p = $('#panel');
+  if (!P.mode) { if (!p.hidden) { p.hidden = true; document.body.classList.remove('locked'); } return; }
+  const keep = document.activeElement && document.activeElement.id && p.contains(document.activeElement) ? [document.activeElement.id, document.activeElement.selectionStart] : null;
+  const keepMe = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.me;
+  const sc = $('.sheet').scrollTop;
+  $('#pbody').innerHTML = P.mode === 'cart' ? cartHTML() : P.mode === 'done' ? doneHTML() : mineHTML();
+  p.hidden = false; document.body.classList.add('locked'); $('.sheet').scrollTop = sc;
+  const el = keep ? document.getElementById(keep[0]) : keepMe ? $(`[data-me="${keepMe}"]`) : null;
+  if (el) { el.focus(); try { el.setSelectionRange(keep ? keep[1] : el.value.length, keep ? keep[1] : el.value.length); } catch (e) { } }
 }
 function draw() {
   document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
   $('#langbtn').textContent = LANG === 'ar' ? 'English' : 'العربية';
   $('#sname').textContent = SET.name || 'Shanta'; $('#stag').textContent = t('tag');
   document.title = (SET.name || 'Shanta') + (LANG === 'ar' ? ' · المتجر' : ' Shop');
-  if (STATE === 'ok' && CAT.length) { const f = $('#filters'), had = document.activeElement && document.activeElement.id === 'q'; f.innerHTML = filtersHTML(); if (had) { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+  if (STATE === 'ok' && CAT.length) { const had = document.activeElement && document.activeElement.id === 'q'; $('#filters').innerHTML = filtersHTML(); if (had) { const i = $('#q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   else $('#filters').innerHTML = '';
   $('#banner').innerHTML = STATE === 'ok' && SET.open === false ? `<p class="banner">${t('closed')}</p>` : '';
-  drawGrid(); drawBar();
-  if ($('#cart').open) drawCart();
+  drawGrid(); drawBar(); drawPanel();
 }
-function lineHTML(x, req) {
-  return `<li><div class="li"><b dir="auto">${esc(x.p.name)}</b><small dir="auto">${esc(x.p.brand || '')} · ${money(+x.p.price || 0)}${x.split ? ' · ' + t('reqOnly', x.p.avail | 0) : ''}</small></div>
-    ${x.split ? `<b class="lq">× ${x.q}</b>` : `<div class="step sm"><button type="button" data-q="${esc(x.p.id)}:-1" aria-label="${t('less')}">−</button><b>${x.q}</b><button type="button" data-q="${esc(x.p.id)}:1" aria-label="${t('more')}"${(CART[x.p.id] | 0) >= maxFor(x.p) ? ' disabled' : ''}>+</button></div>`}
-    <b class="lt">${money(x.q * (+x.p.price || 0))}</b></li>`;
+function toast(m) { const e = $('#toast'); e.textContent = m; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2400); }
+const errMsg = e => { const c = (e && e.code) || '', E = W[LANG].errs;
+  return /invalid-phone|missing-phone/.test(c) ? E.phone : /invalid-verification-code|code-expired|missing-code/.test(c) ? E.code : /too-many|quota/.test(c) ? E.many
+    : /operation-not-allowed|billing|admin-restricted|region/.test(c) ? E.off : /network|unavailable/.test(c) ? E.net : /permission/.test(c) && SET.open === false ? E.closed : E.gen; };
+
+/* ---- sign in with an SMS code ---- */
+const e164 = v => { const raw = String(v || '').trim(), d = raw.replace(/\D/g, '');
+  if (/^01\d{9}$/.test(d)) return '+2' + d;
+  if (/^1\d{9}$/.test(d)) return '+20' + d;
+  if (raw.startsWith('+')) return '+' + d;
+  if (d.startsWith('00')) return '+' + d.slice(2);
+  return d.length >= 11 ? '+' + d : ''; };
+async function sendCode() {
+  const ph = e164($('#phonein').value); P.phone = $('#phonein').value.trim();
+  if (!ph || ph.length < 11) { P.err = t('errs').phone; return drawPanel(); }
+  P.busy = 'send'; P.err = ''; drawPanel();
+  try {
+    const { U, auth } = await fbx(); auth.languageCode = LANG;
+    if (!sendCode.v) sendCode.v = new U.RecaptchaVerifier(auth, 'recap', { size: 'invisible' });
+    P.conf = await U.signInWithPhoneNumber(auth, ph, sendCode.v); P.phone = ph;
+  } catch (e) { console.warn(e); P.err = errMsg(e); try { sendCode.v && sendCode.v.clear(); } catch (x) { } sendCode.v = null; $('#recap').innerHTML = ''; }
+  P.busy = ''; drawPanel(); const c = $('#codein'); if (c) c.focus();
 }
-function drawCart() {
-  const L = lines(), can = SET.open !== false && !!SET.whatsapp;
-  const f = (k, l, type, extra) => `<label class="fl"><span>${l}</span><input data-me="${k}" type="${type}" value="${esc(ME[k] || '')}" ${extra || ''}></label>`;
-  $('#cartbody').innerHTML = `<div class="dh"><h2>${t('cart')}</h2><button type="button" class="x" data-act="close" aria-label="${t('close')}">×</button></div>
-    ${!L.n ? `<p class="msg">${t('cartEmpty')}</p><button type="button" class="btn full" data-act="close">${t('keepShopping')}</button>` : `
-    ${L.o.length ? `<section><h3>${t('order')}<small>${t('orderSub')}</small></h3><ul class="cl">${L.o.map(x => lineHTML(x)).join('')}</ul><p class="tot"><span>${t('total')}</span><b>${money(L.ot)}</b></p><p class="note">${t('pay')}</p></section>` : ''}
-    ${L.r.length ? `<section class="rq"><h3>${t('requests')}<small>${t('reqSub')}</small></h3><ul class="cl">${L.r.map(x => lineHTML(x, 1)).join('')}</ul><p class="tot"><span>${t('reqTotal')}</span><b>${money(L.rt)}</b></p>${L.pct ? `<p class="tot down"><span>${t('down', L.pct)}</span><b>${money(L.down)}</b></p><p class="note">${t('downNote', L.pct)}</p>` : ''}</section>` : ''}
-    ${L.gone.length ? `<p class="note">${t('gone')}: ${L.gone.length} <button type="button" class="linkbtn" data-act="dropgone">${t('remove')}</button></p>` : ''}
-    <section><h3>${t('details')}</h3><div class="fg">${f('name', t('name'), 'text', 'autocomplete="name"')}${f('phone', t('phone'), 'tel', 'autocomplete="tel" dir="ltr" inputmode="tel"')}${f('address', t('address'), 'text', 'autocomplete="street-address"')}${f('note', t('note'), 'text')}</div></section>
-    <p class="err" id="cerr" hidden></p>
-    ${can ? `<button type="button" class="btn full wa" data-act="send">${t('send')}</button>` : `<p class="banner">${SET.open === false ? t('closed') : t('noWa')}</p>`}
-    ${ME.sentAt ? `<button type="button" class="linkbtn" data-act="clearcart">${t('sent')}</button>` : ''}`}`;
+async function checkCode() {
+  const c = ($('#codein').value || '').replace(/\D/g, ''); if (c.length < 6) { P.err = t('errs').code; return drawPanel(); }
+  P.busy = 'code'; P.err = ''; drawPanel();
+  try { await P.conf.confirm(c); P.conf = null; } catch (e) { console.warn(e); P.err = errMsg(e); }
+  P.busy = ''; draw();
 }
-function message(L) {
-  const o = W[LANG], ln = x => `- ${x.q} × ${x.p.name}${x.p.brand ? ` (${x.p.brand})` : ''} · ${money(x.q * (+x.p.price || 0))}`;
-  const out = [o.msgHead(SET.name || 'Shanta'), ''];
-  if (L.o.length) out.push(o.msgOrder + ':', ...L.o.map(ln), `${o.msgTotal}: ${money(L.ot)}`, '');
-  if (L.r.length) out.push(o.msgReq(L.pct) + ':', ...L.r.map(ln), `${o.msgTotal}: ${money(L.rt)}`, ...(L.pct ? [`${o.msgDown}: ${money(L.down)}`] : []), '');
-  out.push(`${o.msgName}: ${ME.name}`, `${o.msgPhone}: ${ME.phone}`, `${o.msgAddr}: ${ME.address}`);
-  if (String(ME.note || '').trim()) out.push(`${o.msgNote}: ${ME.note}`);
-  return out.join('\n');
+
+/* ---- placing the order ---- */
+const CODE_CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => CODE_CH[b % CODE_CH.length]).join('');
+const pack = a => a.map(x => ({ id: x.p.id, name: x.p.name, brand: x.p.brand || '', ean: x.p.ean || '', price: num(x.p.price), qty: x.q }));
+async function place() {
+  const L = lines();
+  if (!String(ME.name || '').trim() || !String(ME.address || '').trim()) { P.err = t('need'); return drawPanel(); }
+  P.busy = 'place'; P.err = ''; drawPanel();
+  try {
+    const { S, fs } = FBX, now = new Date().toISOString(), b = S.writeBatch(fs), out = [];
+    const base = { uid: USER.uid, phone: USER.phoneNumber, name: ME.name.trim(), address: ME.address.trim(), note: String(ME.note || '').trim(), lang: LANG, createdAt: now };
+    const group = newCode();
+    if (L.o.length) out.push(Object.assign({}, base, { kind: 'order', status: 'new', method: L.method, lines: pack(L.o), goods: L.og, delivery: L.od, creditUsed: L.oc, total: L.ot, downPct: L.opct, down: L.odown, group, code: group }));
+    if (L.r.length) out.push(Object.assign({}, base, { kind: 'request', status: 'requested', method: L.method, lines: pack(L.r), goods: L.rg, delivery: L.rd, creditUsed: L.rc, total: L.rt, downPct: L.rpct, down: L.rdown, group, code: L.o.length ? newCode() : group }));
+    const cref = S.doc(fs, 'customers', USER.uid);
+    if (!CUST) b.set(cref, { name: base.name, phone: USER.phoneNumber, address: base.address, createdAt: now, updatedAt: now });
+    else if (CUST.name !== base.name || CUST.address !== base.address) b.update(cref, { name: base.name, address: base.address, updatedAt: now });
+    P.placed = out.map(o => { const r = S.doc(S.collection(fs, 'orders')); b.set(r, o); return Object.assign({ id: r.id }, o); });
+    await b.commit();
+    Object.keys(CART).forEach(k => delete CART[k]); save('shop-cart', CART); delete ME.note; save('shop-me', ME);
+    P.mode = 'done';
+  } catch (e) { console.warn(e); P.err = errMsg(e); P.placed = []; }
+  P.busy = ''; draw();
 }
-function toast(m) { const e = $('#toast'); e.textContent = m; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2200); }
+
+/* ---- InstaPay screenshot: made small enough to keep with the order ---- */
+async function shrink(file) {
+  const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = URL.createObjectURL(file); });
+  for (const [max, q] of [[1200, .62], [900, .5], [700, .42]]) {
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const u = c.toDataURL('image/jpeg', q); if (u.length < 650000) { URL.revokeObjectURL(img.src); return u; }
+  }
+  throw new Error('too big');
+}
+let proofFor = '';
+$('#proofin').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0], id = proofFor; e.target.value = ''; if (!f || !id) return;
+  P.busy = 'proof:' + id; P.err = ''; drawPanel();
+  try { const u = await shrink(f); const { S, fs } = FBX; await S.updateDoc(S.doc(fs, 'orders', id), { proof: u, proofAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); toast(t('proofOk')); }
+  catch (x) { console.warn(x); P.err = x && x.message === 'too big' ? t('tooBig') : errMsg(x); }
+  P.busy = ''; drawPanel();
+});
+async function updMine(id, data) {
+  try { const { S, fs } = FBX; await S.updateDoc(S.doc(fs, 'orders', id), Object.assign({ updatedAt: new Date().toISOString() }, data)); P.err = ''; }
+  catch (e) { console.warn(e); P.err = errMsg(e); }
+  P.cancelling = ''; draw();
+}
 
 /* ---- events ---- */
 document.addEventListener('click', e => {
@@ -193,30 +406,54 @@ document.addEventListener('click', e => {
   const s = e.target.closest('[data-q]');
   if (s) { const [id, d] = s.dataset.q.split(':'); setQty(id, (CART[id] | 0) + +d); return draw(); }
   const c = e.target.closest('[data-avail]'); if (c) { UI.avail = c.dataset.avail; return draw(); }
+  const cp = e.target.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy).then(() => toast(t('copied'))).catch(() => { }); return; }
+  const pf = e.target.closest('[data-proof]'); if (pf) { proofFor = pf.dataset.proof; return $('#proofin').click(); }
   if (e.target.closest('#langbtn')) { LANG = LANG === 'ar' ? 'en' : 'ar'; localStorage.setItem('shop-lang', LANG); return draw(); }
-  if (e.target.closest('#cartbtn')) { drawCart(); return $('#cart').showModal(); }
+  if (e.target.closest('#cartbtn')) { P.mode = 'cart'; P.err = ''; return draw(); }
+  if (e.target.closest('#mebtn')) { P.mode = 'mine'; P.err = ''; return draw(); }
+  if (e.target === $('#panel')) { P.mode = ''; return draw(); }
+  const mm = e.target.closest('[data-mine]');
+  if (mm) {
+    const [act, id] = mm.dataset.mine.split(':'), o = MINE.find(x => x.id === id) || P.placed.find(x => x.id === id), now = new Date().toISOString();
+    const refTo = () => { const v = (document.getElementById('refto-' + id) || $('#credto') || {}).value || ''; if (v.trim()) { ME.instapay = v.trim(); save('shop-me', ME); } return v.trim(); };
+    if (act === 'credask') { P.creditAsk = true; return drawPanel(); }
+    if (act === 'credref') { const v = refTo(); if (!v) return; const { S, fs } = FBX;
+      S.updateDoc(S.doc(fs, 'customers', USER.uid), { creditRefundTo: v, creditRefundAt: now }).then(() => { P.creditAsk = false; drawPanel(); }).catch(x => { P.err = errMsg(x); drawPanel(); }); return; }
+    if (!o) return;
+    if (act === 'take') return updMine(id, { status: 'new' });
+    if (act === 'cancel') { if (!confirm(t('cancelAsk'))) return; if ((o.downPaid || o.proof) && num(o.down) > 0) { P.cancelling = id; return drawPanel(); } return updMine(id, { status: 'cancelled', cancelledAt: now }); }
+    if (act === 'nocx') { P.cancelling = ''; return drawPanel(); }
+    if (act === 'cxrefund' || act === 'refund') { const v = refTo(); if (!v) { const i = document.getElementById('refto-' + id); if (i) i.focus(); return; }
+      return updMine(id, Object.assign({ refund: 'refund', refundTo: v }, act === 'cxrefund' ? { status: 'cancelled', cancelledAt: now } : {})); }
+    if (act === 'cxcredit' || act === 'credit') return updMine(id, Object.assign({ refund: 'credit' }, act === 'cxcredit' ? { status: 'cancelled', cancelledAt: now } : {}));
+  }
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
   if (act === 'retry') load();
   if (act === 'clear') { Object.assign(UI, { q: '', avail: '', cat: '', brand: '' }); draw(); }
-  if (act === 'cart') { drawCart(); $('#cart').showModal(); }
-  if (act === 'close') $('#cart').close();
+  if (act === 'cart') { P.mode = 'cart'; P.err = ''; draw(); }
+  if (act === 'close') { P.mode = ''; P.err = ''; P.cancelling = ''; draw(); }
   if (act === 'dropgone') { lines().gone.forEach(id => delete CART[id]); save('shop-cart', CART); draw(); }
-  if (act === 'clearcart') { Object.keys(CART).forEach(k => delete CART[k]); delete ME.sentAt; save('shop-cart', CART); save('shop-me', ME); toast(t('cleared')); draw(); }
-  if (act === 'send') {
-    const L = lines(), err = $('#cerr');
-    if (!String(ME.name || '').trim() || String(ME.phone || '').replace(/\D/g, '').length < 8 || !String(ME.address || '').trim()) { err.textContent = t('need'); err.hidden = false; return; }
-    ME.sentAt = new Date().toISOString(); save('shop-me', ME);
-    window.open(`https://wa.me/${encodeURIComponent(SET.whatsapp)}?text=${encodeURIComponent(message(L))}`, '_blank', 'noopener');
-    drawCart();
-  }
+  if (act === 'send') sendCode();
+  if (act === 'code') checkCode();
+  if (act === 'renum') { P.conf = null; P.err = ''; drawPanel(); }
+  if (act === 'signout') { FBX && FBX.U.signOut(FBX.auth); P.conf = null; }
+  if (act === 'place') place();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && P.mode) { P.mode = ''; draw(); }
+  if (e.key === 'Enter' && e.target.id === 'phonein') sendCode();
+  if (e.key === 'Enter' && e.target.id === 'codein') checkCode();
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'q') { UI.q = e.target.value; drawGrid(); return; }
-  const k = e.target.dataset.me; if (k) { ME[k] = e.target.value; save('shop-me', ME); const err = $('#cerr'); if (err) err.hidden = true; }
+  if (e.target.id === 'codein' && e.target.value.replace(/\D/g, '').length === 6 && !P.busy) return checkCode();
+  const k = e.target.dataset.me; if (k) { ME[k] = e.target.value; save('shop-me', ME); }
 });
-document.addEventListener('change', e => { const k = e.target.dataset.f; if (k) { UI[k] = e.target.value; draw(); } });
-$('#cart').addEventListener('click', e => { if (e.target === $('#cart')) $('#cart').close(); });
+document.addEventListener('change', e => {
+  const k = e.target.dataset.f; if (k) { UI[k] = e.target.value; return draw(); }
+  const m = e.target.dataset.method; if (m) { ME.method = m; save('shop-me', ME); drawPanel(); }
+});
 /* coming back to the tab: fresh stock and prices */
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && STATE === 'ok' && Date.now() - (load.at || 0) > 120000) { load.at = Date.now(); load(); } });
 load.at = Date.now(); load();
