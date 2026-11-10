@@ -794,3 +794,5 @@ Object.assign(AR, { 'Google sign-in client ID': 'معرّف عميل تسجيل 
 Object.assign(AR, { 'or': 'أو', 'Sign in with Google': 'تسجيل الدخول باستخدام Google', 'Signing in…': 'جارٍ تسجيل الدخول…',
   'The Google window closed before signing you in. Try again.': 'أُغلقت نافذة Google قبل تسجيل دخولك. حاول مرة أخرى.',
   'Google sign-in is not enabled yet (Authentication → Sign-in method).': 'تسجيل الدخول عبر Google غير مفعّل بعد (Authentication ← Sign-in method).' });
+Object.assign(AR, { 'dm products show dm’s own photo; other products use Open Beauty Facts.': 'منتجات dm تظهر بصورة dm الأصلية؛ والمنتجات الأخرى تستخدم Open Beauty Facts.',
+  'To show dm’s own photos, add the dm search relay in Settings → Barcode search.': 'لعرض صور dm الأصلية، أضف وسيط بحث dm في الإعدادات ← البحث بالباركود.' });
