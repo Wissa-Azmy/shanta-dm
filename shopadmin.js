@@ -4,9 +4,11 @@
    the shop's name, WhatsApp number and the down payment on requests. One entry per product (its barcode,
    or name + brand when it has none). Products with nothing left in Egypt stay listed, so customers can
    request them. Price = the suggested price of the oldest units in Egypt (else of the latest purchase).
-   Photos: dm's own photo for dm products (needs the dm search relay), else Open Beauty Facts / Open Food
-   Facts, by barcode, looked up once and remembered. */
-const SHOP_IMG_KEY = 'shanta-shop-img', SHOP_PUB_KEY = 'shanta-shop-pub';
+   Photos: only from the store's own site, dm or rossmann.de, by barcode (needs the relay). Products
+   without one show their initials. */
+/* -img2: photos from dm and Rossmann only; the older list (with Open Beauty Facts photos) is dropped */
+const SHOP_IMG_KEY = 'shanta-shop-img2', SHOP_PUB_KEY = 'shanta-shop-pub';
+try { localStorage.removeItem('shanta-shop-img'); localStorage.removeItem('shanta-shop-dmimg'); } catch (e) { }
 const jsonLS = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
 const ShopPub = { busy: false, again: false, msg: '', t: null, imgs: jsonLS(SHOP_IMG_KEY, {}), pub: jsonLS(SHOP_PUB_KEY, null) };
 const shopUrl = () => new URL('shop/', location.href.split('#')[0]).href;
@@ -34,38 +36,35 @@ function shopItems(R = calc()) {
     return x;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
-const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, status: x.status, img: ShopPub.imgs[x.ean] || '' });
+const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, status: x.status, img: isStoreImg(ShopPub.imgs[x.ean]) ? ShopPub.imgs[x.ean] : '' });
 const shopSettingsDoc = () => { const s = db.settings;
   const pct = v => Math.max(0, Math.min(100, num(v)));
   return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), instapay: String(s.shopInstapay || '').trim(), reqDownPct: pct(s.shopReqDown),
     downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), googleClientId: String(s.shopGoogleId || '').trim(), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
-/* a product photo by barcode: dm's own photo for dm products (through the dm search relay), else
-   Open Beauty Facts / Open Food Facts. Nothing is remembered when offline, so it is tried again next time */
-const SHOP_DMI_KEY = 'shanta-shop-dmimg';
-ShopPub.dmTried = jsonLS(SHOP_DMI_KEY, {});
-const isDmImg = u => /dm-static\.com|dmtech\.com/.test(u || '');
+/* product photos come only from the store the product was bought at, by barcode, through the relay
+   (Settings → Barcode search): dm's photo for dm products, rossmann.de's photo for Rossmann products.
+   Other products, and products the store doesn't list, show the initials. A photo is looked up once and
+   remembered; offline or relay errors are tried again next time */
+const isStoreImg = u => /(^https:\/\/)([^/]*\.)?(dm-static\.com|dmtech\.com|dm\.de|rossmann\.de)\//.test(u || '');
 async function dmImg(ean) {
-  if (typeof FSRC === 'undefined' || !dmRelay()) return null;   // dm only answers through the relay (Settings → Barcode search)
+  if (typeof FSRC === 'undefined' || !dmRelay()) return null;
   try { const r = await fetch(FSRC.dm.url(ean)); if (!r.ok) return null;
     const hit = FSRC.dm.map(await r.json()).find(x => x.code === ean && x.img);
-    return hit ? hit.img : '';
+    return hit && isStoreImg(hit.img) ? hit.img : '';
+  } catch (e) { return null; }
+}
+async function rossImg(ean) {
+  if (typeof dmRelay !== 'function' || !dmRelay()) return null;
+  try { const r = await fetch(`${dmRelay()}/rossmann?ean=${encodeURIComponent(ean)}`);
+    if (r.status === 404) return null;               // an older relay without the Rossmann lookup: try again after it's updated
+    if (!r.ok) return null;
+    const d = await r.json(); return d && isStoreImg(d.img) ? d.img : '';
   } catch (e) { return null; }
 }
 async function shopImg(x) {
-  const ean = x.ean;
-  if (x.store === 'dm' && !ShopPub.dmTried[ean]) {
-    const u = await dmImg(ean);
-    if (u !== null) { ShopPub.dmTried[ean] = 1; try { localStorage.setItem(SHOP_DMI_KEY, JSON.stringify(ShopPub.dmTried)); } catch (e) { } }
-    if (u) { ShopPub.imgs[ean] = u; try { localStorage.setItem(SHOP_IMG_KEY, JSON.stringify(ShopPub.imgs)); } catch (e) { } return; }
-    if (ean in ShopPub.imgs) return;                 // dm has none: keep the photo found before
-  }
-  let u = '';
-  for (const site of ['openbeautyfacts', 'openfoodfacts']) {
-    try { const r = await fetch(`https://world.${site}.org/api/v2/product/${encodeURIComponent(ean)}?fields=image_front_small_url,image_front_url`);
-      if (r.ok) { const p = (await r.json()).product || {}; u = p.image_front_small_url || p.image_front_url || ''; } } catch (e) { return; }
-    if (u) break;
-  }
-  ShopPub.imgs[ean] = u; try { localStorage.setItem(SHOP_IMG_KEY, JSON.stringify(ShopPub.imgs)); } catch (e) { }
+  const u = x.store === 'dm' ? await dmImg(x.ean) : x.store === 'Rossmann' ? await rossImg(x.ean) : '';
+  if (u === null) return;
+  ShopPub.imgs[x.ean] = u; try { localStorage.setItem(SHOP_IMG_KEY, JSON.stringify(ShopPub.imgs)); } catch (e) { }
 }
 const shopRulesMsg = 'The shop can’t be published yet: the Firestore rules need the shop part. Open Settings → Shared online ledger → Admin, type both emails, copy the rules, paste them in Firebase → Firestore Database → Rules and press Publish.';
 Object.assign(ShopPub, {
@@ -81,12 +80,12 @@ Object.assign(ShopPub, {
       if (manual || !this.pub) {
         const q = await within(S.getDocs(S.collection(F.fs, 'catalog')), 20000, offlineMsg), st = await within(S.getDoc(S.doc(F.fs, 'shop', 'settings')), 20000, offlineMsg);
         this.pub = { cat: {}, set: '' };
-        q.forEach(d => { const v = d.data(); this.pub.cat[d.id] = stable(v); if (v.ean && v.img && !this.imgs[v.ean]) this.imgs[v.ean] = v.img; });
+        q.forEach(d => { const v = d.data(); this.pub.cat[d.id] = stable(v); if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
         if (st.exists()) { const v = Object.assign({}, st.data()); delete v.updatedAt; this.pub.set = stable(v); }
       }
       const items = shopItems().filter(x => !x.hidden);
       /* dm products get dm's photo once (replacing an older Open Beauty Facts one); others only when missing */
-      const need = items.filter(x => x.ean && (!(x.ean in this.imgs) || (x.store === 'dm' && typeof dmRelay === 'function' && dmRelay() && !this.dmTried[x.ean] && !isDmImg(this.imgs[x.ean]))));
+      const need = items.filter(x => x.ean && (x.store === 'dm' || x.store === 'Rossmann') && !(x.ean in this.imgs));
       for (let i = 0; i < need.length; i++) { if (manual) this.note(`Looking up product photos… ${i + 1} of ${need.length}`); await shopImg(need[i]); if (i < need.length - 1) await sleep(650); }
       const next = {}; items.forEach(x => next[x.id] = shopDoc(x));
       const st = shopSettingsDoc(), ops = [];
@@ -140,7 +139,7 @@ function shopCardHTML() {
     <details class="howto"><summary>Products in the shop (${shown.length} of ${items.length})</summary><div class="howto-b">
       <p class="note">Untick a product to hide it from the shop. Prices follow the suggested price (today’s rate + ${num(s.targetMargin)}% markup).</p>
       <ul class="mini shoplist">${items.map(x => `<li><label class="shrow"><input type="checkbox" data-shophide="${esc(x.key)}"${x.hidden ? '' : ' checked'}><span><b class="notr">${esc(x.name)}</b><span class="sub"><span class="notr">${esc(x.brand)}</span> · ${fEGP(x.price)}${x.eg ? ` · ${x.eg} in Egypt` : ''}</span></span></label><span class="pill ${stt[x.status][1]}">${stt[x.status][0]}</span></li>`).join('') || '<li class="note">No products yet.</li>'}</ul>
-      <p class="note">${typeof dmRelay === 'function' && dmRelay() ? 'dm products show dm’s own photo; other products use Open Beauty Facts.' : 'To show dm’s own photos, add the dm search relay in Settings → Barcode search.'}</p>
+      <p class="note">${typeof dmRelay === 'function' && dmRelay() ? 'Photos come only from dm (for dm products) and rossmann.de (for Rossmann products). Products they don’t list show their initials.' : 'Product photos need the dm search relay (Settings → Barcode search). Until then the shop shows initials.'}</p>
       <button type="button" class="btn sm ghost" data-act="shop-imgs">Look for missing photos again</button></div></details>
     <p class="note">First time only: the Firestore rules need the shop part. In Shared online ledger → Admin, type both emails, copy the rules and publish them in Firebase.</p></div>`;
 }
@@ -150,8 +149,7 @@ function shopCardHTML() {
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act="shop-pub"],[data-act="shop-imgs"]'); if (!t) return;
   if (t.dataset.act === 'shop-imgs') {
-    Object.keys(ShopPub.imgs).forEach(k => { if (!ShopPub.imgs[k]) { delete ShopPub.imgs[k]; delete ShopPub.dmTried[k]; } });
-    try { localStorage.setItem(SHOP_DMI_KEY, JSON.stringify(ShopPub.dmTried)); } catch (x) { }
+    Object.keys(ShopPub.imgs).forEach(k => { if (!ShopPub.imgs[k]) delete ShopPub.imgs[k]; });
     try { localStorage.setItem(SHOP_IMG_KEY, JSON.stringify(ShopPub.imgs)); } catch (x) { }
   }
   ShopPub.publish(true);

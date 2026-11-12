@@ -796,3 +796,5 @@ Object.assign(AR, { 'or': 'أو', 'Sign in with Google': 'تسجيل الدخو�
   'Google sign-in is not enabled yet (Authentication → Sign-in method).': 'تسجيل الدخول عبر Google غير مفعّل بعد (Authentication ← Sign-in method).' });
 Object.assign(AR, { 'dm products show dm’s own photo; other products use Open Beauty Facts.': 'منتجات dm تظهر بصورة dm الأصلية؛ والمنتجات الأخرى تستخدم Open Beauty Facts.',
   'To show dm’s own photos, add the dm search relay in Settings → Barcode search.': 'لعرض صور dm الأصلية، أضف وسيط بحث dm في الإعدادات ← البحث بالباركود.' });
+Object.assign(AR, { 'Photos come only from dm (for dm products) and rossmann.de (for Rossmann products). Products they don’t list show their initials.': 'الصور من dm فقط (لمنتجات dm) ومن rossmann.de (لمنتجات Rossmann). المنتجات غير الموجودة لديهما تظهر بالأحرف الأولى.',
+  'Product photos need the dm search relay (Settings → Barcode search). Until then the shop shows initials.': 'صور المنتجات تحتاج إلى وسيط بحث dm (الإعدادات ← البحث بالباركود). حتى ذلك الحين يعرض المتجر الأحرف الأولى.' });
