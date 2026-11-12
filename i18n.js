@@ -802,3 +802,14 @@ Object.assign(AR, { 'Looking…': 'جارٍ البحث…', 'Already updating th
 rx(/^Already looking up photos… (\d+) of (\d+)$/, (m, a, b) => `يجري البحث عن الصور بالفعل… ${a} من ${b}`);
 rx(/^Photos (\d+) of (\d+)…$/, (m, a, b) => `الصور ${a} من ${b}…`);
 rx(/^Shop updated: (\d+) products, (\d+) in stock · (\d+) with a photo$/, (m, n, k, p) => `تم تحديث المتجر: ${n} منتج، ${k} في المخزون · ${p} بصورة`);
+Object.assign(AR, { 'Order server address': 'عنوان خادم الطلبات', 'Testing…': 'جارٍ الاختبار…',
+  'The Cloudflare Worker from shop-worker.js. With it, stock is held the moment a customer orders (even when nobody has Shanta open), unpaid orders cancel after 24 hours and unconfirmed offers go back on sale. Press Publish now after adding it.': 'الـ Worker على Cloudflare من الملف shop-worker.js. معه يُحجز المخزون لحظة طلب العميل (حتى لو لم يكن Shanta مفتوحًا)، وتُلغى الطلبات غير المدفوعة بعد 24 ساعة، وتعود العروض غير المؤكدة للبيع. اضغط «انشر الآن» بعد إضافته.',
+  'Type the order server address first.': 'اكتب عنوان خادم الطلبات أولًا.', 'Order server works. Press Publish now to switch it on.': 'خادم الطلبات يعمل. اضغط «انشر الآن» لتشغيله.',
+  'Couldn’t reach the order server. Check the address.': 'تعذّر الوصول إلى خادم الطلبات. تحقق من العنوان.',
+  'The order server doesn’t accept this site. Check ALLOWED in shop-worker.js.': 'خادم الطلبات لا يقبل هذا الموقع. تحقق من ALLOWED في shop-worker.js.',
+  'The order server works, but the FIREBASE_SA secret is missing. Add it under the Worker’s Settings → Variables and Secrets.': 'خادم الطلبات يعمل، لكن السر FIREBASE_SA غير موجود. أضفه من إعدادات الـ Worker ← Variables and Secrets.' });
+Object.assign(AR, { 'Cancelled: not paid within 24 h': 'أُلغي: لم يُدفع خلال 24 ساعة', '🧾 View InstaPay proof': '🧾 عرض إثبات InstaPay',
+  'Loading the screenshot…': 'جارٍ تحميل الصورة…', 'The screenshot couldn’t be found.': 'تعذّر العثور على الصورة.',
+  'An earlier offer ran out after 24 hours without an answer.': 'انتهى عرض سابق بعد 24 ساعة دون رد.',
+  'Cancelled automatically: the down payment wasn’t sent within 24 hours, so the units went back on sale.': 'أُلغي تلقائيًا: لم تُرسل الدفعة المقدمة خلال 24 ساعة، فعادت الوحدات للبيع.' });
+rx(/^Offered (.+)\. The units are held for the customer; if they don’t confirm within 24 hours the offer ends by itself and the units go back on sale\.$/, (m, a) => `عُرض ${tr(a)}. الوحدات محجوزة للعميل؛ إن لم يؤكد خلال 24 ساعة ينتهي العرض تلقائيًا وتعود الوحدات للبيع.`);

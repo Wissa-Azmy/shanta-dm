@@ -5,7 +5,7 @@
    ledger as usual. Down payments and credit stay on the order until then.
    Statuses: new → confirmed → out → delivered; requested → offered → new (customer confirms);
    declined (by you) / cancelled (by the customer). */
-const ShopOrd = { orders: [], customers: {}, loaded: false, started: false, err: '', tab: 'new', lastN: -1 };
+const ShopOrd = { orders: [], customers: {}, loaded: false, started: false, err: '', tab: 'new', lastN: -1, proofs: {} };
 const ORD_ST = { new: ['New', 'warn'], confirmed: ['Confirmed', 'ok'], out: ['Out for delivery', 'ok'], delivered: ['Delivered', 'ok'],
   requested: ['Requested', ''], offered: ['Offered, waiting for customer', 'warn'], declined: ['Declined', 'bad'], cancelled: ['Cancelled by customer', 'bad'] };
 const ORD_TABS = [['new', 'New'], ['active', 'In progress'], ['requests', 'Requests'], ['closed', 'Closed'], ['customers', 'Customers']];
@@ -47,7 +47,7 @@ Object.assign(ShopOrd, {
         if (ch.type === 'modified' && o.proof && !o.downPaid && ch.doc.metadata && !ch.doc.metadata.hasPendingWrites) { const old = this.orders.find(x => x.id === ch.doc.id); if (old && !old.proof) toast(`🧾 InstaPay proof from ${o.name || o.phone}`); }
       });
       this.orders = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-      this.loaded = true; this.err = ''; this.changed();
+      this.loaded = true; this.err = ''; this.changed(); setTimeout(() => this.moveProofs(), 3000);
     }, fail);
     S.onSnapshot(S.collection(F.fs, 'customers'), snap => {
       this.customers = {}; snap.forEach(d => this.customers[d.id] = Object.assign({ id: d.id }, d.data())); this.changed();
@@ -119,7 +119,7 @@ function ordWa(o) {
 
 /* ---------- the page ---------- */
 function ordCard(o, R) {
-  const st = ORD_ST[o.status] || [o.status, ''], c = custOf(o), exp = ordExpPct(o);
+  const st = o.status === 'cancelled' && o.cancelledBy === 'timer' ? ['Cancelled: not paid within 24 h', 'bad'] : ORD_ST[o.status] || [o.status, ''], c = custOf(o), exp = ordExpPct(o);
   if (ordCard.R !== R) { ordCard.R = R; ordCard.items = {}; shopItems(R).forEach(x => ordCard.items[x.id] = x); }
   const items = ordCard.items;
   const line = l => { const it = items[l.id], eg = it ? egLots(it).reduce((a, x) => a + x.left, 0) : null;
@@ -150,9 +150,12 @@ function ordCard(o, R) {
       ${num(o.creditUsed) ? `<li><span>Paid from credit</span><span>−${fEGP(num(o.creditUsed))}</span></li>` : ''}
       <li><span><b>Total to pay</b></span><b>${fEGP(num(o.total))}</b></li>
       ${due > 0 ? `<li><span>Down payment ${num(o.downPct)}%${num(o.downPct) < exp ? ` <span class="pill warn">shop asks ${exp}% now</span>` : ''}</span><span>${o.downPaid ? '<span class="pill ok">received</span> ' : o.proof ? '<span class="pill warn">proof sent</span> ' : '<span class="pill bad">not paid</span> '}${fEGP(due)}</span></li>` : ''}</ul>
-    ${o.proof ? `<button type="button" class="proofbtn" data-ord="proof:${o.id}"><img src="${esc(o.proof)}" alt="InstaPay proof"><span>InstaPay proof · tap to enlarge</span></button>` : ''}
+    ${typeof o.proof === 'string' ? `<button type="button" class="proofbtn" data-ord="proof:${o.id}"><img src="${esc(o.proof)}" alt="InstaPay proof"><span>InstaPay proof · tap to enlarge</span></button>`
+      : o.proof ? `<button type="button" class="btn sm ghost proofopen" data-ord="proof:${o.id}">🧾 View InstaPay proof</button>` : ''}
     ${o.declineMsg && o.status === 'declined' ? `<p class="note">Your message: “<span class="notr">${esc(o.declineMsg)}</span>”</p>` : ''}
-    ${o.status === 'offered' && o.offeredAt ? `<p class="note">Offered ${agoTxt(o.offeredAt)}. The units are held for the customer; withdraw the offer if they don’t answer within 24 hours.</p>` : ''}
+    ${o.status === 'offered' && o.offeredAt ? `<p class="note">Offered ${agoTxt(o.offeredAt)}. The units are held for the customer; ${shopApi() ? 'if they don’t confirm within 24 hours the offer ends by itself and the units go back on sale.' : 'withdraw the offer if they don’t answer within 24 hours.'}</p>` : ''}
+    ${o.status === 'requested' && o.offerExpired ? '<p class="note">An earlier offer ran out after 24 hours without an answer.</p>' : ''}
+    ${o.status === 'cancelled' && o.cancelledBy === 'timer' ? '<p class="note">Cancelled automatically: the down payment wasn’t sent within 24 hours, so the units went back on sale.</p>' : ''}
     ${refund}<div class="soact">${act.join('')}</div></div>`;
 }
 function custRow(c) {
@@ -195,13 +198,36 @@ V.orders = R => {
 NAV.splice(NAV.findIndex(x => x[0] === 'sales') + 1, 0, ['orders', '✆', 'Orders', 'From the online shop']);
 { const c0 = counts; counts = () => Object.assign(c0(), { orders: ShopOrd.pending() }); }
 
-function ordProof(o) {
+/* the screenshot lives in proofs/<order id>, so the order list stays small; older orders still carry it inline */
+async function proofSrc(o) {
+  if (typeof o.proof === 'string') return o.proof;
+  if (ShopOrd.proofs[o.id]) return ShopOrd.proofs[o.id];
+  await fb(); const s = await within(F.S.getDoc(F.S.doc(F.fs, 'proofs', o.id)), 20000, offlineMsg);
+  return ShopOrd.proofs[o.id] = s.exists() ? String(s.data().data || '') : '';
+}
+async function ordProof(o) {
   let d = $('#proofdlg'); if (!d) { d = document.createElement('dialog'); d.id = 'proofdlg'; document.body.appendChild(d); }
-  d.innerHTML = `<div class="sdbody"><div class="eyebrow">InstaPay proof · #${esc(o.code)}</div><img class="proofbig" src="${esc(o.proof)}" alt="">
+  const paint = src => d.innerHTML = `<div class="sdbody"><div class="eyebrow">InstaPay proof · #${esc(o.code)}</div>${src === null ? '<p class="note">Loading the screenshot…</p>' : src ? `<img class="proofbig" src="${esc(src)}" alt="">` : '<p class="err">The screenshot couldn’t be found.</p>'}
     <p class="note">Amount asked: <b>${fEGP(num(o.down))}</b>. Check it arrived in your InstaPay before marking it received.</p>
     <div class="mact"><button type="button" class="btn ghost" data-proofclose="">Close</button>${!o.downPaid ? `<button type="button" class="btn" data-ord="down:${o.id}" data-proofclose="">Down payment received</button>` : ''}</div></div>`;
-  d.showModal();
+  paint(typeof o.proof === 'string' ? o.proof : ShopOrd.proofs[o.id] || null); d.showModal();
+  if (typeof o.proof !== 'string' && !ShopOrd.proofs[o.id]) try { paint(await proofSrc(o)); } catch (e) { paint(''); toast('⚠ ' + ((e && e.message) || fsMsg(e))); }
 }
+/* one-time tidy-up: move screenshots stored inside older orders into proofs/, a few at a time */
+ShopOrd.moveProofs = async function () {
+  if (this.moving) return; const old = this.orders.filter(o => typeof o.proof === 'string' && o.proof.startsWith('data:')).slice(0, 5);
+  if (!old.length) return; this.moving = true;
+  try {
+    const S = F.S;
+    for (const o of old) {
+      const bt = S.writeBatch(F.fs);
+      bt.set(S.doc(F.fs, 'proofs', o.id), { uid: o.uid || '', data: o.proof, at: o.proofAt || o.updatedAt || new Date().toISOString() });
+      bt.update(S.doc(F.fs, 'orders', o.id), { proof: true });
+      await within(bt.commit(), 20000, offlineMsg); this.proofs[o.id] = o.proof;
+    }
+  } catch (e) { console.warn('moving proofs', e); }
+  this.moving = false;
+};
 document.addEventListener('click', e => {
   const tb = e.target.closest('[data-otab]'); if (tb) { ShopOrd.tab = tb.dataset.otab; return render(); }
   if (e.target.closest('[data-proofclose]')) $('#proofdlg').close();
@@ -226,7 +252,16 @@ document.addEventListener('click', e => {
   if (a === 'out') return ShopOrd.upd(o, { status: 'out', outAt: now }, 'Out for delivery');
   if (a === 'delivered') { ShopOrd.upd(o, { status: 'delivered', deliveredAt: now }, 'Delivered');
     if (o.saleId && (calc().book.byId[o.saleId] || {}).balance > 0.005 && confirm('Delivered. Record the money collected now?')) markPaid(o.saleId); return; }
-  if (a === 'offer') return ShopOrd.upd(o, { status: 'offered', offeredAt: now }, 'Offered; send them a WhatsApp');
+  if (a === 'offer') {
+    if (!shopApi()) return ShopOrd.upd(o, { status: 'offered', offeredAt: now, offerExpired: false }, 'Offered; send them a WhatsApp');
+    /* with the order server on, held stock lives on the catalog: hold the units now, the server lets them go when the offer ends */
+    const S = F.S, bt = S.writeBatch(F.fs);
+    bt.update(S.doc(F.fs, 'orders', o.id), { status: 'offered', offeredAt: now, offerExpired: false, holding: true, updatedAt: now });
+    (o.lines || []).forEach(l => bt.update(S.doc(F.fs, 'catalog', l.id), { held: S.increment(num(l.qty)) }));
+    return within(bt.commit(), 20000, offlineMsg).then(() => toast('Offered; send them a WhatsApp')).catch(x => x && x.code === 'not-found'
+      /* a product isn't in the shop's list (not published yet): offer without holding it */
+      ? ShopOrd.upd(o, { status: 'offered', offeredAt: now, offerExpired: false }, 'Offered; send them a WhatsApp') : toast('⚠ ' + ((x && x.message) || fsMsg(x))));
+  }
   if (a === 'withdraw') return ShopOrd.upd(o, { status: 'requested', offeredAt: '' }, 'Offer withdrawn');
   if (a === 'down') return ShopOrd.upd(o, { downPaid: !o.downPaid, downPaidAt: o.downPaid ? '' : now }, o.downPaid ? 'Marked not received' : 'Down payment received');
   if (a === 'refunded') { if (!confirm(`Mark ${fEGP(refundable(o))} as refunded${o.refundTo ? ' to ' + o.refundTo : ''}?`)) return; return ShopOrd.upd(o, { refundDone: true, refundDoneAt: now, refund: 'refund' }, 'Refund marked as sent'); }

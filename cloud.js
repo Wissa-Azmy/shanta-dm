@@ -560,13 +560,25 @@ service cloud.firestore {
              'lines', 'goods', 'delivery', 'creditUsed', 'total', 'downPct', 'down', 'group', 'code', 'createdAt'])
         && (request.resource.data.creditUsed == 0
             || request.resource.data.creditUsed <= get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.get('credit', 0))
-        && get(/databases/$(database)/documents/shop/settings).data.open == true;
+        && get(/databases/$(database)/documents/shop/settings).data.open == true
+        // once the order server is switched on, orders only come in through it (it holds the stock)
+        && get(/databases/$(database)/documents/shop/settings).data.get('orderApi', '') == '';
       allow update: if admin() || (request.auth != null && resource.data.uid == request.auth.uid
         && changes().hasOnly(['status', 'proof', 'proofAt', 'refund', 'refundTo', 'cancelledAt', 'updatedAt'])
         && (request.resource.data.status == resource.data.status
             || (resource.data.status in ['new', 'requested', 'offered'] && request.resource.data.status == 'cancelled')
             || (resource.data.status == 'offered' && request.resource.data.status == 'new'))
-        && request.resource.data.get('proof', '').size() < 700000);
+        && (!changes().hasAny(['proof']) || request.resource.data.proof == true));
+      allow delete: if admin();
+    }
+    // InstaPay screenshots, one per order, kept apart so the order list stays small and fast
+    match /proofs/{id} {
+      allow read: if admin();
+      allow create, update: if admin() || (request.auth != null
+        && get(/databases/$(database)/documents/orders/$(id)).data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'data', 'at'])
+        && request.resource.data.data is string && request.resource.data.data.size() < 700000);
       allow delete: if admin();
     }
   }
@@ -600,7 +612,7 @@ service cloud.firestore {
       <div class="fgrid">
         <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none"></div>
         <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none"></div>
-        <div class="f span"><textarea id="cl_rules" readonly rows="40" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
+        <div class="f span"><textarea id="cl_rules" readonly rows="52" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
       </div>
       <p class="note">Forgotten password: in Firebase open Users, click ⋮ next to the person and choose Reset password; they get an email to set a new one. Nothing in the ledger is lost.</p></details>`;
   }

@@ -51,6 +51,10 @@ const W = {
     cancel: 'Cancel order', cancelReq: 'Cancel request', cancelAsk: 'Cancel this order?', cancelAskPaid: a => `Cancel this order? You choose next whether your ${a} comes back to your InstaPay or stays as credit.`, confirmOffer: 'Yes, I still want it', keep: 'Keep it',
     kOrder: 'Order', kOrderSub: 'In stock in Egypt · delivered to you', kReq: 'Request', kReqSub: 'Not in Egypt yet · comes with the next box from Germany',
     together: c => `Placed together with #${c}`,
+    shortNow: n => `Sorry, someone just bought the last one: ${n}. Your cart now shows what is left; check it and send again.`,
+    payBy: d => `Send it by <b>${d}</b>; after that the order is cancelled and the products go back on sale.`,
+    timer: 'Cancelled automatically: the down payment didn’t arrive within 24 hours. You can order again any time.',
+    offerGone: 'You didn’t confirm within 24 hours, so the product went back on sale. Your request is still open; we’ll offer it again when more arrive.',
     next: 'What happens next', steps: { sent: 'Sent', pay: 'Down payment', check: 'Payment check', confirmed: 'Confirmed', out: 'On the way', delivered: 'Delivered', requested: 'Requested', arrives: 'Arrives in Egypt', yours: 'You confirm' },
     nx: {
       pay: a => `<b>Send ${a} by InstaPay</b> using the details below, then upload a screenshot of the transfer. We confirm your order as soon as it arrives.`,
@@ -104,6 +108,10 @@ const W = {
     cancel: 'إلغاء الطلب', cancelReq: 'إلغاء طلب المنتج', cancelAsk: 'إلغاء هذا الطلب؟', cancelAskPaid: a => `إلغاء هذا الطلب؟ ستختار بعدها هل يعود مبلغ ${a} إلى InstaPay الخاص بك أم يبقى كرصيد.`, confirmOffer: 'نعم، ما زلت أريده', keep: 'احتفظ به',
     kOrder: 'طلب', kOrderSub: 'متوفر في مصر · يصلك بالتوصيل', kReq: 'طلب منتج', kReqSub: 'غير موجود في مصر بعد · يصل مع الشحنة القادمة من ألمانيا',
     together: c => `أُرسل مع الطلب #${c}`,
+    shortNow: n => `عذرًا، اشترى شخص آخر آخر قطعة للتو: ${n}. سلتك تعرض الآن المتوفر؛ راجعها وأرسل مرة أخرى.`,
+    payBy: d => `حوّل قبل <b>${d}</b>؛ بعدها يُلغى الطلب وتعود المنتجات للبيع.`,
+    timer: 'أُلغي تلقائيًا: لم يصل العربون خلال 24 ساعة. يمكنك الطلب مرة أخرى في أي وقت.',
+    offerGone: 'لم تؤكد خلال 24 ساعة، فعاد المنتج للبيع. طلبك ما زال مفتوحًا؛ سنعرضه عليك مرة أخرى عند وصول المزيد.',
     next: 'ماذا سيحدث بعد ذلك', steps: { sent: 'أُرسل', pay: 'العربون', check: 'مراجعة الدفع', confirmed: 'تم التأكيد', out: 'في الطريق', delivered: 'تم التوصيل', requested: 'تم الطلب', arrives: 'يصل إلى مصر', yours: 'تؤكد أنت' },
     nx: {
       pay: a => `<b>حوّل ${a} عبر InstaPay</b> باستخدام البيانات بالأسفل، ثم ارفع صورة التحويل. نؤكد طلبك فور وصول المبلغ.`,
@@ -129,6 +137,8 @@ const W = {
 const t = (k, ...a) => { const v = W[LANG][k] ?? W.en[k] ?? k; return typeof v === 'function' ? v(...a) : v; };
 const money = n => LANG === 'ar' ? `${Math.round(n).toLocaleString('en-US')} ج.م` : `EGP ${Math.round(n).toLocaleString('en-US')}`;
 const when = iso => iso ? new Date(iso).toLocaleString(LANG === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+/* the order server cancels an unpaid order at this time (same rule as shop-worker.js): 24 h after ordering, or 48 h after the offer for a request that arrived */
+const payDeadline = o => Date.parse(o.offeredAt || o.createdAt) + (o.offeredAt ? 48 : 24) * 36e5;
 
 /* ---- state ---- */
 let CAT = [], BY = {}, SET = { name: 'Shanta', reqDownPct: 20, downCod: 0, downInsta: 100, deliveryFee: 0, open: true, lowStock: 2 }, STATE = 'loading';
@@ -148,12 +158,17 @@ async function fbx() {
   U.onAuthStateChanged(auth, u => { USER = u; listen(); draw(); });
   return FBX;
 }
+/* units in Egypt minus units held by open orders; older catalogs only have the final number */
+function stockOf(p) {
+  if (p.eg !== undefined) { p.avail = Math.max(0, num(p.eg) - num(p.held)); p.status = p.avail > 0 ? 'in' : num(p.way) > 0 ? 'way' : 'request'; }
+  return p;
+}
 async function load() {
   STATE = 'loading'; draw();
   try {
     const { S, fs } = await fbx();
     const [cat, st] = await Promise.all([S.getDocs(S.collection(fs, 'catalog')), S.getDoc(S.doc(fs, 'shop', 'settings'))]);
-    CAT = []; cat.forEach(d => CAT.push(Object.assign({ id: d.id }, d.data())));
+    CAT = []; cat.forEach(d => CAT.push(stockOf(Object.assign({ id: d.id }, d.data()))));
     BY = {}; CAT.forEach(p => BY[p.id] = p);
     if (st.exists()) SET = Object.assign(SET, st.data());
     STATE = 'ok';
@@ -326,14 +341,14 @@ function nextOf(o) {
   const N = W[LANG].nx, dp = num(o.down) > 0, due = money(num(o.down));
   const rest = Math.max(0, num(o.total) - (o.downPaid ? num(o.down) : 0));
   const pay = rest > 0 ? N.rest(money(rest)) : N.noRest;
-  if (o.status === 'cancelled') return N.cancelled;
+  if (o.status === 'cancelled') return o.cancelledBy === 'timer' ? t('timer') : N.cancelled;
   if (o.status === 'declined') return N.declined + (o.declineMsg ? ` ${t('why')}: “${esc(o.declineMsg)}”` : '');
   if (o.status === 'delivered') return N.delivered;
   if (o.status === 'offered') return N.offered;
-  if (o.status === 'requested') return dp && !o.downPaid ? (o.proof ? N.reqCheck : N.reqPay(due)) : N.requested;
+  if (o.status === 'requested') return (o.offerExpired ? t('offerGone') + ' ' : '') + (dp && !o.downPaid ? (o.proof ? N.reqCheck : N.reqPay(due)) : N.requested);
   if (o.status === 'out') return `${N.out} ${pay}`;
   if (o.status === 'confirmed') return `${N.prep} ${pay}`;
-  if (dp && !o.downPaid) return o.proof ? N.check : N.pay(due);
+  if (dp && !o.downPaid) return o.proof ? N.check : N.pay(due) + (o.holding && o.createdAt ? ' ' + t('payBy', when(new Date(payDeadline(o)).toISOString())) : '');
   return `${N.confirm} ${pay}`;
 }
 function orderHTML(o) {
@@ -460,6 +475,27 @@ async function checkCode() {
 const CODE_CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => CODE_CH[b % CODE_CH.length]).join('');
 const pack = a => a.map(x => ({ id: x.p.id, name: x.p.name, brand: x.p.brand || '', ean: x.p.ean || '', price: num(x.p.price), qty: x.q }));
+/* with the order server switched on (shop settings: orderApi), the server checks the stock, works out
+   prices, down payment and credit, holds the units and writes the orders, all in one step */
+async function placeViaServer(L, phone) {
+  const tok = await USER.getIdToken();
+  const want = {};
+  L.o.forEach(x => (want[x.p.id] = want[x.p.id] || { id: x.p.id, qty: 0, now: 0 }, want[x.p.id].qty += x.q, want[x.p.id].now += x.q));
+  L.r.forEach(x => (want[x.p.id] = want[x.p.id] || { id: x.p.id, qty: 0, now: 0 }, want[x.p.id].qty += x.q));
+  const r = await fetch(SET.orderApi.replace(/\/+$/, '') + '/order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    body: JSON.stringify({ lines: Object.values(want), method: L.method, phone, name: ME.name.trim(), address: ME.address.trim(), note: String(ME.note || '').trim(), lang: LANG }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 409 && (d.short || d.gone)) {
+    /* someone else just bought it: show the real stock and let the customer look again */
+    (d.short || []).forEach(s => { const p = BY[s.id]; if (p) { p.avail = s.avail; p.status = s.avail > 0 ? 'in' : num(p.way) > 0 ? 'way' : 'request'; } });
+    (d.gone || []).forEach(id => { delete BY[id]; });
+    CAT = CAT.filter(p => BY[p.id]);
+    throw Object.assign(new Error('short'), { short: (d.short || []).map(s => (BY[s.id] || {}).name).filter(Boolean) });
+  }
+  if (d.closed) SET.open = false;
+  if (!r.ok) throw Object.assign(new Error(d.error || 'server'), { code: d.code || (r.status >= 500 ? 'unavailable' : '') });
+  return d.orders || [];
+}
 async function place() {
   const L = lines();
   if (!String(ME.name || '').trim() || !String(ME.address || '').trim()) { P.err = t('need'); return drawPanel(); }
@@ -467,6 +503,11 @@ async function place() {
   if (!/^[+][0-9]{10,15}$/.test(phone)) { P.err = t('needPhone'); return drawPanel(); }
   P.busy = 'place'; P.err = ''; drawPanel();
   try {
+    if (SET.orderApi) {
+      P.placed = await placeViaServer(L, phone);
+      Object.keys(CART).forEach(k => delete CART[k]); save('shop-cart', CART); delete ME.note; save('shop-me', ME);
+      P.mode = 'done'; P.busy = ''; return draw();
+    }
     const { S, fs } = FBX, now = new Date().toISOString(), b = S.writeBatch(fs), out = [];
     const base = { uid: USER.uid, phone, verified: !!USER.phoneNumber, email: USER.email || '', name: ME.name.trim(), address: ME.address.trim(), note: String(ME.note || '').trim(), lang: LANG, createdAt: now };
     const group = newCode();
@@ -479,7 +520,7 @@ async function place() {
     await b.commit();
     Object.keys(CART).forEach(k => delete CART[k]); save('shop-cart', CART); delete ME.note; save('shop-me', ME);
     P.mode = 'done';
-  } catch (e) { console.warn(e); P.err = errMsg(e); P.placed = []; }
+  } catch (e) { console.warn(e); P.err = e.short ? t('shortNow', e.short.join(', ')) : errMsg(e); P.placed = []; }
   P.busy = ''; draw();
 }
 
@@ -498,7 +539,11 @@ let proofFor = '';
 $('#proofin').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0], id = proofFor; e.target.value = ''; if (!f || !id) return;
   P.busy = 'proof:' + id; P.err = ''; drawPanel();
-  try { const u = await shrink(f); const { S, fs } = FBX; await S.updateDoc(S.doc(fs, 'orders', id), { proof: u, proofAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); toast(t('proofOk')); }
+  try { const u = await shrink(f), { S, fs } = FBX, now = new Date().toISOString(), b = S.writeBatch(fs);
+    /* the picture goes in its own record; the order only notes that one was sent */
+    b.set(S.doc(fs, 'proofs', id), { uid: USER.uid, data: u, at: now });
+    b.update(S.doc(fs, 'orders', id), { proof: true, proofAt: now, updatedAt: now });
+    await b.commit(); toast(t('proofOk')); }
   catch (x) { console.warn(x); P.err = x && x.message === 'too big' ? t('tooBig') : errMsg(x); }
   P.busy = ''; drawPanel();
 });

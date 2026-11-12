@@ -36,11 +36,14 @@ function shopItems(R = calc()) {
     return x;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
-const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, status: x.status, img: isStoreImg(ShopPub.imgs[x.ean]) ? ShopPub.imgs[x.ean] : '' });
+/* eg = units in Egypt, way = units on the way. held = units in open orders: worked out here while orders are
+   written by the shop itself, but kept by the order server once it is switched on (so it's never sent then) */
+const shopApi = () => String(db.settings.shopApi || '').trim().replace(/\/+$/, '');
+const shopDoc = x => Object.assign({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, eg: x.eg, way: x.way, status: x.status, img: isStoreImg(ShopPub.imgs[x.ean]) ? ShopPub.imgs[x.ean] : '' }, shopApi() ? {} : { held: x.held });
 const shopSettingsDoc = () => { const s = db.settings;
   const pct = v => Math.max(0, Math.min(100, num(v)));
   return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), instapay: String(s.shopInstapay || '').trim(), reqDownPct: pct(s.shopReqDown),
-    downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), googleClientId: String(s.shopGoogleId || '').trim(), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
+    downCod: pct(s.shopDownCod), downInsta: pct(s.shopDownInsta ?? 100), deliveryFee: Math.max(0, num(s.shopDelivery)), googleClientId: String(s.shopGoogleId || '').trim(), orderApi: shopApi(), open: s.shopOpen !== false, lowStock: num(s.lowStock), currency: 'EGP' }; };
 /* product photos come only from the store the product was bought at, by barcode, through the relay
    (Settings → Barcode search): dm's photo for dm products, rossmann.de's photo for Rossmann products.
    Other products, and products the store doesn't list, show the initials. A photo is looked up once and
@@ -87,7 +90,7 @@ Object.assign(ShopPub, {
       if (manual || !this.pub) {
         const q = await within(S.getDocs(S.collection(F.fs, 'catalog')), 20000, offlineMsg), st = await within(S.getDoc(S.doc(F.fs, 'shop', 'settings')), 20000, offlineMsg);
         this.pub = { cat: {}, set: '' };
-        q.forEach(d => { const v = d.data(); this.pub.cat[d.id] = stable(v); if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
+        q.forEach(d => { const v = Object.assign({}, d.data()); if (shopApi()) delete v.held; this.pub.cat[d.id] = stable(v); if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
         if (st.exists()) { const v = Object.assign({}, st.data()); delete v.updatedAt; this.pub.set = stable(v); }
       }
       const items = shopItems().filter(x => !x.hidden);
@@ -97,7 +100,15 @@ Object.assign(ShopPub, {
       this.prog = '';
       const next = {}; items.forEach(x => next[x.id] = shopDoc(x));
       const st = shopSettingsDoc(), ops = [];
-      Object.entries(next).forEach(([id, d]) => { if (this.pub.cat[id] !== stable(d)) ops.push(b => b.set(S.doc(F.fs, 'catalog', id), d)); });
+      /* switching the order server on: hand it the units open orders hold right now, once */
+      const prevApi = (() => { try { return JSON.parse(this.pub.set || '{}').orderApi || ''; } catch (e) { return ''; } })();
+      if (st.orderApi && prevApi !== st.orderApi) {
+        const held = typeof shopHeld === 'function' ? shopHeld() : {};
+        items.forEach(x => ops.push(b => b.set(S.doc(F.fs, 'catalog', x.id), { held: held[x.id] || 0 }, { merge: true })));
+        (typeof ShopOrd !== 'undefined' ? ShopOrd.orders : []).filter(o => o.status === 'new' || o.status === 'offered')
+          .forEach(o => ops.push(b => b.update(S.doc(F.fs, 'orders', o.id), { holding: true })));
+      }
+      Object.entries(next).forEach(([id, d]) => { if (this.pub.cat[id] !== stable(d)) ops.push(b => b.set(S.doc(F.fs, 'catalog', id), d, { merge: true })); });
       Object.keys(this.pub.cat).forEach(id => { if (!(id in next)) ops.push(b => b.delete(S.doc(F.fs, 'catalog', id))); });
       const catOps = ops.length;
       if (catOps || this.pub.set !== stable(st)) ops.push(b => b.set(S.doc(F.fs, 'shop', 'settings'), Object.assign({ updatedAt: new Date().toISOString() }, st)));
@@ -138,6 +149,8 @@ function shopCardHTML() {
     <div class="fgrid">${f('shopName', 'Shop name', 'text')}${f('shopWhatsapp', 'WhatsApp for questions', 'tel', 'dir="ltr" placeholder="01012345678"', 'Customers can message you here from the shop.')}</div>
     <div class="fgrid">${f('shopInstapay', 'InstaPay address', 'text', 'dir="ltr" placeholder="name@instapay"', 'Shown to customers who pay a down payment or pay by InstaPay.')}${f('shopDelivery', 'Delivery fee (EGP)', 'number', 'step="5" min="0"', '0 = free delivery. Added to every order.')}</div>
     ${f('shopGoogleId', 'Google sign-in client ID', 'text', 'dir="ltr" placeholder="1234567890-abc….apps.googleusercontent.com" autocomplete="off"', 'Firebase → Authentication → Sign-in method → Google → Web SDK configuration → Web client ID. Without it, Google sign-in may not work in browsers that block third-party cookies.')}
+    <div class="f"><label>Order server address</label><div class="raterow"><input data-set="shopApi" type="url" dir="ltr" autocomplete="off" placeholder="https://shanta-shop.….workers.dev" value="${esc(s.shopApi || '')}"><button type="button" class="btn sm ghost" data-act="shop-apitest">Test</button></div>
+    <span class="hint">The Cloudflare Worker from shop-worker.js. With it, stock is held the moment a customer orders (even when nobody has Shanta open), unpaid orders cancel after 24 hours and unconfirmed offers go back on sale. Press Publish now after adding it.</span></div>
     <div class="fgrid">${f('shopDownCod', 'Down payment, cash on delivery (%)', 'number', 'step="1" min="0" max="100"', 'Paid by InstaPay before you confirm; the rest to the courier.')}${f('shopDownInsta', 'Down payment, InstaPay orders (%)', 'number', 'step="1" min="0" max="100"', '100 = paid in full upfront.')}</div>
     ${f('shopReqDown', 'Down payment on requests (%)', 'number', 'step="1" min="0" max="100"', 'Asked when a customer requests a product that isn’t in Egypt. A change applies to new requests only.')}
     <div class="f chk"><input type="checkbox" id="sh_open" data-set="shopOpen"${s.shopOpen !== false ? ' checked' : ''}><label for="sh_open">Shop is open for orders</label></div>
@@ -168,4 +181,20 @@ document.addEventListener('change', e => {
   const c = e.target.closest && e.target.closest('[data-shophide]'); if (!c) return;
   const k = c.dataset.shophide, h = new Set(db.settings.shopHidden || []);
   c.checked ? h.delete(k) : h.add(k); db.settings.shopHidden = [...h]; commit();
+});
+/* "Test" next to the order server address: is it reachable, and does it have the Firebase key? */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="shop-apitest"]'); if (!b) return;
+  const i = $('[data-set="shopApi"]'), url = (i ? i.value : shopApi()).trim().replace(/\/+$/, '');
+  if (!url) return toast('⚠ Type the order server address first.');
+  b.disabled = true; b.textContent = 'Testing…';
+  try {
+    const r = await within(fetch(url + '/ping'), 15000, offlineMsg), d = await r.json().catch(() => ({}));
+    if (r.status === 403) toast('⚠ The order server doesn’t accept this site. Check ALLOWED in shop-worker.js.');
+    else if (!r.ok || !d.ok) toast('⚠ The order server didn’t answer properly (' + r.status + ').');
+    else if (!d.key) toast('⚠ The order server works, but the FIREBASE_SA secret is missing. Add it under the Worker’s Settings → Variables and Secrets.');
+    else if (!d.firestore) toast('⚠ The order server can’t reach Firestore with its key: ' + (d.err || 'check the FIREBASE_SA secret.'));
+    else toast('✓ Order server works. Press Publish now to switch it on.');
+  } catch (x) { toast('⚠ Couldn’t reach the order server. Check the address.'); }
+  b.disabled = false; b.textContent = 'Test';
 });
