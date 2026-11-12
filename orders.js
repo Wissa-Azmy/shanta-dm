@@ -254,13 +254,12 @@ document.addEventListener('click', e => {
     if (o.saleId && (calc().book.byId[o.saleId] || {}).balance > 0.005 && confirm('Delivered. Record the money collected now?')) markPaid(o.saleId); return; }
   if (a === 'offer') {
     if (!shopApi()) return ShopOrd.upd(o, { status: 'offered', offeredAt: now, offerExpired: false }, 'Offered; send them a WhatsApp');
-    /* with the order server on, held stock lives on the catalog: hold the units now, the server lets them go when the offer ends */
-    const S = F.S, bt = S.writeBatch(F.fs);
+    /* with the order server on, it keeps the held units (shop/held): hold them now, it lets them go when the offer ends */
+    const S = F.S, bt = S.writeBatch(F.fs), add = {};
+    (o.lines || []).forEach(l => add[l.id] = S.increment(num(l.qty)));
     bt.update(S.doc(F.fs, 'orders', o.id), { status: 'offered', offeredAt: now, offerExpired: false, holding: true, updatedAt: now });
-    (o.lines || []).forEach(l => bt.update(S.doc(F.fs, 'catalog', l.id), { held: S.increment(num(l.qty)) }));
-    return within(bt.commit(), 20000, offlineMsg).then(() => toast('Offered; send them a WhatsApp')).catch(x => x && x.code === 'not-found'
-      /* a product isn't in the shop's list (not published yet): offer without holding it */
-      ? ShopOrd.upd(o, { status: 'offered', offeredAt: now, offerExpired: false }, 'Offered; send them a WhatsApp') : toast('⚠ ' + ((x && x.message) || fsMsg(x))));
+    bt.set(S.doc(F.fs, 'shop', 'held'), add, { merge: true });
+    return within(bt.commit(), 20000, offlineMsg).then(() => toast('Offered; send them a WhatsApp')).catch(x => toast('⚠ ' + ((x && x.message) || fsMsg(x))));
   }
   if (a === 'withdraw') return ShopOrd.upd(o, { status: 'requested', offeredAt: '' }, 'Offer withdrawn');
   if (a === 'down') return ShopOrd.upd(o, { downPaid: !o.downPaid, downPaidAt: o.downPaid ? '' : now }, o.downPaid ? 'Marked not received' : 'Down payment received');

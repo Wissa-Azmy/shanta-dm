@@ -1,5 +1,5 @@
 /* ---------- Shanta Shop: what customers see ----------
-   Reads the public catalog Shanta publishes (catalog/<product>, shop/settings). Customers sign in with their
+   Reads the public catalog Shanta publishes (shop/catalog, shop/held, shop/settings). Customers sign in with their
    mobile number and an SMS code, then place orders that land in Shanta's Orders page (orders/<id>).
    Products in Egypt go in the order; the rest becomes a request. Down payments are paid by InstaPay and
    the customer uploads a screenshot. Their profile and credit are in customers/<uid>; only the two admins
@@ -167,8 +167,13 @@ async function load() {
   STATE = 'loading'; draw();
   try {
     const { S, fs } = await fbx();
-    const [cat, st] = await Promise.all([S.getDocs(S.collection(fs, 'catalog')), S.getDoc(S.doc(fs, 'shop', 'settings'))]);
-    CAT = []; cat.forEach(d => CAT.push(stockOf(Object.assign({ id: d.id }, d.data()))));
+    /* the whole list is one document (shop/catalog) plus the units open orders hold (shop/held): 3 reads a visit */
+    const [cat, held, st] = await Promise.all(['catalog', 'held', 'settings'].map(n => S.getDoc(S.doc(fs, 'shop', n))));
+    const H = held.exists() ? held.data() : {};
+    CAT = [];
+    if (cat.exists()) Object.entries(cat.data().items || {}).forEach(([id, p]) => CAT.push(stockOf(Object.assign({ id }, p, { held: num(H[id]) }))));
+    else (await S.getDocs(S.collection(fs, 'catalog'))).forEach(d => CAT.push(stockOf(Object.assign({ id: d.id }, d.data()))));   // not moved yet
+    CAT.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     BY = {}; CAT.forEach(p => BY[p.id] = p);
     if (st.exists()) SET = Object.assign(SET, st.data());
     STATE = 'ok';

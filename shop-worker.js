@@ -3,7 +3,7 @@
    - POST /order   a signed-in customer places an order. In one Firestore transaction it checks the shop is
                    open, checks each product still has the units (in Egypt minus held), takes the prices, down
                    payment and credit from Firestore (never from the phone), writes the order and the request,
-                   and holds the units (catalog.held). If someone just bought the last unit it answers 409.
+                   and holds the units (shop/held). If someone just bought the last unit it answers 409.
    - every 15 min  (Cron trigger) lets go of held units: unpaid orders are cancelled 24 hours after ordering
                    (48 hours after the offer for a request that arrived), offers nobody confirmed within
                    24 hours go back to "requested", and orders that ended or became a sale stop holding.
@@ -81,18 +81,17 @@ async function placeOrder(env, user, b) {
 
   const tx = await fs(env, ':beginTransaction', { options: { readWrite: {} } }).then(r => r.transaction);
   try {
-    const ids = [...want.keys()];
-    const got = await getDocs(env, ['shop/settings', `customers/${uid}`, ...ids.map(id => `catalog/${id}`)], tx);
+
+    const got = await getDocs(env, ['shop/settings', 'shop/catalog', 'shop/held', `customers/${uid}`], tx);
     const set = got['shop/settings'];
     if (!set || set.data.open === false) { await rollback(env, tx); return { status: 403, body: { error: 'The shop is closed.', code: 'permission-denied', closed: true } }; }
-    const S = set.data, cust = got[`customers/${uid}`], C = cust ? cust.data : null;
+    const S = set.data, cust = got[`customers/${uid}`], C = cust ? cust.data : null, items = (got['shop/catalog'] || { data: {} }).data.items || {}, H = (got['shop/held'] || { data: {} }).data;
 
     const short = [], gone = [], o = [], r = [];
     for (const w of want.values()) {
-      const doc = got[`catalog/${w.id}`];
+      const doc = items[w.id];
       if (!doc) { gone.push(w.id); continue; }
-      const p = Object.assign({ id: w.id }, doc.data), eg = p.eg !== undefined ? num(p.eg) : num(p.avail);
-      const avail = Math.max(0, eg - num(p.held));
+      const p = Object.assign({ id: w.id }, doc), avail = Math.max(0, num(p.eg) - num(H[w.id]));
       if (w.now > avail) { short.push({ id: w.id, avail }); continue; }
       if (w.now) o.push({ p, q: w.now });
       if (w.qty - w.now) r.push({ p, q: w.qty - w.now });
@@ -117,7 +116,7 @@ async function placeOrder(env, user, b) {
     if (r.length) orders.push(Object.assign({}, base, { kind: 'request', status: 'requested', method, lines: pack(r), goods: rg, delivery: rd, creditUsed: rc, total: rt, downPct: rpct, down: downOf(rt, rpct), group, code: o.length ? newId(6, CODE_CH) : group }));
 
     const writes = orders.map(x => { x.id = newId(); return { update: { name: `${DOCS}/orders/${x.id}`, fields: fields(omit(x, 'id')) }, currentDocument: { exists: false } }; });
-    for (const x of o) writes.push(setFields(`catalog/${x.p.id}`, { held: num(x.p.held) + x.q }, got[`catalog/${x.p.id}`].updateTime));
+    if (o.length) { const nh = Object.assign({}, H); o.forEach(x => nh[x.p.id] = num(nh[x.p.id]) + x.q); writes.push(heldWrite(nh, got['shop/held'])); }
     if (!C) writes.push({ update: { name: `${DOCS}/customers/${uid}`, fields: fields({ name, phone, verified, email, address, createdAt: now, updatedAt: now }) }, currentDocument: { exists: false } });
     else if (C.name !== name || C.address !== address || (!verified && C.phone !== phone)) writes.push(setFields(`customers/${uid}`, Object.assign({ name, address, updatedAt: now }, verified ? {} : { phone })));
     await fs(env, ':commit', { writes, transaction: tx });
@@ -156,9 +155,9 @@ async function release(env, id) {
     const o = od && od.data, change = o && o.holding === true ? decide(o, Date.now()) : null;
     if (!change) { await rollback(env, tx); return; }
     const per = {}; (o.lines || []).forEach(l => { if (l && l.id) per[l.id] = (per[l.id] || 0) + num(l.qty); });
-    const cat = Object.keys(per).length ? await getDocs(env, Object.keys(per).map(x => `catalog/${x}`), tx) : {};
+    const hd = (await getDocs(env, ['shop/held'], tx))['shop/held'], nh = Object.assign({}, hd ? hd.data : {});
     const writes = [setFields(`orders/${id}`, Object.assign({ holding: false, updatedAt: new Date().toISOString() }, change), od.updateTime)];
-    for (const [pid, q] of Object.entries(per)) { const c = cat[`catalog/${pid}`]; if (c) writes.push(setFields(`catalog/${pid}`, { held: Math.max(0, num(c.data.held) - q) }, c.updateTime)); }
+    Object.entries(per).forEach(([pid, q]) => nh[pid] = num(nh[pid]) - q); writes.push(heldWrite(nh, hd));
     await fs(env, ':commit', { writes, transaction: tx });
   } catch (e) { await rollback(env, tx); throw e; }
 }
@@ -251,4 +250,10 @@ async function verifyUser(h) {
   if (!ok || pay.aud !== PROJECT || pay.iss !== `https://securetoken.google.com/${PROJECT}` || !pay.sub || num(pay.exp) < t || num(pay.iat) > t + 300)
     throw bad('Please sign in again.', 401, 'unauthenticated');
   return pay;
+}
+
+/* shop/held: { productId: units held by open orders }. Written whole, and only if nobody changed it since it was read */
+function heldWrite(h, doc) {
+  const clean = {}; Object.entries(h).forEach(([k, v]) => { if (num(v) > 0) clean[k] = num(v); });
+  return { update: { name: `${DOCS}/shop/held`, fields: fields(clean) }, currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false } };
 }

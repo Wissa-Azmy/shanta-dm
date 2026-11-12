@@ -1,6 +1,6 @@
 /* ---------- online shop: publish the catalog customers browse ----------
    The shop (the shop/ folder next to this app) never sees the ledger. Shanta writes a public copy of what
-   can be sold: catalog/<product> with name, brand, price and how many are in Egypt, and shop/settings with
+   can be sold: shop/catalog (one document, every product with name, brand, price and units in Egypt and on the way), shop/held (units held by open orders) and shop/settings with
    the shop's name, WhatsApp number and the down payment on requests. One entry per product (its barcode,
    or name + brand when it has none). Products with nothing left in Egypt stay listed, so customers can
    request them. Price = the suggested price of the oldest units in Egypt (else of the latest purchase).
@@ -36,10 +36,10 @@ function shopItems(R = calc()) {
     return x;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
-/* eg = units in Egypt, way = units on the way. held = units in open orders: worked out here while orders are
-   written by the shop itself, but kept by the order server once it is switched on (so it's never sent then) */
+/* eg = units in Egypt, way = units on the way. Held units (open orders) go in shop/held: worked out here while
+   orders are written by the shop itself, kept by the order server once it is switched on */
 const shopApi = () => String(db.settings.shopApi || '').trim().replace(/\/+$/, '');
-const shopDoc = x => Object.assign({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, avail: x.avail, eg: x.eg, way: x.way, status: x.status, img: isStoreImg(ShopPub.imgs[x.ean]) ? ShopPub.imgs[x.ean] : '' }, shopApi() ? {} : { held: x.held });
+const shopDoc = x => ({ name: x.name, brand: x.brand, store: x.store, category: x.category, size: shopSize(x.name), ean: x.ean, price: x.price, eg: x.eg, way: x.way, img: isStoreImg(ShopPub.imgs[x.ean]) ? ShopPub.imgs[x.ean] : '' });
 const shopSettingsDoc = () => { const s = db.settings;
   const pct = v => Math.max(0, Math.min(100, num(v)));
   return { name: String(s.shopName || 'Shanta').trim(), whatsapp: waNumber(s.shopWhatsapp), instapay: String(s.shopInstapay || '').trim(), reqDownPct: pct(s.shopReqDown),
@@ -78,6 +78,12 @@ Object.assign(ShopPub, {
     if (p) { p.disabled = !!busy; p.textContent = busy || 'Publish now'; }
     if (g) { g.disabled = !!busy; g.textContent = busy ? 'Looking…' : 'Look for missing photos again'; }
   },
+  /* once: the photos found so far are kept, and the old per-product documents are removed after the move */
+  async readOld() {
+    const S = F.S, q = await within(S.getDocs(S.collection(F.fs, 'catalog')), 20000, offlineMsg), ids = [];
+    q.forEach(d => { const v = d.data(); ids.push(d.id); if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
+    return ids;
+  },
   async publish(manual) {
     /* already running (often the photo check after a change): say so instead of silently waiting */
     if (this.busy) { this.again = true; if (manual) toast(this.prog ? `Already looking up photos… ${this.prog}` : 'Already updating the shop…'); return; }
@@ -86,37 +92,45 @@ Object.assign(ShopPub, {
     this.btns('Publishing…');
     try {
       await fb(); const S = F.S;
-      /* "Publish now" reads what the shop has, so it fixes anything another device left behind */
-      if (manual || !this.pub) {
-        const q = await within(S.getDocs(S.collection(F.fs, 'catalog')), 20000, offlineMsg), st = await within(S.getDoc(S.doc(F.fs, 'shop', 'settings')), 20000, offlineMsg);
-        this.pub = { cat: {}, set: '' };
-        q.forEach(d => { const v = Object.assign({}, d.data()); if (shopApi()) delete v.held; this.pub.cat[d.id] = stable(v); if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
-        if (st.exists()) { const v = Object.assign({}, st.data()); delete v.updatedAt; this.pub.set = stable(v); }
+      /* "Publish now" reads what the shop has (3 small reads), so it fixes anything another device left behind */
+      if (manual || !this.pub || this.pub.v !== 2) {
+        const [c, h, s] = await within(Promise.all(['catalog', 'held', 'settings'].map(n => S.getDoc(S.doc(F.fs, 'shop', n)))), 20000, offlineMsg);
+        const items = c.exists() ? c.data().items || {} : {};
+        Object.values(items).forEach(v => { if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
+        const sv = s.exists() ? Object.assign({}, s.data()) : {}; delete sv.updatedAt;
+        this.pub = { v: 2, cat: c.exists() ? stable(items) : '', held: h.exists() ? stable(h.data()) : '', set: s.exists() ? stable(sv) : '' };
+        /* the shop used to keep one document per product (a read per product on every visit): move once */
+        this.firstMove = !sv.catV; this.oldIds = sv.catV ? [] : await this.readOld();
       }
       const items = shopItems().filter(x => !x.hidden);
       /* dm products get dm's photo once (replacing an older Open Beauty Facts one); others only when missing */
       const need = items.filter(x => x.ean && (x.store === 'dm' || x.store === 'Rossmann') && !(x.ean in this.imgs));
       for (let i = 0; i < need.length; i++) { this.prog = `${i + 1} of ${need.length}`; this.note(`Looking up product photos… ${this.prog}`); this.btns(`Photos ${this.prog}…`); await shopImg(need[i]); if (i < need.length - 1) await sleep(650); }
       this.prog = '';
+      /* the whole catalog is one document, so a shop visit costs a few reads however many products there are */
       const next = {}; items.forEach(x => next[x.id] = shopDoc(x));
-      const st = shopSettingsDoc(), ops = [];
-      /* switching the order server on: hand it the units open orders hold right now, once */
+      const cat = stable(next), st = Object.assign(shopSettingsDoc(), { catV: 2 }), ops = [];
+      if (cat.length > 950000) throw new Error('The shop list is too big for one document (' + Math.round(cat.length / 1024) + ' KB of 1 MB). Hide some products from the shop.');
+      /* held units: worked out here while the shop writes orders itself; once the order server is on it keeps
+         them, so they're only handed over once, when it's switched on */
       const prevApi = (() => { try { return JSON.parse(this.pub.set || '{}').orderApi || ''; } catch (e) { return ''; } })();
-      if (st.orderApi && prevApi !== st.orderApi) {
-        const held = typeof shopHeld === 'function' ? shopHeld() : {};
-        items.forEach(x => ops.push(b => b.set(S.doc(F.fs, 'catalog', x.id), { held: held[x.id] || 0 }, { merge: true })));
-        (typeof ShopOrd !== 'undefined' ? ShopOrd.orders : []).filter(o => o.status === 'new' || o.status === 'offered')
-          .forEach(o => ops.push(b => b.update(S.doc(F.fs, 'orders', o.id), { holding: true })));
+      const handover = st.orderApi && (prevApi !== st.orderApi || this.firstMove), heldNow = {};
+      if (!st.orderApi || handover) {
+        const h = typeof shopHeld === 'function' ? shopHeld() : {};
+        items.forEach(x => { const n = Math.min(x.eg, num(h[x.id])); if (n > 0) heldNow[x.id] = n; });
+        if (handover || this.pub.held !== stable(heldNow)) ops.push(b => b.set(S.doc(F.fs, 'shop', 'held'), heldNow));
       }
-      Object.entries(next).forEach(([id, d]) => { if (this.pub.cat[id] !== stable(d)) ops.push(b => b.set(S.doc(F.fs, 'catalog', id), d, { merge: true })); });
-      Object.keys(this.pub.cat).forEach(id => { if (!(id in next)) ops.push(b => b.delete(S.doc(F.fs, 'catalog', id))); });
-      const catOps = ops.length;
-      if (catOps || this.pub.set !== stable(st)) ops.push(b => b.set(S.doc(F.fs, 'shop', 'settings'), Object.assign({ updatedAt: new Date().toISOString() }, st)));
+      if (handover) (typeof ShopOrd !== 'undefined' ? ShopOrd.orders : []).filter(o => o.status === 'new' || o.status === 'offered')
+        .forEach(o => ops.push(b => b.update(S.doc(F.fs, 'orders', o.id), { holding: true })));
+      const catChanged = this.pub.cat !== cat;
+      if (catChanged) ops.push(b => b.set(S.doc(F.fs, 'shop', 'catalog'), { items: next, n: items.length, updatedAt: new Date().toISOString() }));
+      if (catChanged || this.pub.set !== stable(st)) ops.push(b => b.set(S.doc(F.fs, 'shop', 'settings'), Object.assign({ updatedAt: new Date().toISOString() }, st)));
       if (ops.length) await Cloud.writeAll(ops);
-      this.pub = { cat: {}, set: stable(st) }; Object.entries(next).forEach(([id, d]) => this.pub.cat[id] = stable(d));
+      if (this.oldIds && this.oldIds.length) { const ids = this.oldIds; this.oldIds = []; await Cloud.writeAll(ids.map(id => b => b.delete(S.doc(F.fs, 'catalog', id)))); }
+      this.pub = { v: 2, cat, held: st.orderApi ? '' : stable(heldNow), set: stable(st) }; this.firstMove = false;
       try { localStorage.setItem(SHOP_PUB_KEY, JSON.stringify(this.pub)); } catch (e) { }
       this.note('');
-      const eg = items.filter(x => x.status === 'in').length;
+      const eg = items.filter(x => x.status === 'in').length, catOps = catChanged;
       if (catOps || !db.settings.shopPublished) { db.settings.shopPublished = { at: new Date().toISOString(), n: items.length, eg }; commit(); }
       if (manual) { const ph = items.filter(x => isStoreImg(this.imgs[x.ean])).length;
         toast(`✓ Shop updated: ${items.length} products, ${eg} in stock · ${ph} with a photo`); }
