@@ -48,14 +48,14 @@ const shopSettingsDoc = () => { const s = db.settings;
 const isStoreImg = u => /(^https:\/\/)([^/]*\.)?(dm-static\.com|dmtech\.com|dm\.de|rossmann\.de)\//.test(u || '');
 async function dmImg(ean) {
   if (typeof FSRC === 'undefined' || !dmRelay()) return null;
-  try { const r = await fetch(FSRC.dm.url(ean)); if (!r.ok) return null;
+  try { const r = await within(fetch(FSRC.dm.url(ean)), 15000, offlineMsg); if (!r.ok) return null;
     const hit = FSRC.dm.map(await r.json()).find(x => x.code === ean && x.img);
     return hit && isStoreImg(hit.img) ? hit.img : '';
   } catch (e) { return null; }
 }
 async function rossImg(ean) {
   if (typeof dmRelay !== 'function' || !dmRelay()) return null;
-  try { const r = await fetch(`${dmRelay()}/rossmann?ean=${encodeURIComponent(ean)}`);
+  try { const r = await within(fetch(`${dmRelay()}/rossmann?ean=${encodeURIComponent(ean)}`), 20000, offlineMsg);
     if (r.status === 404) return null;               // an older relay without the Rossmann lookup: try again after it's updated
     if (!r.ok) return null;
     const d = await r.json(); return d && isStoreImg(d.img) ? d.img : '';
@@ -69,11 +69,18 @@ async function shopImg(x) {
 const shopRulesMsg = 'The shop can’t be published yet: the Firestore rules need the shop part. Open Settings → Shared online ledger → Admin, type both emails, copy the rules, paste them in Firebase → Firestore Database → Rules and press Publish.';
 Object.assign(ShopPub, {
   note(m) { this.msg = m; const e = $('#shop_msg'); if (e) { e.textContent = m; e.hidden = !m; } },
+  /* both shop buttons show what is going on, and can't be pressed twice */
+  btns(busy) {
+    const p = $('[data-act="shop-pub"]'), g = $('[data-act="shop-imgs"]');
+    if (p) { p.disabled = !!busy; p.textContent = busy || 'Publish now'; }
+    if (g) { g.disabled = !!busy; g.textContent = busy ? 'Looking…' : 'Look for missing photos again'; }
+  },
   async publish(manual) {
-    if (this.busy) { this.again = true; return; }
+    /* already running (often the photo check after a change): say so instead of silently waiting */
+    if (this.busy) { this.again = true; if (manual) toast(this.prog ? `Already looking up photos… ${this.prog}` : 'Already updating the shop…'); return; }
     if (!Cloud.on() || Cloud.isBackup()) { if (manual) toast('⚠ Sign in to the shared ledger (the live one, not a backup) to publish the shop.'); return; }
     this.busy = true; this.again = false;
-    const btn = $('[data-act="shop-pub"]'); if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    this.btns('Publishing…');
     try {
       await fb(); const S = F.S;
       /* "Publish now" reads what the shop has, so it fixes anything another device left behind */
@@ -86,7 +93,8 @@ Object.assign(ShopPub, {
       const items = shopItems().filter(x => !x.hidden);
       /* dm products get dm's photo once (replacing an older Open Beauty Facts one); others only when missing */
       const need = items.filter(x => x.ean && (x.store === 'dm' || x.store === 'Rossmann') && !(x.ean in this.imgs));
-      for (let i = 0; i < need.length; i++) { if (manual) this.note(`Looking up product photos… ${i + 1} of ${need.length}`); await shopImg(need[i]); if (i < need.length - 1) await sleep(650); }
+      for (let i = 0; i < need.length; i++) { this.prog = `${i + 1} of ${need.length}`; this.note(`Looking up product photos… ${this.prog}`); this.btns(`Photos ${this.prog}…`); await shopImg(need[i]); if (i < need.length - 1) await sleep(650); }
+      this.prog = '';
       const next = {}; items.forEach(x => next[x.id] = shopDoc(x));
       const st = shopSettingsDoc(), ops = [];
       Object.entries(next).forEach(([id, d]) => { if (this.pub.cat[id] !== stable(d)) ops.push(b => b.set(S.doc(F.fs, 'catalog', id), d)); });
@@ -99,14 +107,15 @@ Object.assign(ShopPub, {
       this.note('');
       const eg = items.filter(x => x.status === 'in').length;
       if (catOps || !db.settings.shopPublished) { db.settings.shopPublished = { at: new Date().toISOString(), n: items.length, eg }; commit(); }
-      if (manual) toast(`✓ Shop updated: ${items.length} products, ${eg} in stock`);
+      if (manual) { const ph = items.filter(x => isStoreImg(this.imgs[x.ean])).length;
+        toast(`✓ Shop updated: ${items.length} products, ${eg} in stock · ${ph} with a photo`); }
     } catch (e) {
       console.warn(e);
       const m = e && e.code === 'permission-denied' ? shopRulesMsg : (e && e.message) || fsMsg(e);
       this.note(m); if (manual) toast('⚠ ' + m);
     } finally {
       this.busy = false;
-      const b = $('[data-act="shop-pub"]'); if (b) { b.disabled = false; b.textContent = 'Publish now'; }
+      this.prog = ''; this.btns('');
       if (this.again) this.auto();
     }
   },
@@ -135,12 +144,12 @@ function shopCardHTML() {
     <div class="f chk"><input type="checkbox" id="sh_auto" data-set="shopAuto"${s.shopAuto !== false ? ' checked' : ''}><label for="sh_auto">Update the shop after every change (sales, counts, moves, prices)</label></div>
     <p class="note">${p ? `Last published ${esc(fDateTime(p.at))} · ${p.n} products, ${p.eg} in stock` : 'Not published yet.'}</p>
     <div class="err" id="shop_msg"${ShopPub.msg ? '' : ' hidden'}>${esc(ShopPub.msg)}</div>
-    <div class="topact"><button type="button" class="btn" data-act="shop-pub">Publish now</button><a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">Open the shop ↗</a></div>
+    <div class="topact"><button type="button" class="btn" data-act="shop-pub"${ShopPub.busy ? ' disabled' : ''}>${ShopPub.busy ? (ShopPub.prog ? `Photos ${ShopPub.prog}…` : 'Publishing…') : 'Publish now'}</button><a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">Open the shop ↗</a></div>
     <details class="howto"><summary>Products in the shop (${shown.length} of ${items.length})</summary><div class="howto-b">
       <p class="note">Untick a product to hide it from the shop. Prices follow the suggested price (today’s rate + ${num(s.targetMargin)}% markup).</p>
       <ul class="mini shoplist">${items.map(x => `<li><label class="shrow"><input type="checkbox" data-shophide="${esc(x.key)}"${x.hidden ? '' : ' checked'}><span><b class="notr">${esc(x.name)}</b><span class="sub"><span class="notr">${esc(x.brand)}</span> · ${fEGP(x.price)}${x.eg ? ` · ${x.eg} in Egypt` : ''}</span></span></label><span class="pill ${stt[x.status][1]}">${stt[x.status][0]}</span></li>`).join('') || '<li class="note">No products yet.</li>'}</ul>
       <p class="note">${typeof dmRelay === 'function' && dmRelay() ? 'Photos come only from dm (for dm products) and rossmann.de (for Rossmann products). Products they don’t list show their initials.' : 'Product photos need the dm search relay (Settings → Barcode search). Until then the shop shows initials.'}</p>
-      <button type="button" class="btn sm ghost" data-act="shop-imgs">Look for missing photos again</button></div></details>
+      <button type="button" class="btn sm ghost" data-act="shop-imgs"${ShopPub.busy ? ' disabled' : ''}>${ShopPub.busy ? 'Looking…' : 'Look for missing photos again'}</button></div></details>
     <p class="note">First time only: the Firestore rules need the shop part. In Shared online ledger → Admin, type both emails, copy the rules and publish them in Firebase.</p></div>`;
 }
 { const vs = V.settings, mark = '<div class="card"><h3>Barcode search</h3>';
@@ -148,6 +157,7 @@ function shopCardHTML() {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act="shop-pub"],[data-act="shop-imgs"]'); if (!t) return;
+  if (t.disabled) return;
   if (t.dataset.act === 'shop-imgs') {
     Object.keys(ShopPub.imgs).forEach(k => { if (!ShopPub.imgs[k]) delete ShopPub.imgs[k]; });
     try { localStorage.setItem(SHOP_IMG_KEY, JSON.stringify(ShopPub.imgs)); } catch (x) { }

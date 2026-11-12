@@ -798,3 +798,7 @@ Object.assign(AR, { 'dm products show dm’s own photo; other products use Open 
   'To show dm’s own photos, add the dm search relay in Settings → Barcode search.': 'لعرض صور dm الأصلية، أضف وسيط بحث dm في الإعدادات ← البحث بالباركود.' });
 Object.assign(AR, { 'Photos come only from dm (for dm products) and rossmann.de (for Rossmann products). Products they don’t list show their initials.': 'الصور من dm فقط (لمنتجات dm) ومن rossmann.de (لمنتجات Rossmann). المنتجات غير الموجودة لديهما تظهر بالأحرف الأولى.',
   'Product photos need the dm search relay (Settings → Barcode search). Until then the shop shows initials.': 'صور المنتجات تحتاج إلى وسيط بحث dm (الإعدادات ← البحث بالباركود). حتى ذلك الحين يعرض المتجر الأحرف الأولى.' });
+Object.assign(AR, { 'Looking…': 'جارٍ البحث…', 'Already updating the shop…': 'يجري تحديث المتجر بالفعل…' });
+rx(/^Already looking up photos… (\d+) of (\d+)$/, (m, a, b) => `يجري البحث عن الصور بالفعل… ${a} من ${b}`);
+rx(/^Photos (\d+) of (\d+)…$/, (m, a, b) => `الصور ${a} من ${b}…`);
+rx(/^Shop updated: (\d+) products, (\d+) in stock · (\d+) with a photo$/, (m, n, k, p) => `تم تحديث المتجر: ${n} منتج، ${k} في المخزون · ${p} بصورة`);
