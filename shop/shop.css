@@ -269,3 +269,12 @@ select:not(#_){-webkit-appearance:none;appearance:none;background-image:url("dat
 .mo.isreq .steps li.done i{background:var(--gold);border-color:var(--gold)}
 .mo.isreq .steps li.wait i{border-color:var(--gold)}
 .mo.isreq .steps li.wait i::after{background:var(--gold)}
+
+/* product photos: every card gets the same square photo box. The photo is only ever scaled down to fit
+   inside it (never stretched or cropped) and sits on white, so tall or wide photos blend into the box */
+.ph:not(#_){aspect-ratio:1/1;height:auto;overflow:hidden;background:#fff;display:block;flex:none}
+.ph img:not(#_){position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:contain;object-position:center;
+  padding:12px;box-sizing:border-box;background:#fff;display:block}
+.ph .ini:not(#_){position:absolute;inset:0;margin:auto;width:62%;height:62%}
+.ph .stag{z-index:1}
+.pc{height:100%}
