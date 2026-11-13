@@ -7,7 +7,7 @@
    - every 15 min  (Cron trigger) lets go of held units: unpaid orders are cancelled 24 hours after ordering
                    (48 hours after the offer for a request that arrived), offers nobody confirmed within
                    24 hours go back to "requested", and orders that ended or became a sale stop holding.
-   - GET /ping     used by Shanta's "Test" button.
+   - GET /ping     used by Shanta's "Test" button. Open <worker address>/ping in a browser to see the details.
 
    Setup (once)
    1. Firebase console → Project settings → Service accounts → Generate new private key (a .json file).
@@ -27,18 +27,20 @@ const CODE_CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export default {
   async fetch(req, env) {
     const origin = req.headers.get('Origin') || '';
-    const cors = { 'Access-Control-Allow-Origin': ALLOWED.includes(origin) ? origin : ALLOWED[0], 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400', Vary: 'Origin' };
-    const out = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: Object.assign({ 'Content-Type': 'application/json' }, cors) });
+    const cors = {
+      'Access-Control-Allow-Origin': ALLOWED.includes(origin) ? origin : ALLOWED[0],
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+      'Cache-Control': 'no-store',
+      Vary: 'Origin'
+    };
+    const out = (data, status = 200) => new Response(JSON.stringify(data, null, 1), { status, headers: Object.assign({ 'Content-Type': 'application/json' }, cors) });
     if (origin && !ALLOWED.includes(origin)) return out({ error: 'This site is not allowed.' }, 403);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const path = new URL(req.url).pathname.replace(/\/+$/, '');
     try {
-      if (path === '/ping') {
-        const r = { ok: true, key: !!env.FIREBASE_SA, firestore: false };
-        if (r.key) try { await getDocs(env, ['shop/settings']); r.firestore = true; } catch (e) { r.err = String(e.message || e).slice(0, 200); }
-        return out(r);
-      }
+      if (path === '/ping') return out(await ping(env));
       if (path === '/order' && req.method === 'POST') {
         const user = await verifyUser(req.headers.get('Authorization'));
         const body = await req.json().catch(() => null);
@@ -57,6 +59,22 @@ export default {
   }
 };
 
+/* ---------- /ping: each step on its own, so a failure says where it happened ---------- */
+async function ping(env) {
+  const r = { ok: true, key: !!env.FIREBASE_SA, token: false, firestore: false };
+  if (!r.key) return r;
+  try {
+    const sa = JSON.parse(env.FIREBASE_SA);
+    r.keyProject = sa.project_id || '';
+    r.keyAccount = sa.client_email || '';
+    if (r.keyProject !== PROJECT) r.warn = `The key belongs to the project "${r.keyProject}", not "${PROJECT}".`;
+  } catch (e) { r.err = 'FIREBASE_SA isn’t valid JSON: paste the whole .json file.'; return r; }
+  try { await saToken(env); r.token = true; } catch (e) { r.step = 'google sign-in'; r.err = errText(e); return r; }
+  try { await getDocs(env, ['shop/settings']); r.firestore = true; } catch (e) { r.step = 'firestore read'; r.err = errText(e); }
+  return r;
+}
+const errText = e => [e.httpStatus, e.fsStatus, String(e.message || e)].filter(Boolean).join(' · ').slice(0, 400);
+
 /* ---------- placing an order ---------- */
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const bad = (msg, status = 400, code = 'invalid-argument') => Object.assign(new Error(msg), { status, code });
@@ -71,7 +89,10 @@ async function placeOrder(env, user, b) {
   for (const l of b.lines) {
     const id = String((l && l.id) || ''), qty = Math.floor(num(l && l.qty)), now = Math.floor(num(l && l.now));
     if (!/^[A-Za-z0-9_-]{1,120}$/.test(id) || qty < 1 || qty > 99 || now < 0 || now > qty) throw bad('A product line isn’t valid.');
-    const w = want.get(id) || { id, qty: 0, now: 0 }; w.qty += qty; w.now += now; want.set(id, w);
+    const w = want.get(id) || { id, qty: 0, now: 0 };
+    w.qty += qty;
+    w.now += now;
+    want.set(id, w);
   }
   const name = str(b.name, 80), address = str(b.address, 300), note = str(b.note, 500), lang = b.lang === 'ar' ? 'ar' : 'en';
   if (!name || !address) throw bad('Name and address are needed.');
@@ -81,11 +102,16 @@ async function placeOrder(env, user, b) {
 
   const tx = await fs(env, ':beginTransaction', { options: { readWrite: {} } }).then(r => r.transaction);
   try {
-
     const got = await getDocs(env, ['shop/settings', 'shop/catalog', 'shop/held', `customers/${uid}`], tx);
     const set = got['shop/settings'];
-    if (!set || set.data.open === false) { await rollback(env, tx); return { status: 403, body: { error: 'The shop is closed.', code: 'permission-denied', closed: true } }; }
-    const S = set.data, cust = got[`customers/${uid}`], C = cust ? cust.data : null, items = (got['shop/catalog'] || { data: {} }).data.items || {}, H = (got['shop/held'] || { data: {} }).data;
+    if (!set || set.data.open === false) {
+      await rollback(env, tx);
+      return { status: 403, body: { error: 'The shop is closed.', code: 'permission-denied', closed: true } };
+    }
+    const S = set.data;
+    const cust = got[`customers/${uid}`], C = cust ? cust.data : null;
+    const catDoc = got['shop/catalog'], heldDoc = got['shop/held'];
+    const items = (catDoc && catDoc.data.items) || {}, H = heldDoc ? heldDoc.data : {};
 
     const short = [], gone = [], o = [], r = [];
     for (const w of want.values()) {
@@ -96,7 +122,10 @@ async function placeOrder(env, user, b) {
       if (w.now) o.push({ p, q: w.now });
       if (w.qty - w.now) r.push({ p, q: w.qty - w.now });
     }
-    if (short.length || gone.length) { await rollback(env, tx); return { status: 409, body: { error: 'Not enough stock.', short, gone } }; }
+    if (short.length || gone.length) {
+      await rollback(env, tx);
+      return { status: 409, body: { error: 'Not enough stock.', short, gone } };
+    }
 
     /* money: the same rules as lines() in shop.js */
     const sum = a => a.reduce((s, x) => s + x.q * num(x.p.price), 0);
@@ -115,10 +144,23 @@ async function placeOrder(env, user, b) {
     if (o.length) orders.push(Object.assign({}, base, { kind: 'order', status: 'new', method, lines: pack(o), goods: og, delivery: od, creditUsed: oc, total: ot, downPct: opct, down: downOf(ot, opct), group, code: group, holding: true }));
     if (r.length) orders.push(Object.assign({}, base, { kind: 'request', status: 'requested', method, lines: pack(r), goods: rg, delivery: rd, creditUsed: rc, total: rt, downPct: rpct, down: downOf(rt, rpct), group, code: o.length ? newId(6, CODE_CH) : group }));
 
-    const writes = orders.map(x => { x.id = newId(); return { update: { name: `${DOCS}/orders/${x.id}`, fields: fields(omit(x, 'id')) }, currentDocument: { exists: false } }; });
-    if (o.length) { const nh = Object.assign({}, H); o.forEach(x => nh[x.p.id] = num(nh[x.p.id]) + x.q); writes.push(heldWrite(nh, got['shop/held'])); }
-    if (!C) writes.push({ update: { name: `${DOCS}/customers/${uid}`, fields: fields({ name, phone, verified, email, address, createdAt: now, updatedAt: now }) }, currentDocument: { exists: false } });
-    else if (C.name !== name || C.address !== address || (!verified && C.phone !== phone)) writes.push(setFields(`customers/${uid}`, Object.assign({ name, address, updatedAt: now }, verified ? {} : { phone })));
+    const writes = [];
+    for (const x of orders) {
+      x.id = newId();
+      writes.push({ update: { name: `${DOCS}/orders/${x.id}`, fields: fields(omit(x, 'id')) }, currentDocument: { exists: false } });
+    }
+    if (o.length) {
+      const nh = Object.assign({}, H);
+      for (const x of o) nh[x.p.id] = num(nh[x.p.id]) + x.q;
+      writes.push(heldWrite(nh, heldDoc));
+    }
+    if (!C) {
+      writes.push({ update: { name: `${DOCS}/customers/${uid}`, fields: fields({ name, phone, verified, email, address, createdAt: now, updatedAt: now }) }, currentDocument: { exists: false } });
+    } else if (C.name !== name || C.address !== address || (!verified && C.phone !== phone)) {
+      const upd = { name, address, updatedAt: now };
+      if (!verified) upd.phone = phone;
+      writes.push(setFields(`customers/${uid}`, upd));
+    }
     await fs(env, ':commit', { writes, transaction: tx });
     return { status: 200, body: { ok: true, orders } };
   } catch (e) { await rollback(env, tx); throw e; }
@@ -151,42 +193,69 @@ async function sweep(env) {
 async function release(env, id) {
   const tx = await fs(env, ':beginTransaction', { options: { readWrite: {} } }).then(r => r.transaction);
   try {
-    const got = await getDocs(env, [`orders/${id}`], tx), od = got[`orders/${id}`];
-    const o = od && od.data, change = o && o.holding === true ? decide(o, Date.now()) : null;
+    const got = await getDocs(env, [`orders/${id}`, 'shop/held'], tx);
+    const od = got[`orders/${id}`], hd = got['shop/held'];
+    const o = od ? od.data : null, change = o && o.holding === true ? decide(o, Date.now()) : null;
     if (!change) { await rollback(env, tx); return; }
-    const per = {}; (o.lines || []).forEach(l => { if (l && l.id) per[l.id] = (per[l.id] || 0) + num(l.qty); });
-    const hd = (await getDocs(env, ['shop/held'], tx))['shop/held'], nh = Object.assign({}, hd ? hd.data : {});
-    const writes = [setFields(`orders/${id}`, Object.assign({ holding: false, updatedAt: new Date().toISOString() }, change), od.updateTime)];
-    Object.entries(per).forEach(([pid, q]) => nh[pid] = num(nh[pid]) - q); writes.push(heldWrite(nh, hd));
+    const per = {};
+    for (const l of o.lines || []) if (l && l.id) per[l.id] = (per[l.id] || 0) + num(l.qty);
+    const nh = Object.assign({}, hd ? hd.data : {});
+    for (const pid of Object.keys(per)) nh[pid] = num(nh[pid]) - per[pid];
+    const writes = [
+      setFields(`orders/${id}`, Object.assign({ holding: false, updatedAt: new Date().toISOString() }, change), od.updateTime),
+      heldWrite(nh, hd)
+    ];
     await fs(env, ':commit', { writes, transaction: tx });
   } catch (e) { await rollback(env, tx); throw e; }
+}
+
+/* shop/held: { productId: units held by open orders }. Written whole, and only if nobody changed it since it was read */
+function heldWrite(h, doc) {
+  const clean = {};
+  for (const k of Object.keys(h)) if (num(h[k]) > 0) clean[k] = num(h[k]);
+  return { update: { name: `${DOCS}/shop/held`, fields: fields(clean) }, currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false } };
 }
 
 /* ---------- Firestore REST ---------- */
 async function fs(env, op, body) {
   const r = await fetch(API + op, { method: 'POST', headers: { Authorization: 'Bearer ' + await saToken(env), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = (Array.isArray(d) ? d[0] : d).error || {}; throw Object.assign(new Error(e.message || 'Firestore ' + r.status), { status: r.status === 409 ? 503 : 502, code: 'unavailable', fsStatus: e.status }); }
+  if (!r.ok) {
+    const e = (Array.isArray(d) ? d[0] : d).error || {};
+    throw Object.assign(new Error(e.message || 'Firestore ' + r.status), { status: r.status === 409 ? 503 : 502, code: 'unavailable', fsStatus: e.status, httpStatus: r.status });
+  }
   return d;
 }
 async function getDocs(env, paths, tx) {
-  const res = await fs(env, ':batchGet', Object.assign({ documents: paths.map(p => `${DOCS}/${p}`) }, tx ? { transaction: tx } : {}));
+  const body = { documents: paths.map(p => `${DOCS}/${p}`) };
+  if (tx) body.transaction = tx;
+  const res = await fs(env, ':batchGet', body);
   const out = {};
   for (const x of res) if (x.found) out[x.found.name.slice(DOCS.length + 1)] = { data: decode(x.found.fields), updateTime: x.found.updateTime };
   return out;
 }
 const rollback = (env, tx) => fs(env, ':rollback', { transaction: tx }).catch(() => {});
-/* contention: another write touched the same products; try again a couple of times */
+/* contention: another write touched the same documents; try again a couple of times */
 async function withRetry(fn) {
   for (let i = 0; ; i++) {
-    try { return await fn(); } catch (e) { if (i >= 2 || !/ABORTED|FAILED_PRECONDITION/.test(e.fsStatus || '')) throw e; await new Promise(ok => setTimeout(ok, 150 * (i + 1) + Math.random() * 200)); }
+    try { return await fn(); } catch (e) {
+      if (i >= 2 || !/ABORTED|FAILED_PRECONDITION/.test(e.fsStatus || '')) throw e;
+      await new Promise(ok => setTimeout(ok, 150 * (i + 1) + Math.random() * 200));
+    }
   }
 }
 /* change only these fields (like update() in the app); fails if the document changed or is gone */
-const setFields = (path, data, updateTime) => ({ update: { name: `${DOCS}/${path}`, fields: fields(data) }, updateMask: { fieldPaths: Object.keys(data) },
-  currentDocument: updateTime ? { updateTime } : { exists: true } });
+const setFields = (path, data, updateTime) => ({
+  update: { name: `${DOCS}/${path}`, fields: fields(data) },
+  updateMask: { fieldPaths: Object.keys(data) },
+  currentDocument: updateTime ? { updateTime } : { exists: true }
+});
 const omit = (o, k) => { const c = Object.assign({}, o); delete c[k]; return c; };
-const fields = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => [k, enc(v)]));
+function fields(o) {
+  const f = {};
+  for (const k of Object.keys(o)) if (o[k] !== undefined) f[k] = enc(o[k]);
+  return f;
+}
 function enc(v) {
   if (v === null) return { nullValue: null };
   if (typeof v === 'boolean') return { booleanValue: v };
@@ -205,7 +274,11 @@ function dec(v) {
   if ('mapValue' in v) return decode(v.mapValue.fields);
   return null;
 }
-const decode = f => Object.fromEntries(Object.entries(f || {}).map(([k, v]) => [k, dec(v)]));
+function decode(f) {
+  const o = {};
+  for (const k of Object.keys(f || {})) o[k] = dec(f[k]);
+  return o;
+}
 
 /* ---------- Google sign-in for the worker itself (service account → access token) ---------- */
 let SA_TOKEN = { tok: '', exp: 0 };
@@ -218,12 +291,16 @@ async function saToken(env) {
   const sa = JSON.parse(env.FIREBASE_SA), iat = Math.floor(Date.now() / 1000);
   const der = unb64u(sa.private_key.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '').replace(/\+/g, '-').replace(/\//g, '_'));
   const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-  const unsigned = b64uStr(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' + b64uStr(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore', aud: 'https://oauth2.googleapis.com/token', iat, exp: iat + 3600 }));
+  const claims = { iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore', aud: 'https://oauth2.googleapis.com/token', iat, exp: iat + 3600 };
+  const unsigned = b64uStr(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' + b64uStr(JSON.stringify(claims));
   const jwt = unsigned + '.' + b64u(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned)));
-  const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + jwt });
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + jwt
+  });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok || !d.access_token) throw Object.assign(new Error('Google refused the service-account key: ' + (d.error_description || d.error || r.status)), { status: 503, code: 'unavailable' });
+  if (!r.ok || !d.access_token) throw Object.assign(new Error('Google refused the service-account key: ' + (d.error_description || d.error || r.status)), { status: 503, code: 'unavailable', httpStatus: r.status });
   SA_TOKEN = { tok: d.access_token, exp: Date.now() + (num(d.expires_in) - 120) * 1000 };
   return SA_TOKEN.tok;
 }
@@ -240,7 +317,9 @@ async function verifyUser(h) {
   if (Date.now() > JWKS.exp || !JWKS.keys[head.kid]) {
     const r = await fetch('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
     const d = await r.json(), age = /max-age=(\d+)/.exec(r.headers.get('Cache-Control') || '');
-    JWKS = { keys: Object.fromEntries((d.keys || []).map(k => [k.kid, k])), exp: Date.now() + (age ? num(age[1]) : 3600) * 1000 };
+    const keys = {};
+    for (const k of d.keys || []) keys[k.kid] = k;
+    JWKS = { keys, exp: Date.now() + (age ? num(age[1]) : 3600) * 1000 };
   }
   const jwk = JWKS.keys[head.kid];
   if (!jwk) throw bad('Please sign in again.', 401, 'unauthenticated');
@@ -250,10 +329,4 @@ async function verifyUser(h) {
   if (!ok || pay.aud !== PROJECT || pay.iss !== `https://securetoken.google.com/${PROJECT}` || !pay.sub || num(pay.exp) < t || num(pay.iat) > t + 300)
     throw bad('Please sign in again.', 401, 'unauthenticated');
   return pay;
-}
-
-/* shop/held: { productId: units held by open orders }. Written whole, and only if nobody changed it since it was read */
-function heldWrite(h, doc) {
-  const clean = {}; Object.entries(h).forEach(([k, v]) => { if (num(v) > 0) clean[k] = num(v); });
-  return { update: { name: `${DOCS}/shop/held`, fields: fields(clean) }, currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false } };
 }

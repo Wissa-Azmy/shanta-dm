@@ -207,7 +207,8 @@ document.addEventListener('click', async e => {
     if (r.status === 403) toast('⚠ The order server doesn’t accept this site. Check ALLOWED in shop-worker.js.');
     else if (!r.ok || !d.ok) toast('⚠ The order server didn’t answer properly (' + r.status + ').');
     else if (!d.key) toast('⚠ The order server works, but the FIREBASE_SA secret is missing. Add it under the Worker’s Settings → Variables and Secrets.');
-    else if (!d.firestore) toast('⚠ The order server can’t reach Firestore with its key: ' + (d.err || 'check the FIREBASE_SA secret.'));
+    else if (d.warn) toast('⚠ ' + d.warn + ' Make the key in the Shanta Firebase project.');
+    else if (!d.firestore) toast('⚠ Order server: ' + (d.step === 'google sign-in' ? 'Google didn’t accept the key' : 'Firestore refused the read') + ': ' + (d.err || 'check the FIREBASE_SA secret.'));
     else toast('✓ Order server works. Press Publish now to switch it on.');
   } catch (x) { toast('⚠ Couldn’t reach the order server. Check the address.'); }
   b.disabled = false; b.textContent = 'Test';
