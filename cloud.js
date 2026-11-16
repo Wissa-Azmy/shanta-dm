@@ -37,9 +37,14 @@ const cleanDoc = (d, id) => { const o = Object.assign({}, d, { id }); delete o._
 const Reads = {
   get() { try { const r = JSON.parse(localStorage.getItem('shanta-reads') || 'null'); return r && r.day === today() ? r : { day: today(), n: 0 }; } catch (e) { return { day: today(), n: 0 }; } },
   add(n) { if (!(n > 0)) return; const r = this.get(); r.n += n; try { localStorage.setItem('shanta-reads', JSON.stringify(r)); } catch (e) { } },
-  /* a listener: the first answer from the server costs every document sent (at least 1), later ones the changes */
+  /* a listener: the first answer from the server costs every document sent (at least 1), later ones the changes.
+     A single document (settings, deletions) has no list of changes: 1 per update from the server */
   snap(snap, seen, key, all) {
     if (snap.metadata.fromCache) return;
+    if (typeof snap.docChanges !== 'function') {
+      if (!seen[key] || !snap.metadata.hasPendingWrites) { seen[key] = true; this.add(1); }
+      return;
+    }
     if (!seen[key]) { seen[key] = true; this.add(Math.max(1, all ? snap.size : snap.docChanges().length)); }
     else this.add(snap.docChanges().length);
   }
