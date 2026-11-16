@@ -104,6 +104,7 @@ function fsMsg(e) {
   if (c === 'permission-denied' || c === 'unauthenticated') return rulesMsg();
   if (c === 'not-found' || c === 'failed-precondition' && /database/i.test(e.message)) return 'The Firestore database hasn’t been created yet. See “Admin” below.';
   if (c === 'unavailable' || e && e.timeout) return offlineMsg;
+  if (c === 'resource-exhausted') return 'Firestore’s free daily limit is used up (it resets at 09:00). Changes stay on this device and are sent then. Don’t edit on two devices until it’s back.';
   return 'Cloud error: ' + (e && (e.message || c) || e);
 }
 
@@ -119,7 +120,7 @@ const Cloud = {
   ledger() { return (this.cfg && this.cfg.ledger) || CLOUD.ledger; },
   saveCfg() { localStorage.setItem('shanta-cloud', JSON.stringify(this.cfg)); },
   saveBase() { clearTimeout(this.bt); this.bt = setTimeout(() => { if (this.ready && this.on()) localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); }, 800); },
-  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $("#g_msg"); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } const lm = $("#ldmsg"); if (lm && this.msg) lm.textContent = this.msg; },
+  set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); cloudBanner(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $("#g_msg"); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } const lm = $("#ldmsg"); if (lm && this.msg) lm.textContent = this.msg; },
 
   async connect(email, pw) {
     let f; try { f = await fb(); } catch (e) { throw new Error(netMsg); }
@@ -224,9 +225,14 @@ const Cloud = {
   /* ---- live listeners ---- */
   stopListen() { this.unsubs.forEach(u => { try { u(); } catch (e) { } }); this.unsubs = []; this.ready = false; },
   listen() {
+    const wasReady = this.ready;
     this.stopListen();
     const l = this.ledger(), got = {};
-    this.base0 = this.switching ? null : (this.base ? cloneSnap(this.base) : null);
+    /* the last state confirmed by the server is what this device's own changes are measured against. A retry
+       after a failed start (offline, daily limit used up) keeps it: the half-filled base of the failed try
+       would make this device's old copy look like new changes and overwrite the other device's work */
+    if (this.switching) this.base0 = null;
+    else if (wasReady || !this.base0) this.base0 = this.base ? cloneSnap(this.base) : null;
     this.remote = emptySnap(); this.base = emptySnap();
     const done = k => { got[k] = true; if (!this.ready && ['settings'].concat(COLLS).every(x => got[x])) this.becomeReady(); };
     /* a listener that fails stops for good: start them all again after a pause, instead of
@@ -234,7 +240,7 @@ const Cloud = {
     const fail = e => {
       console.warn(e); this.set(e.code === 'unavailable' ? 'offline' : 'error', fsMsg(e));
       clearTimeout(this.rt);
-      this.rt = setTimeout(() => { if (this.on() && this.unsubs.length) this.listen(); }, e.code === 'permission-denied' ? 20000 : 5000);
+      this.rt = setTimeout(() => { if (this.on() && this.unsubs.length) this.listen(); }, e.code === 'permission-denied' ? 20000 : e.code === 'resource-exhausted' ? 120000 : 5000);
     };
     COLLS.forEach(c => this.unsubs.push(F.S.onSnapshot(F.S.collection(F.fs, 'ledgers', l, c), { includeMetadataChanges: true }, snap => {
       snap.docChanges({ includeMetadataChanges: true }).forEach(ch => {
@@ -273,6 +279,10 @@ const Cloud = {
         if (!Object.keys(remote.settings).length) Object.entries(local.settings).forEach(([k, v]) => pending['settings/' + k] = JSON.parse(v));
       }
     }
+    /* many deletions on connecting means this device's copy is behind, not that someone deleted them: ask */
+    const dels = Object.keys(pending).filter(k => pending[k] === null && k.split('/').length === 2 && !k.startsWith('settings/'));
+    if (dels.length >= 10 && !confirm(`This device's copy is missing ${dels.length} entries that are in the shared ledger.\n\nOK = delete them from the shared ledger too\nCancel = keep them (recommended unless you deleted them on purpose while offline)`))
+      dels.forEach(k => delete pending[k]);
     this.switching = false; this.base0 = null; this.ready = true;
     this.fromRemote(snapApply(cloneSnap(remote), pending));
     if (Object.keys(pending).length) this.write(pending);
@@ -502,7 +512,14 @@ const Cloud = {
     return `<div class="cloudline"><div class="st"><span class="dot ${dot}"></span>${st}</div><p>${esc(userName(this.cfg.email))}${t ? ' · ' + t : ''}${this.msg ? '<br>' + esc(this.msg) : ''}</p>
       <div class="row"><button class="btn sm ghost" data-act="cloud-sync">Sync now</button></div></div>`;
   },
+  /* the two emails the rules let in. Remembered in the shared settings, so the rules can be copied again
+     later from either device without retyping them (a missing one used to become friend@example.com) */
+  admins() { const s = (db.settings.adminEmails || []).map(e => String(e || '').trim()).filter(Boolean);
+    const me = this.cfg && this.cfg.email ? toEmail(this.cfg.email) : '';
+    if (me && !s.map(toEmail).includes(me)) s.unshift(me);
+    return [s[0] || '', s[1] || '']; },
   rules(a, b) {
+    if (a === undefined) [a, b] = this.admins();
     const list = [a || 'you@example.com', b || 'friend@example.com'].map(e => `'${toEmail(e)}'`).join(', ');
     return `rules_version = '2';
 service cloud.firestore {
@@ -610,8 +627,8 @@ service cloud.firestore {
         <li>Send the person the app link with their email and password. That is all they need.</li>
       </ol>
       <div class="fgrid">
-        <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none"></div>
-        <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none"></div>
+        <div class="f"><label>Your email</label><input id="ad_a" type="email" data-rules="1" autocapitalize="none" value="${esc(this.admins()[0])}"></div>
+        <div class="f"><label>Friend’s email</label><input id="ad_b" type="email" data-rules="1" autocapitalize="none" value="${esc(this.admins()[1])}"></div>
         <div class="f span"><textarea id="cl_rules" readonly rows="52" style="font:12px var(--mono)">${esc(this.rules())}</textarea><button type="button" class="btn sm ghost" style="align-self:flex-start" data-act="cloud-copy">Copy rules</button></div>
       </div>
       <p class="note">Forgotten password: in Firebase open Users, click ⋮ next to the person and choose Reset password; they get an email to set a new one. Nothing in the ledger is lost.</p></details>`;
@@ -626,7 +643,13 @@ document.addEventListener('click', async e => {
     toast(Cloud.state === 'ok' ? 'Synced' : (Cloud.msg || offlineMsg));
   }
   if (a === 'cloud-off') { if (confirm('Disconnect this device from the shared cloud ledger?')) Cloud.disconnect(); }
-  if (a === 'cloud-copy') { const ta = $('#cl_rules'); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied'); }
+  if (a === 'cloud-copy') {
+    const ea = toEmail($('#ad_a').value), eb = toEmail($('#ad_b').value), okE = e => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !/@example\.com$/.test(e);
+    /* rules with only one email lock the other person out of the ledger */
+    if (!okE(ea) || !okE(eb) || ea === eb) return toast('⚠ Type both email addresses first: yours and your friend’s. Rules with only one lock the other person out.');
+    db.settings.adminEmails = [ea, eb]; commit();
+    const ta = $('#cl_rules'); ta.value = Cloud.rules(ea, eb); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied for ' + ea + ' and ' + eb);
+  }
   if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
   if (a === 'cloud-backup') {
     t.disabled = true; t.textContent = 'Backing up…';
@@ -765,3 +788,27 @@ async function agsiMount() {
 /* the sign-in boxes are redrawn often (Settings, the opening screen): add the button whenever one appears */
 new MutationObserver(() => { if (document.querySelector('[data-agsi]:not([data-on])')) agsiMount(); }).observe(document.body, { childList: true, subtree: true });
 agsiMount();
+
+/* ---------- banner while the shared ledger can't be reached ----------
+   Offline, or Firestore refusing (rules, daily limit): what's on screen may be only this device's copy.
+   Shown after a short pause so a brief blip doesn't flash it; hidden as soon as sync is back */
+function cloudBanner() {
+  const bad = Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error');
+  let b = document.getElementById('cloudbanner');
+  if (!bad) { clearTimeout(cloudBanner.t); cloudBanner.t = null; if (b) b.remove(); document.body.classList.remove('hasbanner'); return; }
+  const show = () => {
+    cloudBanner.t = null;
+    if (!(Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error'))) return;
+    b = document.getElementById('cloudbanner');
+    if (!b) { b = document.createElement('div'); b.id = 'cloudbanner'; b.setAttribute('role', 'status'); document.body.prepend(b); }
+    const off = Cloud.state === 'offline';
+    b.className = off ? 'off' : 'err';
+    b.innerHTML = `<span class="cbi" aria-hidden="true">${off ? '⚡' : '!'}</span><span class="cbt"><b>${off ? 'Offline' : 'Not syncing with the shared ledger'}</b><span>${off
+      ? 'You see this device’s copy. Changes are saved here and sent when the connection is back.'
+      : 'You may be seeing an old copy, and changes stay on this device. Don’t edit on both devices until this is fixed.'}${Cloud.msg && !off ? ' ' + esc(Cloud.msg) : ''}</span></span><button type="button" class="btn sm" data-act="cloud-sync">Try again</button>`;
+    document.body.classList.add('hasbanner');
+  };
+  if (b) show(); else if (!cloudBanner.t) cloudBanner.t = setTimeout(show, 4000);
+}
+window.addEventListener('online', () => { if (Cloud.on() && Cloud.state !== 'ok') Cloud.sync(); });
+window.addEventListener('offline', () => { if (Cloud.on()) Cloud.set('offline', offlineMsg); });

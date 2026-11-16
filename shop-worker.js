@@ -70,7 +70,12 @@ async function ping(env) {
     if (r.keyProject !== PROJECT) r.warn = `The key belongs to the project "${r.keyProject}", not "${PROJECT}".`;
   } catch (e) { r.err = 'FIREBASE_SA isn’t valid JSON: paste the whole .json file.'; return r; }
   try { await saToken(env); r.token = true; } catch (e) { r.step = 'google sign-in'; r.err = errText(e); return r; }
-  try { await getDocs(env, ['shop/settings']); r.firestore = true; } catch (e) { r.step = 'firestore read'; r.err = errText(e); }
+  try { await getDocs(env, ['shop/settings']); r.firestore = true; } catch (e) {
+    r.step = 'firestore read'; r.err = errText(e);
+    /* Google's own explanation: which limit, on which project */
+    if (e.details) r.details = e.details;
+    if (e.retryAfter) r.retryAfter = e.retryAfter;
+  }
   return r;
 }
 const errText = e => [e.httpStatus, e.fsStatus, String(e.message || e)].filter(Boolean).join(' · ').slice(0, 400);
@@ -222,7 +227,7 @@ async function fs(env, op, body) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
     const e = (Array.isArray(d) ? d[0] : d).error || {};
-    throw Object.assign(new Error(e.message || 'Firestore ' + r.status), { status: r.status === 409 ? 503 : 502, code: 'unavailable', fsStatus: e.status, httpStatus: r.status });
+    throw Object.assign(new Error(e.message || 'Firestore ' + r.status), { status: r.status === 409 ? 503 : 502, code: 'unavailable', fsStatus: e.status, httpStatus: r.status, details: e.details, retryAfter: r.headers.get('Retry-After') });
   }
   return d;
 }

@@ -950,3 +950,12 @@ a.stlink:hover{filter:brightness(.95)}
   .otabs button{padding:7px 13px}
   .otabs .ocnt{min-width:16px;line-height:16px;font-size:10.5px}
 }
+/* banner while the shared ledger can't be reached */
+#cloudbanner{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--gold-soft);color:var(--ink);border-bottom:1px solid var(--gold);font-size:14px}
+#cloudbanner.err{background:var(--terra-soft);border-bottom-color:var(--terra)}
+#cloudbanner .cbi{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#fff;font-weight:700}
+#cloudbanner.err .cbi{background:var(--terra)}
+#cloudbanner .cbt{flex:1;min-width:0;display:flex;flex-direction:column}
+#cloudbanner .cbt span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+#cloudbanner .btn{flex:none}
+@media (max-width:600px){#cloudbanner{flex-wrap:wrap}#cloudbanner .btn{margin-inline-start:38px}}

@@ -813,3 +813,9 @@ Object.assign(AR, { 'Cancelled: not paid within 24 h': 'أُلغي: لم يُد�
   'An earlier offer ran out after 24 hours without an answer.': 'انتهى عرض سابق بعد 24 ساعة دون رد.',
   'Cancelled automatically: the down payment wasn’t sent within 24 hours, so the units went back on sale.': 'أُلغي تلقائيًا: لم تُرسل الدفعة المقدمة خلال 24 ساعة، فعادت الوحدات للبيع.' });
 rx(/^Offered (.+)\. The units are held for the customer; if they don’t confirm within 24 hours the offer ends by itself and the units go back on sale\.$/, (m, a) => `عُرض ${tr(a)}. الوحدات محجوزة للعميل؛ إن لم يؤكد خلال 24 ساعة ينتهي العرض تلقائيًا وتعود الوحدات للبيع.`);
+Object.assign(AR, { 'Firestore’s free daily limit is used up (it resets at 09:00). Changes stay on this device and are sent then. Don’t edit on two devices until it’s back.': 'انتهى حد القراءة اليومي المجاني في Firestore (يتجدد الساعة 09:00). التعديلات تبقى على هذا الجهاز وتُرسل حينها. لا تعدّلوا على جهازين حتى يعود.' });
+Object.assign(AR, { 'Type both email addresses first: yours and your friend’s. Rules with only one lock the other person out.': 'اكتب البريدين أولًا: بريدك وبريد صديقك. القواعد ببريد واحد تمنع الشخص الآخر من الدخول.' });
+rx(/^Rules copied for (\S+) and (\S+)$/, (m, a, b) => `نُسخت القواعد لـ ${a} و${b}`);
+Object.assign(AR, { 'Offline': 'غير متصل', 'Not syncing with the shared ledger': 'لا توجد مزامنة مع الدفتر المشترك', 'Try again': 'حاول مرة أخرى',
+  'You see this device’s copy. Changes are saved here and sent when the connection is back.': 'تشاهد نسخة هذا الجهاز. التعديلات محفوظة هنا وتُرسل عند عودة الاتصال.' });
+rx(/^You may be seeing an old copy, and changes stay on this device\. Don’t edit on both devices until this is fixed\.(.*)$/, (m, rest) => `قد تكون هذه نسخة قديمة، والتعديلات تبقى على هذا الجهاز. لا تعدّلوا على الجهازين حتى يُحل هذا.${rest ? ' ' + tr(rest.trim()) : ''}`);
