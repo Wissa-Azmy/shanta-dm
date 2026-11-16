@@ -94,7 +94,7 @@ Object.assign(ShopPub, {
       await fb(); const S = F.S;
       /* "Publish now" reads what the shop has (3 small reads), so it fixes anything another device left behind */
       if (manual || !this.pub || this.pub.v !== 2) {
-        const [c, h, s] = await within(Promise.all(['catalog', 'held', 'settings'].map(n => S.getDoc(S.doc(F.fs, 'shop', n)))), 20000, offlineMsg);
+        const [c, h, s] = await within(Promise.all(['catalog', 'held', 'settings'].map(n => S.getDoc(S.doc(F.fs, 'shop', n)))), 20000, offlineMsg); Reads.add(3);
         const items = c.exists() ? c.data().items || {} : {};
         Object.values(items).forEach(v => { if (v.ean && isStoreImg(v.img) && !(v.ean in this.imgs)) this.imgs[v.ean] = v.img; });
         const sv = s.exists() ? Object.assign({}, s.data()) : {}; delete sv.updatedAt;

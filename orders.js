@@ -41,6 +41,7 @@ Object.assign(ShopOrd, {
     try { await fb(); } catch (e) { this.started = false; return; }
     const S = F.S, fail = e => { console.warn(e); this.err = e && e.code === 'permission-denied' ? shopRulesMsg : fsMsg(e); this.loaded = true; this.changed(); };
     S.onSnapshot(S.collection(F.fs, 'orders'), snap => {
+      Reads.snap(snap, this.seen = this.seen || {}, 'orders', true);
       const first = !this.loaded;
       if (!first) snap.docChanges().forEach(ch => { const o = ch.doc.data();
         if (ch.type === 'added' && (o.status === 'new' || o.status === 'requested')) toast(`🛍 New shop ${o.status === 'new' ? 'order' : 'request'} from ${o.name || o.phone}`);
@@ -50,6 +51,7 @@ Object.assign(ShopOrd, {
       this.loaded = true; this.err = ''; this.changed(); setTimeout(() => this.moveProofs(), 3000);
     }, fail);
     S.onSnapshot(S.collection(F.fs, 'customers'), snap => {
+      Reads.snap(snap, this.seen = this.seen || {}, 'customers', true);
       this.customers = {}; snap.forEach(d => this.customers[d.id] = Object.assign({ id: d.id }, d.data())); this.changed();
     }, fail);
   },

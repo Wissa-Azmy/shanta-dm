@@ -826,3 +826,6 @@ Object.assign(AR, { 'Name': 'الاسم', 'Sign-in email': 'بريد تسجيل 
 rx(/^(.+)’s share of the profit \(%\)$/, (m, n) => `نصيب ${n} من الربح (%)`);
 rx(/^: (.+), in (Germany|Egypt)\.$/, (m, n, c) => `: ${n}، في ${c === 'Germany' ? 'ألمانيا' : 'مصر'}.`);
 rx(/^, which isn’t linked to either partner yet\. Type it as the sign-in email of the right person below\.$/, () => '، وهو غير مرتبط بأي شريك بعد. اكتبه كبريد تسجيل الدخول للشخص الصحيح بالأسفل.');
+Object.assign(AR, { 'Reads by this device today:': 'القراءات من هذا الجهاز اليوم:', '(free: 50,000 a day for both of you together).': '(المجاني: 50,000 يوميًا لكما معًا).',
+  'Only changes are downloaded.': 'تُنزَّل التغييرات فقط.', 'Last full download:': 'آخر تنزيل كامل:', 'next one around': 'التالي حوالي',
+  'This device downloaded the whole ledger. From the next sync on, only changes are downloaded.': 'نزّل هذا الجهاز الدفتر كاملًا. من المزامنة التالية تُنزَّل التغييرات فقط.' });

@@ -23,13 +23,35 @@ const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const within = (p, ms, msg) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(Object.assign(new Error(msg), { timeout: true })), ms))]);
 
+/* ---- reading less ----
+   Firestore bills one read per document it sends. Reopening after more than 30 minutes used to resend the
+   whole ledger (~800 reads). Now every entry carries _t (when it last changed, set by the server) and
+   deletions are listed in meta/deleted, so a device asks only for what changed since its last sync.
+   A full download still happens on the first sync, every 3 days, and after switching ledgers. */
+const SYNC_KEY = 'shanta-cloud-sync';            // { ledger, since: {coll: ms}, full: ms }
+const FULL_EVERY = 3 * 864e5, SINCE_MARGIN = 2 * 6e4, DEL_KEEP = 10 * 864e5;
+const delRef = l => F.S.doc(F.fs, 'ledgers', l, 'meta', 'deleted');
+const tMs = v => v && typeof v.toMillis === 'function' ? v.toMillis() : 0;
+const cleanDoc = (d, id) => { const o = Object.assign({}, d, { id }); delete o._t; return o; };
+/* reads made by this device today, counted from what Firestore sends (an estimate of the bill) */
+const Reads = {
+  get() { try { const r = JSON.parse(localStorage.getItem('shanta-reads') || 'null'); return r && r.day === today() ? r : { day: today(), n: 0 }; } catch (e) { return { day: today(), n: 0 }; } },
+  add(n) { if (!(n > 0)) return; const r = this.get(); r.n += n; try { localStorage.setItem('shanta-reads', JSON.stringify(r)); } catch (e) { } },
+  /* a listener: the first answer from the server costs every document sent (at least 1), later ones the changes */
+  snap(snap, seen, key, all) {
+    if (snap.metadata.fromCache) return;
+    if (!seen[key]) { seen[key] = true; this.add(Math.max(1, all ? snap.size : snap.docChanges().length)); }
+    else this.add(snap.docChanges().length);
+  }
+};
+
 /* ---- snapshots: { settings: {key: json}, <coll>: {id: json} }, compared as strings ---- */
 /* 'autosave' belongs to this device only */
 const LOCAL_KEYS = ['autosave'];
 const emptySnap = () => { const o = { settings: {} }; COLLS.forEach(c => o[c] = {}); return o; };
 const cloneSnap = s => { const o = { settings: Object.assign({}, s.settings) }; COLLS.forEach(c => o[c] = Object.assign({}, s[c] || {})); return o; };
 function snapSettings(s) { const o = {}; Object.entries(s || {}).forEach(([k, v]) => { if (!LOCAL_KEYS.includes(k) && v !== undefined && v !== null) o[k] = stable(v); }); return o; }
-function snapLocal(d) { const o = { settings: snapSettings(d.settings) }; COLLS.forEach(c => { o[c] = {}; d[c].forEach(r => o[c][r.id] = stable(r)); }); return o; }
+function snapLocal(d) { const o = { settings: snapSettings(d.settings) }; COLLS.forEach(c => { o[c] = {}; d[c].forEach(r => o[c][r.id] = stable(r._t === undefined ? r : cleanDoc(r, r.id))); }); return o; }
 const hasVal = (o, k) => o[k] !== undefined && o[k] !== null;
 function fieldDiff(a, b, path, p) {
   new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
@@ -113,13 +135,17 @@ const Cloud = {
   /* the last state this device saw confirmed by the server: anything in db that differs from it
      was changed here and is (re)sent when the app connects */
   base: JSON.parse(localStorage.getItem('shanta-cloud-base') || 'null'),
-  remote: null, ready: false, state: 'off', msg: '', last: null, busy: false, unsubs: [], backups: null,
+  remote: null, ready: false, state: 'off', msg: '', last: null, busy: false, unsubs: [], backups: null, dellog: {}, unstamped: {}, since: {}, fullAt: 0,
   on() { return !!(this.cfg && this.cfg.fs); },
   /* signed in with the previous version of the app: needs to sign in once more */
   legacy() { return !!(this.cfg && !this.cfg.fs); },
   ledger() { return (this.cfg && this.cfg.ledger) || CLOUD.ledger; },
   saveCfg() { localStorage.setItem('shanta-cloud', JSON.stringify(this.cfg)); },
-  saveBase() { clearTimeout(this.bt); this.bt = setTimeout(() => { if (this.ready && this.on()) localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base)); }, 800); },
+  saveBase() { clearTimeout(this.bt); this.bt = setTimeout(() => { if (!this.ready || !this.on()) return;
+    localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base));
+    /* where to continue next time: saved together with the copy it belongs to */
+    if (!this.isBackup() && this.fullAt) localStorage.setItem(SYNC_KEY, JSON.stringify({ ledger: this.ledger(), since: this.since, full: this.fullAt }));
+    else localStorage.removeItem(SYNC_KEY); }, 800); },
   set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); cloudBanner(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $("#g_msg"); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } const lm = $("#ldmsg"); if (lm && this.msg) lm.textContent = this.msg; },
 
   async connect(email, pw) {
@@ -178,11 +204,12 @@ const Cloud = {
   async ensureMoved() {
     for (;;) {
       let d;
-      try { const s = await within(F.S.getDocFromServer(infoRef(CLOUD.ledger)), 20000, offlineMsg); d = s.exists() ? s.data() : {}; }
+      try { const s = await within(F.S.getDocFromServer(infoRef(CLOUD.ledger)), 20000, offlineMsg); Reads.add(1); d = s.exists() ? s.data() : {}; }
       catch (e) {
         if (e.code === 'permission-denied' || e.code === 'not-found' || e.code === 'failed-precondition') throw new Error(fsMsg(e));
         this.set('offline', navigator.onLine ? 'Can’t reach Firestore. If this stays, check that the Firestore database was created (see “Admin” in Settings).' : offlineMsg); await sleep(6000); continue;
       }
+      this.info = d;
       if (d.movedAt) return;
       const me = this.cfg.email, fresh = d.movingAt && Date.now() - Date.parse(d.movingAt) < 180000;
       if (fresh && d.movingBy !== me) { this.set('syncing', 'Moving the shared ledger to the new database…'); await sleep(4000); continue; }
@@ -226,39 +253,90 @@ const Cloud = {
   stopListen() { this.unsubs.forEach(u => { try { u(); } catch (e) { } }); this.unsubs = []; this.ready = false; },
   listen() {
     const wasReady = this.ready;
-    this.stopListen();
-    const l = this.ledger(), got = {};
+    this.stopListen(); clearTimeout(this.rt); this.rt = null;
+    const l = this.ledger(), got = {}, S = F.S;
     /* the last state confirmed by the server is what this device's own changes are measured against. A retry
        after a failed start (offline, daily limit used up) keeps it: the half-filled base of the failed try
        would make this device's old copy look like new changes and overwrite the other device's work */
     if (this.switching) this.base0 = null;
     else if (wasReady || !this.base0) this.base0 = this.base ? cloneSnap(this.base) : null;
-    this.remote = emptySnap(); this.base = emptySnap();
-    const done = k => { got[k] = true; if (!this.ready && ['settings'].concat(COLLS).every(x => got[x])) this.becomeReady(); };
-    /* a listener that fails stops for good: start them all again after a pause, instead of
-       waiting for a page refresh */
+    /* only what changed since the last sync, when this device has a complete, recent copy to start from */
+    const sy = this.syncInfo(), base0 = this.base0;
+    const delta = !!(base0 && sy && sy.ledger === l && Date.now() - num(sy.full) < FULL_EVERY && !this.isBackup()
+      && this.info && this.info.stampedAt && COLLS.every(c => typeof sy.since[c] === 'number'));
+    this.mode = delta ? 'delta' : 'full';
+    this.since = delta ? Object.assign({}, sy.since) : {}; COLLS.forEach(c => { if (typeof this.since[c] !== 'number') this.since[c] = 0; });
+    this.fullAt = delta ? num(sy.full) : 0;
+    this.unstamped = {}; this.dellog = {};
+    this.remote = delta ? cloneSnap(base0) : emptySnap(); this.base = delta ? cloneSnap(base0) : emptySnap();
+    const seen = {};
+    const done = k => { got[k] = true; if (!this.ready && ['settings', 'deleted'].concat(COLLS).every(x => got[x])) this.becomeReady(); };
+    /* a listener that fails stops for good: start them all again after a pause, instead of waiting for a
+       page refresh. Each retry costs reads, so the pause grows: 20 s, 1 min, 3 min … up to 15 min */
     const fail = e => {
       console.warn(e); this.set(e.code === 'unavailable' ? 'offline' : 'error', fsMsg(e));
-      clearTimeout(this.rt);
-      this.rt = setTimeout(() => { if (this.on() && this.unsubs.length) this.listen(); }, e.code === 'permission-denied' ? 20000 : e.code === 'resource-exhausted' ? 120000 : 5000);
+      if (this.rt) return;
+      this.failN = (this.failN || 0) + 1;
+      const wait = e.code === 'resource-exhausted' ? 15 * 6e4 : e.code === 'permission-denied' || e.code === 'unauthenticated' ? Math.min(15 * 6e4, 2e4 * Math.pow(3, this.failN - 1)) : Math.min(6e4, 5000 * this.failN);
+      this.rt = setTimeout(() => { this.rt = null; if (this.on() && this.unsubs.length) this.listen(); }, wait);
     };
-    COLLS.forEach(c => this.unsubs.push(F.S.onSnapshot(F.S.collection(F.fs, 'ledgers', l, c), { includeMetadataChanges: true }, snap => {
-      snap.docChanges({ includeMetadataChanges: true }).forEach(ch => {
-        const id = ch.doc.id;
-        if (ch.type === 'removed') { delete this.remote[c][id]; delete this.base[c][id]; return; }
-        const s = stable(Object.assign({}, ch.doc.data(), { id }));
-        this.remote[c][id] = s;
-        if (!ch.doc.metadata.hasPendingWrites) this.base[c][id] = s;
-      });
-      if (!snap.metadata.fromCache) done(c);
-      this.changed(c);
-    }, fail)));
-    this.unsubs.push(F.S.onSnapshot(setRef(l), { includeMetadataChanges: true }, d => {
+    COLLS.forEach(c => {
+      const col = S.collection(F.fs, 'ledgers', l, c);
+      const q = delta ? S.query(col, S.where('_t', '>', S.Timestamp.fromMillis(Math.max(0, this.since[c] - SINCE_MARGIN)))) : col;
+      this.unsubs.push(S.onSnapshot(q, { includeMetadataChanges: true }, snap => {
+        Reads.snap(snap, seen, c, !delta);
+        snap.docChanges({ includeMetadataChanges: true }).forEach(ch => {
+          const id = ch.doc.id;
+          /* with "changed since", leaving the answer isn't a deletion (meta/deleted says what was deleted) */
+          if (ch.type === 'removed') { if (!delta) { delete this.remote[c][id]; delete this.base[c][id]; } return; }
+          const data = ch.doc.data(), t = tMs(data._t), s = stable(cleanDoc(data, id));
+          this.remote[c][id] = s;
+          if (!ch.doc.metadata.hasPendingWrites) {
+            this.base[c][id] = s;
+            if (t > this.since[c]) this.since[c] = t;
+            if (!t) this.unstamped[c + '/' + id] = 1; else delete this.unstamped[c + '/' + id];
+          }
+        });
+        if (!snap.metadata.fromCache) done(c);
+        this.changed(c);
+      }, fail));
+    });
+    this.unsubs.push(S.onSnapshot(setRef(l), { includeMetadataChanges: true }, d => {
+      Reads.snap(d, seen, 'settings', true);
       this.remote.settings = snapSettings(d.exists() ? d.data() : {});
       if (!d.metadata.hasPendingWrites) this.base.settings = Object.assign({}, this.remote.settings);
       if (!d.metadata.fromCache) done('settings');
       this.changed('settings');
     }, fail));
+    /* deletions: { <coll>: { <id>: when } } */
+    this.unsubs.push(S.onSnapshot(delRef(l), { includeMetadataChanges: true }, d => {
+      Reads.snap(d, seen, 'deleted', true);
+      this.dellog = d.exists() ? d.data() : {};
+      COLLS.forEach(c => Object.keys(this.dellog[c] || {}).forEach(id => { delete this.remote[c][id]; if (!d.metadata.hasPendingWrites) delete this.base[c][id]; }));
+      if (!d.metadata.fromCache) done('deleted');
+      this.changed('deleted');
+    }, fail));
+  },
+  syncInfo() { try { const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); return s && s.since ? s : null; } catch (e) { return null; } },
+  /* once per full download: give entries without a change time one (needed for "changed since"),
+     and drop deletions older than 10 days (every device has had a full download since) */
+  async tidy() {
+    if (this.isBackup() || this.mode !== 'full' || this.tidying) return;
+    this.tidying = true;
+    try {
+      const l = this.ledger(), S = F.S, ts = S.serverTimestamp(), ops = [];
+      Object.keys(this.unstamped).forEach(k => { const [c, id] = k.split('/'); if (id in this.base[c]) ops.push(b => b.update(docRef(l, c, id), { _t: ts })); });
+      const old = {}, cut = Date.now() - DEL_KEEP;
+      COLLS.forEach(c => Object.entries(this.dellog[c] || {}).forEach(([id, t]) => { const m = tMs(t); if (m && m < cut) (old[c] = old[c] || {})[id] = S.deleteField(); }));
+      if (Object.keys(old).length) ops.push(b => b.set(delRef(l), old, { merge: true }));
+      if (ops.length) await this.writeAll(ops);
+      this.unstamped = {};
+      if (!(this.info && this.info.stampedAt)) {
+        await within(S.setDoc(infoRef(l), { stampedAt: new Date().toISOString() }, { merge: true }), 30000, offlineMsg);
+        this.info = Object.assign({}, this.info, { stampedAt: new Date().toISOString() });
+      }
+    } catch (e) { console.warn('tidy', e); }
+    this.tidying = false;
   },
   /* first complete picture from the server: merge in what this device changed while it wasn't connected */
   becomeReady() {
@@ -283,11 +361,13 @@ const Cloud = {
     const dels = Object.keys(pending).filter(k => pending[k] === null && k.split('/').length === 2 && !k.startsWith('settings/'));
     if (dels.length >= 10 && !confirm(`This device's copy is missing ${dels.length} entries that are in the shared ledger.\n\nOK = delete them from the shared ledger too\nCancel = keep them (recommended unless you deleted them on purpose while offline)`))
       dels.forEach(k => delete pending[k]);
-    this.switching = false; this.base0 = null; this.ready = true;
+    this.switching = false; this.base0 = null; this.ready = true; this.failN = 0;
+    if (this.mode === 'full') this.fullAt = Date.now();
     setTimeout(() => { if (linkPartnerEmails()) commit(); }, 0);
     this.fromRemote(snapApply(cloneSnap(remote), pending));
     if (Object.keys(pending).length) this.write(pending);
     this.last = new Date(); this.set('ok'); this.saveBase();
+    setTimeout(() => this.tidy(), 3000);
     /* always redraw: the screen may still show the loading view */
     render();
     (this.readyWaiters || []).forEach(r => r()); this.readyWaiters = [];
@@ -331,18 +411,24 @@ const Cloud = {
     }
     this.write(patch);
   },
-  /* patch paths → Firestore writes; fields of one entry go in one merge */
+  /* patch paths → Firestore writes; fields of one entry go in one merge. Each written entry gets the server's
+     change time (_t); a deleted one is listed in meta/deleted, and leaves that list if it comes back */
   write(patch, applied) {
     if (!applied) snapApply(this.remote, patch);
-    const l = this.ledger(), docs = {}, ops = [], st = {};
+    const l = this.ledger(), docs = {}, ops = [], st = {}, gone = {}, S = F.S, ts = S.serverTimestamp();
+    const mark = (c, id, v) => (gone[c] = gone[c] || {})[id] = v;
     Object.entries(patch).forEach(([k, v]) => {
       const [c, id, f] = k.split('/');
-      if (c === 'settings') st[id] = v === null ? F.S.deleteField() : v;
-      else if (f === undefined) ops.push(v === null ? b => b.delete(docRef(l, c, id)) : b => b.set(docRef(l, c, id), v));
-      else { const d = docs[c + '/' + id] || (docs[c + '/' + id] = { c, id, v: {} }); d.v[f] = v === null ? F.S.deleteField() : v; }
+      if (c === 'settings') st[id] = v === null ? S.deleteField() : v;
+      else if (f === undefined) {
+        if (v === null) { ops.push(b => b.delete(docRef(l, c, id))); mark(c, id, ts); }
+        else { ops.push(b => b.set(docRef(l, c, id), Object.assign({}, v, { _t: ts }))); if (this.dellog[c] && id in this.dellog[c]) mark(c, id, S.deleteField()); }
+      }
+      else { const d = docs[c + '/' + id] || (docs[c + '/' + id] = { c, id, v: { _t: ts } }); d.v[f] = v === null ? S.deleteField() : v; }
     });
     Object.values(docs).forEach(d => ops.push(b => b.set(docRef(l, d.c, d.id), d.v, { merge: true })));
     if (Object.keys(st).length) ops.push(b => b.set(setRef(l), st, { merge: true }));
+    if (Object.keys(gone).length) ops.push(b => b.set(delRef(l), gone, { merge: true }));
     for (let i = 0; i < ops.length; i += 400) {
       const b = F.S.writeBatch(F.fs); ops.slice(i, i + 400).forEach(o => o(b));
       b.commit().catch(e => { console.warn(e); this.set('error', fsMsg(e)); });
@@ -380,7 +466,7 @@ const Cloud = {
   /* a whole ledger from the server */
   async readLedger(l) {
     const o = emptySnap();
-    for (const c of COLLS) (await within(F.S.getDocsFromServer(F.S.collection(F.fs, 'ledgers', l, c)), 30000, offlineMsg)).forEach(d => o[c][d.id] = stable(Object.assign({}, d.data(), { id: d.id })));
+    for (const c of COLLS) { const q = await within(F.S.getDocsFromServer(F.S.collection(F.fs, 'ledgers', l, c)), 30000, offlineMsg); Reads.add(Math.max(1, q.size)); q.forEach(d => o[c][d.id] = stable(cleanDoc(d.data(), d.id))); }
     const s = await within(F.S.getDocFromServer(setRef(l)), 30000, offlineMsg);
     o.settings = snapSettings(s.exists() ? s.data() : {});
     return o;
@@ -411,7 +497,9 @@ const Cloud = {
     try {
       const name = await this.snapshot(reason);
       const l = this.ledger(), ops = [];
-      COLLS.forEach(c => Object.keys(this.remote[c]).forEach(id => ops.push(b => b.delete(docRef(l, c, id)))));
+      const gone = {}, ts = F.S.serverTimestamp();
+      COLLS.forEach(c => Object.keys(this.remote[c]).forEach(id => { ops.push(b => b.delete(docRef(l, c, id))); (gone[c] = gone[c] || {})[id] = ts; }));
+      if (Object.keys(gone).length) ops.push(b => b.set(delRef(l), gone, { merge: true }));
       await this.writeAll(ops);
       COLLS.forEach(c => { db[c] = []; this.remote[c] = {}; }); persistLocal();
       return name;
@@ -435,13 +523,15 @@ const Cloud = {
       const live = await this.readLedger(CLOUD.ledger);
       const when = (this.backups || []).find(b => b.name === name);
       await this.snapshot(`Automatic backup before restoring the backup from ${when ? fDateTime(when.createdAt) : name}`, live, CLOUD.ledger);
-      const ops = [];
+      const ops = [], gone = {}, ts = F.S.serverTimestamp();
       COLLS.forEach(c => {
-        Object.keys(live[c]).forEach(id => { if (!(id in src[c])) ops.push(b => b.delete(docRef(CLOUD.ledger, c, id))); });
-        Object.entries(src[c]).forEach(([id, s]) => ops.push(b => b.set(docRef(CLOUD.ledger, c, id), JSON.parse(s))));
+        Object.keys(live[c]).forEach(id => { if (!(id in src[c])) { ops.push(b => b.delete(docRef(CLOUD.ledger, c, id))); (gone[c] = gone[c] || {})[id] = ts; } });
+        Object.entries(src[c]).forEach(([id, s]) => ops.push(b => b.set(docRef(CLOUD.ledger, c, id), Object.assign(JSON.parse(s), { _t: ts }))));
       });
       const st = {}; Object.entries(src.settings).forEach(([k, v]) => st[k] = JSON.parse(v));
       if (Object.keys(st).length) ops.push(b => b.set(setRef(CLOUD.ledger), st));
+      /* restored entries may have been deleted before: start the deletion list afresh */
+      ops.unshift(b => b.set(delRef(CLOUD.ledger), gone));
       await this.writeAll(ops);
       this.backups = null;
     } finally { this.busy = false; }
@@ -449,7 +539,7 @@ const Cloud = {
   },
   async listBackups() {
     await fb();
-    const q = await within(F.S.getDocs(backupsCol()), 20000, offlineMsg);
+    const q = await within(F.S.getDocs(backupsCol()), 20000, offlineMsg); Reads.add(Math.max(1, q.size)); this.backupsAt = Date.now();
     this.backups = q.docs.map(d => Object.assign({ name: d.id }, d.data())).sort((a, b) => b.name.localeCompare(a.name));
     return this.backups;
   },
@@ -458,7 +548,7 @@ const Cloud = {
     if (this.state !== 'ok') throw new Error('Couldn’t reach the cloud. ' + this.msg);
     this.cfg.ledger = name; this.saveCfg();
     /* show exactly what is in that ledger; nothing from the previous one is carried over */
-    this.switching = true; this.base = null; localStorage.removeItem('shanta-cloud-base');
+    this.switching = true; this.base = null; localStorage.removeItem('shanta-cloud-base'); localStorage.removeItem(SYNC_KEY);
     this.listen();
     await this.whenReady(30000);
     if (!this.ready) throw new Error('Couldn’t reach the cloud. ' + offlineMsg);
@@ -501,6 +591,8 @@ const Cloud = {
   async fillBackups() {
     const el = $('#cl_backups'); if (!el || !this.on()) return;
     el.innerHTML = this.backupsHTML();
+    /* Settings is redrawn after every change: list the backups once, then again only after 10 minutes */
+    if (this.backups && Date.now() - (this.backupsAt || 0) < 10 * 6e4) return;
     try { await this.listBackups(); } catch (e) { this.backups = []; }
     const el2 = $('#cl_backups'); if (el2) el2.innerHTML = this.backupsHTML();
   },
@@ -611,6 +703,7 @@ service cloud.firestore {
       <p class="note">Signed in as <b>${esc(whoAmI() ? pname(whoAmI()) + ' (' + userName(this.cfg.email) + ')' : userName(this.cfg.email))}</b>. Changes appear on ${esc(partnerName())}’s phone within seconds. Without internet everything keeps working: changes are saved on this device and sent when the connection is back. The file on disk still works as an extra backup.</p>
       ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
       <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
+      ${this.usageHTML()}
       <div id="cl_backups"></div>
       ${this.adminHTML()}</div>`;
     return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
@@ -619,6 +712,13 @@ service cloud.firestore {
       <div class="gor"><span>or</span></div><div class="agsi" data-agsi="cl"></div>
       <div class="err" id="cl_msg"${this.msg ? '' : ' hidden'}>${esc(this.msg)}</div>
       ${this.adminHTML()}</div>`;
+  },
+  /* how much this device reads: the free plan allows 50,000 a day for both of you together */
+  usageHTML() {
+    const n = Reads.get().n, sy = this.syncInfo(), d = ms => esc(fDateTime(new Date(ms).toISOString()));
+    return `<p class="note usage"><span>Reads by this device today:</span> <b class="notr">${n.toLocaleString('en-GB')}</b> <span>(free: 50,000 a day for both of you together).</span>
+      ${this.mode === 'delta' && sy && sy.full ? `<br><span>Only changes are downloaded.</span> <span>Last full download:</span> <b class="notr">${d(sy.full)}</b> · <span>next one around</span> <b class="notr">${d(sy.full + FULL_EVERY)}</b>`
+      : this.ready ? '<br><span>This device downloaded the whole ledger. From the next sync on, only changes are downloaded.</span>' : ''}</p>`;
   },
   adminHTML() {
     return `<details class="admin"><summary>Admin: add a person or update the access rules</summary>
