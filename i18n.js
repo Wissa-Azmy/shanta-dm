@@ -819,3 +819,10 @@ rx(/^Rules copied for (\S+) and (\S+)$/, (m, a, b) => `نُسخت القواعد
 Object.assign(AR, { 'Offline': 'غير متصل', 'Not syncing with the shared ledger': 'لا توجد مزامنة مع الدفتر المشترك', 'Try again': 'حاول مرة أخرى',
   'You see this device’s copy. Changes are saved here and sent when the connection is back.': 'تشاهد نسخة هذا الجهاز. التعديلات محفوظة هنا وتُرسل عند عودة الاتصال.' });
 rx(/^You may be seeing an old copy, and changes stay on this device\. Don’t edit on both devices until this is fixed\.(.*)$/, (m, rest) => `قد تكون هذه نسخة قديمة، والتعديلات تبقى على هذا الجهاز. لا تعدّلوا على الجهازين حتى يُحل هذا.${rest ? ' ' + tr(rest.trim()) : ''}`);
+Object.assign(AR, { 'Name': 'الاسم', 'Sign-in email': 'بريد تسجيل الدخول', 'In Germany · buys and ships': 'في ألمانيا · يشتري ويشحن', 'In Egypt · sells': 'في مصر · يبيع',
+  'You': 'أنت', ' (you)': ' (أنت)', '(you)': '(أنت)', 'your partner': 'شريكك', 'Partner in Germany': 'الشريك في ألمانيا', 'Partner in Egypt': 'الشريك في مصر',
+  'Money moving between the two of you, e.g. sales money sent from Egypt to Germany.': 'أموال تنتقل بينكما، مثل أموال المبيعات المرسلة من مصر إلى ألمانيا.',
+  'Signed in here as': 'مسجّل الدخول هنا باسم', 'This device is signed in as': 'هذا الجهاز مسجّل الدخول باسم' });
+rx(/^(.+)’s share of the profit \(%\)$/, (m, n) => `نصيب ${n} من الربح (%)`);
+rx(/^: (.+), in (Germany|Egypt)\.$/, (m, n, c) => `: ${n}، في ${c === 'Germany' ? 'ألمانيا' : 'مصر'}.`);
+rx(/^, which isn’t linked to either partner yet\. Type it as the sign-in email of the right person below\.$/, () => '، وهو غير مرتبط بأي شريك بعد. اكتبه كبريد تسجيل الدخول للشخص الصحيح بالأسفل.');

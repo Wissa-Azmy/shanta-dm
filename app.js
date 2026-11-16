@@ -102,6 +102,7 @@ document.addEventListener('input', e => {
     db.settings[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.dataset.num ? num(e.target.value) : e.target.value;
     if (k === 'meShare') db.settings.meShare = Math.max(0, Math.min(100, db.settings.meShare));
     if (k === 'rate') db.settings.rateManual = today();
+    if (k === 'meEmail' || k === 'friendEmail') db.settings[k] = String(db.settings[k]).trim().toLowerCase();
     clearTimeout(render._s); render._s = setTimeout(() => { const id = document.activeElement && document.activeElement.dataset.set; commit(); if (id) { const el = $(`[data-set="${id}"]`); if (el) { el.focus(); if (el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } } }, 500);
   }
 });

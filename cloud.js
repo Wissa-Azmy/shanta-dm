@@ -284,6 +284,7 @@ const Cloud = {
     if (dels.length >= 10 && !confirm(`This device's copy is missing ${dels.length} entries that are in the shared ledger.\n\nOK = delete them from the shared ledger too\nCancel = keep them (recommended unless you deleted them on purpose while offline)`))
       dels.forEach(k => delete pending[k]);
     this.switching = false; this.base0 = null; this.ready = true;
+    setTimeout(() => { if (linkPartnerEmails()) commit(); }, 0);
     this.fromRemote(snapApply(cloneSnap(remote), pending));
     if (Object.keys(pending).length) this.write(pending);
     this.last = new Date(); this.set('ok'); this.saveBase();
@@ -514,7 +515,7 @@ const Cloud = {
   },
   /* the two emails the rules let in. Remembered in the shared settings, so the rules can be copied again
      later from either device without retyping them (a missing one used to become friend@example.com) */
-  admins() { const s = (db.settings.adminEmails || []).map(e => String(e || '').trim()).filter(Boolean);
+  admins() { const p = [pemail('me'), pemail('friend')].filter(Boolean), s = (p.length === 2 ? p : db.settings.adminEmails || []).map(e => String(e || '').trim()).filter(Boolean);
     const me = this.cfg && this.cfg.email ? toEmail(this.cfg.email) : '';
     if (me && !s.map(toEmail).includes(me)) s.unshift(me);
     return [s[0] || '', s[1] || '']; },
@@ -607,13 +608,13 @@ service cloud.firestore {
   },
   settingsHTML() {
     if (this.on()) return `<div class="card span2" id="cloudcard" data-mode="on"><h3>Shared online ledger</h3>
-      <p class="note">Signed in as <b>${esc(userName(this.cfg.email))}</b>. Changes appear on ${esc(db.settings.friendName)}’s phone within seconds. Without internet everything keeps working: changes are saved on this device and sent when the connection is back. The file on disk still works as an extra backup.</p>
+      <p class="note">Signed in as <b>${esc(whoAmI() ? pname(whoAmI()) + ' (' + userName(this.cfg.email) + ')' : userName(this.cfg.email))}</b>. Changes appear on ${esc(partnerName())}’s phone within seconds. Without internet everything keeps working: changes are saved on this device and sent when the connection is back. The file on disk still works as an extra backup.</p>
       ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
       <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
       <div id="cl_backups"></div>
       ${this.adminHTML()}</div>`;
     return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
-      <p class="note">Sign in so you and ${esc(db.settings.friendName)} work on the same numbers from any phone or laptop.</p>
+      <p class="note">Sign in so you and ${esc(partnerName())} work on the same numbers from any phone or laptop.</p>
       <form class="fgrid" data-login="cl">${this.loginFields('cl')}<div class="f span"><button class="btn" style="align-self:flex-start">Sign in</button></div></form>
       <div class="gor"><span>or</span></div><div class="agsi" data-agsi="cl"></div>
       <div class="err" id="cl_msg"${this.msg ? '' : ' hidden'}>${esc(this.msg)}</div>
@@ -647,7 +648,10 @@ document.addEventListener('click', async e => {
     const ea = toEmail($('#ad_a').value), eb = toEmail($('#ad_b').value), okE = e => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !/@example\.com$/.test(e);
     /* rules with only one email lock the other person out of the ledger */
     if (!okE(ea) || !okE(eb) || ea === eb) return toast('⚠ Type both email addresses first: yours and your friend’s. Rules with only one lock the other person out.');
-    db.settings.adminEmails = [ea, eb]; commit();
+    db.settings.adminEmails = [ea, eb];
+    /* keep the partners' sign-in emails in step when they weren't linked yet */
+    if (!pemail('me') && !pemail('friend')) linkPartnerEmails();
+    commit();
     const ta = $('#cl_rules'); ta.value = Cloud.rules(ea, eb); ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (x) { document.execCommand('copy'); } toast('Rules copied for ' + ea + ' and ' + eb);
   }
   if (a === 'cloud-skip') { localStorage.setItem('shanta-offline', '1'); hideGate(); }
@@ -659,7 +663,7 @@ document.addEventListener('click', async e => {
   if (a === 'cloud-restore') {
     const b = (Cloud.backups || []).find(x => x.name === t.dataset.ledger);
     const label = b ? fDateTime(b.createdAt) : t.dataset.ledger;
-    if (!confirm(`Restore the backup from ${label}?\n\nIt replaces ALL shipments, purchases, sales, expenses, transfers and settings in the live ledger, for you and ${db.settings.friendName}.\nThe current live data is saved as a backup first, so you can undo this.`)) return;
+    if (!confirm(`Restore the backup from ${label}?\n\nIt replaces ALL shipments, purchases, sales, expenses, transfers and settings in the live ledger, for you and ${partnerName()}.\nThe current live data is saved as a backup first, so you can undo this.`)) return;
     t.disabled = true; t.textContent = 'Restoring…';
     try { await Cloud.restore(t.dataset.ledger); toast('Backup restored to the live ledger'); go('overview'); }
     catch (x) { console.warn(x); alert(x.message); render(); }

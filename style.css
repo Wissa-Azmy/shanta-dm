@@ -959,3 +959,8 @@ a.stlink:hover{filter:brightness(.95)}
 #cloudbanner .cbt span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
 #cloudbanner .btn{flex:none}
 @media (max-width:600px){#cloudbanner{flex-wrap:wrap}#cloudbanner .btn{margin-inline-start:38px}}
+/* "The two of you" */
+.partner{border:1px solid var(--line);border-radius:12px;padding:10px 12px 2px;margin:10px 0;background:var(--card)}
+.partner .phead{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.youtag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--ink);color:var(--paper)}
+.note.warn{color:#9b3f1b}

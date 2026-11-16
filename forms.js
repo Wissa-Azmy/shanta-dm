@@ -137,7 +137,7 @@ const SCHEMAS = {
     validate(v) { if (num(v.amount) <= 0) return 'Amount must be above zero.'; }
   },
   transfers: {
-    title: 'money transfer', lead: 'Money moving between the two of you, e.g. your friend sending sales money to Germany.',
+    title: 'money transfer', lead: 'Money moving between the two of you, e.g. sales money sent from Egypt to Germany.',
     fields: [
       { k: 'date', l: 'Date', t: 'date', def: today, req: true },
       { k: 'method', l: 'Method', t: 'select', opts: OPT.tMethod, def: 'InstaPay' },

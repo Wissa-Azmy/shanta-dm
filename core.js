@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.16-03";
+const APP_VERSION = "2026.11.16-04";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -21,7 +21,18 @@ const fAmt = (a, cur) => cur === 'EUR' ? fEUR(num(a)) : fEGP(num(a));
 const fDate = d => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '—';
 const PEOPLE = ['me', 'friend'];
 const pname = p => p === 'sale' ? 'From sale' : p === 'friend' ? db.settings.friendName : db.settings.meName;
-const pill = p => `<span class="pill ${p === 'sale' ? 'fromsale' : p === 'friend' ? 'friend' : 'me'}">${esc(pname(p))}</span>`;
+const pill = p => `<span class="pill ${p === 'sale' ? 'fromsale' : p === 'friend' ? 'friend' : 'me'}"${p !== 'sale' ? ` title="${esc(PLACE[p] || '')}${whoAmI() === p ? ' · you' : ''}"` : ''}>${esc(pname(p))}</span>`;
+/* The two partners are fixed by place, not by who holds the phone: 'me' = the partner in Germany (buys and ships),
+   'friend' = the partner in Egypt (sells). Each has a name and the email they sign in with, so every device shows
+   the same people, and "you" is whoever is signed in on this device. */
+const PLACE = { me: 'Germany', friend: 'Egypt' };
+const pemail = p => String(db.settings[p === 'friend' ? 'friendEmail' : 'meEmail'] || '').trim().toLowerCase();
+const signedEmail = () => (typeof Cloud !== 'undefined' && Cloud.on && Cloud.on() && Cloud.cfg && Cloud.cfg.email ? String(Cloud.cfg.email).toLowerCase() : '');
+/* 'me' / 'friend' for the person signed in here, '' when not signed in or the email isn't linked yet */
+const whoAmI = () => { const e = signedEmail(); return !e ? '' : e === pemail('me') ? 'me' : e === pemail('friend') ? 'friend' : ''; };
+const otherOf = p => p === 'friend' ? 'me' : 'friend';
+/* the other partner's name, as seen from this device ("your partner" when it can't tell) */
+const partnerName = () => { const w = whoAmI(); return w ? pname(otherOf(w)) : 'your partner'; };
 const rate = () => num(db.settings.rate) || 1;
 const toEUR = (amount, cur, r) => cur === 'EUR' ? num(amount) : num(amount) / (num(r) || rate());
 /* an amount in EGP: as paid when it was paid in EGP, else at the rate saved on it, else the rate of its day (rateOn below) */
@@ -96,7 +107,7 @@ if (!matchMedia('(hover: hover) and (pointer: fine)').matches && window.HTMLDial
 /* ---------- data ---------- */
 const DEFAULT_DB = () => ({
   app: 'shanta-ledger', version: 1,
-  settings: { meName: 'Me', friendName: 'Friend', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo', shopName: 'Shanta', shopWhatsapp: '', shopReqDown: 20, shopDownCod: 0, shopDownInsta: 100, shopDelivery: 0, shopInstapay: '', shopGoogleId: '', shopApi: '', shopOpen: true, shopAuto: true },
+  settings: { meName: 'Partner in Germany', friendName: 'Partner in Egypt', meEmail: '', friendEmail: '', meShare: 50, rate: 55, targetMargin: 35, packagingPct: 25, lowStock: 2, autosave: true, cityDE: 'dm, Germany', cityEG: 'Cairo', shopName: 'Shanta', shopWhatsapp: '', shopReqDown: 20, shopDownCod: 0, shopDownInsta: 100, shopDelivery: 0, shopInstapay: '', shopGoogleId: '', shopApi: '', shopOpen: true, shopAuto: true },
   shipments: [], purchases: [], sales: [], payments: [], expenses: [], transfers: [],
   meta: { created: new Date().toISOString(), updatedAt: null, savedAt: null }
 });

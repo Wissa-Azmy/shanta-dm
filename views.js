@@ -18,7 +18,7 @@ function settlementHero(R, compact) {
   const row = (l, k, fmt = fEUR) => `<tr><td>${l}</td><td>${fmt(m[k])}</td><td>${fmt(f[k])}</td></tr>`;
   return `<div class="hero">
     <div>
-      <div class="who">${square ? 'Right now you are' : `<b>${esc(pname(from))}</b> should send <b>${esc(pname(to))}</b>`}</div>
+      <div class="who">${square ? 'Right now you are' : `<b>${esc(pname(from))}</b>${whoAmI() === from ? ' (you)' : ''} should send <b>${esc(pname(to))}</b>${whoAmI() === to ? ' (you)' : ''}`}</div>
       <div class="big">${square ? 'All square' : fEUR(amt)}${square ? '' : `<small>≈ ${fEGP(eur2egp(amt))}</small>`}</div>
       <p class="expl">Counts only money customers have actually paid. Each of you first gets back what you spent on the goods that already left stock (product cost plus that box’s shipping and customs), then the profit is split ${s.meShare}% ${esc(s.meName)} / ${100 - s.meShare}% ${esc(s.friendName)}. Money for unsold stock comes back as it sells.</p>
       ${square ? '' : `<button class="btn terra" data-new="transfers" ${pre({ from, to, amount: presetAmt, currency: presetCur, notes: 'Settlement' })}>Record this payment</button>`}
@@ -322,8 +322,8 @@ V.settings = () => {
   const s = db.settings;
   const f = (k, l, t = 'text', extra = '', hint = '') => `<div class="f"><label>${l}</label><input data-set="${k}" type="${t === "number" ? "text" : t}"${t === "number" ? " inputmode=\"decimal\" data-num=\"1\"" : ""} value="${esc(s[k])}" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
   return `<div class="grid2 settings"><div class="card"><h3>The two of you</h3>
-    <div class="fgrid">${f('meName', 'Your name (in Germany)')}${f('friendName', 'Friend’s name (in Egypt)')}</div>
-    ${f('meShare', 'Your share of the profit (%)', 'number', 'min="0" max="100" step="1"', `${esc(s.friendName)} gets ${100 - num(s.meShare)}%`)}
+    ${partnersHTML(f)}
+    ${f('meShare', `${esc(s.meName)}’s share of the profit (%)`, 'number', 'min="0" max="100" step="1"', `${esc(s.friendName)} gets ${100 - num(s.meShare)}%`)}
     <div class="fgrid">${f('cityDE', 'Default place to buy')}${f('cityEG', 'Default city for sales')}</div></div>
   <div class="card"><h3>Money & stock</h3>
     <div class="f"><label>Today’s rate: EGP for €1</label><div class="raterow"><input data-set="rate" type="text" inputmode="decimal" data-num="1" step="0.01" value="${esc(s.rate)}"><button type="button" class="btn sm ghost" data-act="fx">↻ Live rate</button></div><span class="hint" id="fx_hint">${fxHint()}</span></div>
@@ -456,4 +456,27 @@ function lossCard(R) {
       <ul class="mini">${PEOPLE.map(k => `<li><span>${pill(k)}<span class="sub note">${Math.round(R.person[k].shareRatio * 100)}% profit share · ${fEGP(R.person[k].lossShareEGP)}</span></span><span class="r">${fEUR(R.person[k].lossShare)}</span></li>`).join('')}</ul></div>
     <div class="card"><h3>Latest damaged, lost &amp; gifts</h3><ul class="mini">${recs.slice(0, 8).map(r => `<li><span>${esc(r.l.p.product)} ×${r.q}<span class="sub note">${fDate(r.x.date)} · ${kindName(r.x.kind)}${r.x.customer ? ' · <span class="notr">' + esc(r.x.customer) + '</span>' : ''}</span></span><span class="r">${fEUR(r.q * r.l.landed)}</span></li>`).join('')}</ul></div>
   </div>`;
+}
+
+/* "The two of you": one row per partner, by place, with the email they sign in with */
+function partnersHTML(f) {
+  const s = db.settings, w = whoAmI(), me = signedEmail();
+  const row = (p, place) => `<div class="partner ${p}"><div class="phead"><span class="pill ${p}">${esc(place)}</span>${w === p ? '<span class="youtag">You</span>' : ''}</div>
+    <div class="fgrid">${f(p === 'me' ? 'meName' : 'friendName', 'Name')}${f(p === 'me' ? 'meEmail' : 'friendEmail', 'Sign-in email', 'email', 'autocapitalize="none" autocomplete="off" spellcheck="false" dir="ltr"')}</div></div>`;
+  const note = !me ? '' : w ? `<p class="note">Signed in here as <b>${esc(me)}</b>: ${esc(pname(w))}, in ${PLACE[w]}.</p>`
+    : `<p class="note warn">This device is signed in as <b>${esc(me)}</b>, which isn’t linked to either partner yet. Type it as the sign-in email of the right person below.</p>`;
+  return `${note}${row('me', 'In Germany · buys and ships')}${row('friend', 'In Egypt · sells')}`;
+}
+/* link the emails already known (the rules' list, the one signed in here) to the names they match
+   (wissa.azmy@… → Wissa), only where it's unambiguous; never changes an email someone typed */
+function linkPartnerEmails() {
+  const s = db.settings;
+  const list = [...new Set([...(s.adminEmails || []), signedEmail()].map(e => String(e || '').trim().toLowerCase()).filter(e => e.includes('@')))];
+  const key = n => String(n || '').toLowerCase().replace(/[^a-z]/g, '');
+  const hit = n => { const k = key(n); return k.length >= 3 ? list.filter(e => key(e.split('@')[0]).startsWith(k)) : []; };
+  const a = s.meEmail ? [] : hit(s.meName), b = s.friendEmail ? [] : hit(s.friendName);
+  let changed = false;
+  if (a.length === 1 && a[0] !== pemail('friend') && a[0] !== b[0]) { s.meEmail = a[0]; changed = true; }
+  if (b.length === 1 && b[0] !== pemail('me')) { s.friendEmail = b[0]; changed = true; }
+  return changed;
 }
