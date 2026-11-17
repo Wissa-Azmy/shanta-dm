@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.17-07";
+const APP_VERSION = "2026.11.17-09";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -424,3 +424,27 @@ const pct1 = p => (p > 0 ? "+" : "") + p.toFixed(1) + "%";
 const markupTag = m => { const p = markupPct(m); return p === null ? '' : `<span class="mkup ${p >= 0 ? 'up' : 'down'}" title="Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)">${pct1(p)}</span>`; };
 /* the cost the markup is measured on, shown under the profit like the discount note under the total */
 const costNote = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? `<span class="sub">on ${fEGP(c)} cost</span>` : ''; };
+
+/* ---------- the page behind an open dialog doesn't scroll ----------
+   overflow:hidden alone doesn't stop iPhones, so the page is pinned where it was and put back on close */
+const ScrollLock = {
+  on: false, y: 0,
+  sync() {
+    const open = !!document.querySelector('dialog[open]');
+    if (open === this.on) return;
+    this.on = open;
+    const b = document.body, h = document.documentElement;
+    if (open) {
+      this.y = window.scrollY;
+      h.classList.add('modal-open');
+      Object.assign(b.style, { position: 'fixed', top: -this.y + 'px', left: '0', right: '0', width: '100%' });
+    } else {
+      h.classList.remove('modal-open');
+      Object.assign(b.style, { position: '', top: '', left: '', right: '', width: '' });
+      window.scrollTo(0, this.y);
+    }
+  }
+};
+{ const sm = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () { const r = sm.apply(this, arguments); ScrollLock.sync(); return r; }; }
+document.addEventListener('close', () => setTimeout(() => ScrollLock.sync(), 0), true);

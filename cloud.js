@@ -33,6 +33,28 @@ const FULL_EVERY = 3 * 864e5, SINCE_MARGIN = 2 * 6e4, DEL_KEEP = 10 * 864e5;
 const delRef = l => F.S.doc(F.fs, 'ledgers', l, 'meta', 'deleted');
 const tMs = v => v && typeof v.toMillis === 'function' ? v.toMillis() : 0;
 const cleanDoc = (d, id) => { const o = Object.assign({}, d, { id }); delete o._t; return o; };
+
+/* ---- changes not confirmed by the cloud yet ----
+   Every entry this device saves stays in this list (on the device) until Firestore confirms it. If Firestore
+   refuses a save, it takes the entries back out of its own copy; without this list that looked like "the cloud
+   doesn't have them" and they vanished from the screen too. Now they stay visible, are sent again, and are
+   always added when the device reconnects, without asking. Keys: "<coll>/<id>" → entry (or null = deleted),
+   "settings/<key>" → value */
+const OUT_KEY = 'shanta-outbox';
+const Outbox = {
+  load() { try { const o = JSON.parse(localStorage.getItem(OUT_KEY) || 'null'); return o && o.items ? o : { ledger: '', items: {} }; } catch (e) { return { ledger: '', items: {} }; } },
+  items(l) { const o = this.load(); return o.ledger === l ? o.items : {}; },
+  save(l, items) { try { if (Object.keys(items).length) localStorage.setItem(OUT_KEY, JSON.stringify({ ledger: l, items })); else localStorage.removeItem(OUT_KEY); } catch (e) { } },
+  add(l, vals) { const it = this.items(l); Object.assign(it, vals); this.save(l, it); },
+  /* confirmed: drop what was sent, unless it changed again since */
+  done(l, sent) { const it = this.items(l); Object.entries(sent).forEach(([k, s]) => { if (k in it && stable(it[k]) === s) delete it[k]; }); this.save(l, it); },
+  count(l) { return Object.keys(this.items(l)).length; },
+  has(l, k) { return k in this.items(l); },
+  /* lay the waiting changes over a copy of the cloud */
+  over(s, l) { Object.entries(this.items(l)).forEach(([k, v]) => { const [c, id] = k.split('/');
+    if (c === 'settings') { if (v === null) delete s.settings[id]; else s.settings[id] = stable(v); }
+    else if (s[c]) { if (v === null) delete s[c][id]; else s[c][id] = stable(v); } }); return s; }
+};
 /* reads made by this device today, counted from what Firestore sends (an estimate of the bill) */
 const Reads = {
   get() { try { const r = JSON.parse(localStorage.getItem('shanta-reads') || 'null'); return r && r.day === today() ? r : { day: today(), n: 0 }; } catch (e) { return { day: today(), n: 0 }; } },
@@ -351,19 +373,25 @@ const Cloud = {
       const base0 = this.base0;
       if (base0) pending = snapDiff(local, fixBase(base0, remote), remote);
       else {
-        /* nothing known about this device: the cloud is the shared ledger and wins. Only entries the
-           cloud has never seen (e.g. made without signing in) can be added, and only when asked */
+        /* nothing known about this device: the cloud is the shared ledger. Entries the cloud has never seen
+           (e.g. made without signing in) are added when asked; Cancel first keeps a copy of them on this device */
         const own = [];
-        COLLS.forEach(c => Object.keys(local[c]).forEach(id => { if (!(id in remote[c])) own.push(c + '/' + id); }));
+        COLLS.forEach(c => Object.keys(local[c]).forEach(id => { if (!(id in remote[c]) && !Outbox.has(this.ledger(), c + '/' + id)) own.push(c + '/' + id); }));
         const n = own.length;
-        if (n && (!snapHasData(remote) || confirm(`This device has ${n} entr${n === 1 ? 'y' : 'ies'} that ${n === 1 ? 'is' : 'are'} not in the shared ledger.\n\nOK = add ${n === 1 ? 'it' : 'them'} to the shared ledger\nCancel = use only the shared ledger on this device`)))
-          own.forEach(k => { const [c, id] = k.split('/'); pending[k] = JSON.parse(local[c][id]); });
+        if (n) {
+          const add = !snapHasData(remote) || confirm(`This device has ${n} entr${n === 1 ? 'y' : 'ies'} that ${n === 1 ? 'is' : 'are'} not in the shared ledger yet.\n\nOK = add ${n === 1 ? 'it' : 'them'} to the shared ledger (recommended)\nCancel = leave ${n === 1 ? 'it' : 'them'} out (a copy is kept under Settings → Backup & sync → Copies on this device)`);
+          if (add) own.forEach(k => { const [c, id] = k.split('/'); pending[k] = JSON.parse(local[c][id]); });
+          else LocalCopies.save(`${n} entr${n === 1 ? 'y' : 'ies'} left out of the shared ledger`, db);
+        }
         /* an empty cloud gets this device's settings; otherwise the cloud's settings win */
         if (!Object.keys(remote.settings).length) Object.entries(local.settings).forEach(([k, v]) => pending['settings/' + k] = JSON.parse(v));
       }
+      /* changes saved here that the cloud never confirmed always go in, whatever happened meanwhile */
+      const waiting = Outbox.items(this.ledger());
+      Object.entries(waiting).forEach(([k, v]) => { Object.keys(pending).forEach(p => { if (p.startsWith(k + '/')) delete pending[p]; }); pending[k] = v; });
     }
     /* many deletions on connecting means this device's copy is behind, not that someone deleted them: ask */
-    const dels = Object.keys(pending).filter(k => pending[k] === null && k.split('/').length === 2 && !k.startsWith('settings/'));
+    const dels = Object.keys(pending).filter(k => pending[k] === null && k.split('/').length === 2 && !k.startsWith('settings/') && !Outbox.has(this.ledger(), k));
     if (dels.length >= 10 && !confirm(`This device's copy is missing ${dels.length} entries that are in the shared ledger.\n\nOK = delete them from the shared ledger too\nCancel = keep them (recommended unless you deleted them on purpose while offline)`))
       dels.forEach(k => delete pending[k]);
     this.switching = false; this.base0 = null; this.ready = true; this.failN = 0;
@@ -381,7 +409,8 @@ const Cloud = {
   changed() {
     if (!this.ready) return;
     this.saveBase();
-    clearTimeout(this.ct); this.ct = setTimeout(() => this.fromRemote(this.remote), 40);
+    /* changes still waiting for the cloud stay on screen, even if Firestore took them back */
+    clearTimeout(this.ct); this.ct = setTimeout(() => { const l = this.ledger(); this.fromRemote(Outbox.count(l) && !this.isBackup() ? Outbox.over(cloneSnap(this.remote), l) : this.remote); }, 40);
   },
   /* copy a snapshot into db, keeping the order of existing entries */
   fromRemote(s) {
@@ -422,24 +451,47 @@ const Cloud = {
     if (!applied) snapApply(this.remote, patch);
     const l = this.ledger(), docs = {}, ops = [], st = {}, gone = {}, S = F.S, ts = S.serverTimestamp();
     const mark = (c, id, v) => (gone[c] = gone[c] || {})[id] = v;
+    /* what each touched entry looks like now: kept on the device until the cloud confirms it */
+    const keep = {};
+    Object.keys(patch).forEach(k => { const [c, id] = k.split('/'); const dk = c + '/' + id;
+      keep[dk] = c === 'settings' ? (id in this.remote.settings ? JSON.parse(this.remote.settings[id]) : null) : (id in this.remote[c] ? JSON.parse(this.remote[c][id]) : null); });
+    if (!this.isBackup()) Outbox.add(l, keep);
+    const what = describePatch(patch), job = what ? SaveStatus.start(what) : 0;
+    let parts = 0, failed = false;
     Object.entries(patch).forEach(([k, v]) => {
-      const [c, id, f] = k.split('/');
+      const [c, id, f] = k.split('/'), dk = c + '/' + id;
       if (c === 'settings') st[id] = v === null ? S.deleteField() : v;
       else if (f === undefined) {
-        if (v === null) { ops.push(b => b.delete(docRef(l, c, id))); mark(c, id, ts); }
-        else { ops.push(b => b.set(docRef(l, c, id), Object.assign({}, v, { _t: ts }))); if (this.dellog[c] && id in this.dellog[c]) mark(c, id, S.deleteField()); }
+        if (v === null) { ops.push({ k: dk, f: b => b.delete(docRef(l, c, id)) }); mark(c, id, ts); }
+        else { ops.push({ k: dk, f: b => b.set(docRef(l, c, id), Object.assign({}, v, { _t: ts })) }); if (this.dellog[c] && id in this.dellog[c]) mark(c, id, S.deleteField()); }
       }
-      else { const d = docs[c + '/' + id] || (docs[c + '/' + id] = { c, id, v: { _t: ts } }); d.v[f] = v === null ? S.deleteField() : v; }
+      else { const d = docs[dk] || (docs[dk] = { c, id, v: { _t: ts } }); d.v[f] = v === null ? S.deleteField() : v; }
     });
-    Object.values(docs).forEach(d => ops.push(b => b.set(docRef(l, d.c, d.id), d.v, { merge: true })));
-    if (Object.keys(st).length) ops.push(b => b.set(setRef(l), st, { merge: true }));
-    if (Object.keys(gone).length) ops.push(b => b.set(delRef(l), gone, { merge: true }));
+    Object.entries(docs).forEach(([dk, d]) => ops.push({ k: dk, f: b => b.set(docRef(l, d.c, d.id), d.v, { merge: true }) }));
+    if (Object.keys(st).length) ops.push({ k: Object.keys(st).map(id => 'settings/' + id), f: b => b.set(setRef(l), st, { merge: true }) });
+    if (Object.keys(gone).length) ops.push({ k: [], f: b => b.set(delRef(l), gone, { merge: true }) });
     for (let i = 0; i < ops.length; i += 400) {
-      const b = F.S.writeBatch(F.fs); ops.slice(i, i + 400).forEach(o => o(b));
-      b.commit().catch(e => { console.warn(e); this.set('error', fsMsg(e)); });
+      const part = ops.slice(i, i + 400), b = F.S.writeBatch(F.fs), sent = {};
+      part.forEach(o => { o.f(b); [].concat(o.k).forEach(k => { sent[k] = stable(keep[k]); }); });
+      parts++;
+      b.commit().then(() => { Outbox.done(l, sent); this.outFail = 0; if (!Outbox.count(l)) cloudBanner(); if (job && !--parts && !failed) SaveStatus.ok(job); })
+        .catch(e => { console.warn(e); this.set('error', fsMsg(e)); this.retryOut(); if (job && !failed) { failed = true; SaveStatus.fail(job, fsMsg(e)); } });
     }
     this.set('syncing');
     clearTimeout(this.wt); this.wt = setTimeout(() => this.settle(), 50);
+  },
+  /* the cloud refused or lost a save: send what's still waiting again, after a growing pause */
+  retryOut() {
+    if (this.ot) return;
+    this.outFail = (this.outFail || 0) + 1;
+    const wait = Math.min(15 * 6e4, 15000 * Math.pow(2, this.outFail - 1));
+    this.ot = setTimeout(() => { this.ot = null; this.resend(); }, wait);
+  },
+  resend() {
+    if (!this.on() || !this.ready || this.isBackup()) return;
+    const it = Outbox.items(this.ledger()); if (!Object.keys(it).length) return;
+    const patch = {}; Object.entries(it).forEach(([k, v]) => patch[k] = v);
+    this.write(patch);
   },
   async settle() {
     try { await within(F.S.waitForPendingWrites(F.fs), 15000, offlineMsg); if (this.state !== 'error') { this.last = new Date(); this.set('ok'); } }
@@ -465,7 +517,7 @@ const Cloud = {
     else if (!this.ready) this.listen();
     await this.whenReady(15000);
     if (!this.ready) { this.set('offline', offlineMsg); return; }
-    this.push();
+    if (this.state === 'error' || this.outFail) { clearTimeout(this.ot); this.ot = null; this.outFail = 0; this.resend(); } else this.push();
     await this.settle();
   },
   /* a whole ledger from the server */
@@ -607,7 +659,8 @@ const Cloud = {
     const t = this.last ? this.last.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
     const map = { syncing: ['', 'Syncing…'], ok: ['ok', 'Shared in the cloud'], offline: ['bad', 'Offline, saved on this device'], error: ['bad', 'Cloud needs attention'], off: ['', 'Cloud'] };
     const [dot, st] = map[this.state] || map.off;
-    return `<div class="cloudline"><div class="st"><span class="dot ${dot}"></span>${st}</div><p>${esc(userName(this.cfg.email))}${t ? ' · ' + t : ''}${this.msg ? '<br>' + esc(this.msg) : ''}</p>
+    const n = waitingN();
+    return `<div class="cloudline"><div class="st"><span class="dot ${n && this.state !== 'syncing' ? 'bad' : dot}"></span>${st}</div><p>${esc(userName(this.cfg.email))}${t ? ' · ' + t : ''}${n ? `<br><b>${n} change${n === 1 ? '' : 's'} not sent yet</b>` : ''}${this.msg ? '<br>' + esc(this.msg) : ''}</p>
       <div class="row"><button class="btn sm ghost" data-act="cloud-sync">Sync now</button></div></div>`;
   },
   /* the two emails the rules let in. Remembered in the shared settings, so the rules can be copied again
@@ -899,25 +952,137 @@ new MutationObserver(() => { if (document.querySelector('[data-agsi]:not([data-o
 agsiMount();
 
 /* ---------- banner while the shared ledger can't be reached ----------
-   Offline, or Firestore refusing (rules, daily limit): what's on screen may be only this device's copy.
-   Shown after a short pause so a brief blip doesn't flash it; hidden as soon as sync is back */
+   Offline, Firestore refusing (rules, daily limit), or changes the cloud hasn't confirmed for a minute: what's on
+   screen may be only this device's copy. Shown after a short pause so a brief blip doesn't flash it */
+const waitingN = () => Cloud.on() && !Cloud.isBackup() ? Outbox.count(Cloud.ledger()) : 0;
 function cloudBanner() {
-  const bad = Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error');
+  const n = waitingN(), stuck = n > 0 && Cloud.ready && Date.now() - (Cloud.outSince || Date.now()) > 6e4;
+  if (n && !Cloud.outSince) Cloud.outSince = Date.now(); if (!n) Cloud.outSince = 0;
+  const bad = Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error' || stuck);
   let b = document.getElementById('cloudbanner');
-  if (!bad) { clearTimeout(cloudBanner.t); cloudBanner.t = null; if (b) b.remove(); document.body.classList.remove('hasbanner'); return; }
+  if (!bad) { clearTimeout(cloudBanner.t); cloudBanner.t = null; if (b) b.remove(); document.body.classList.remove('hasbanner');
+    if (n) { clearTimeout(cloudBanner.w); cloudBanner.w = setTimeout(cloudBanner, 61000); } return; }
   const show = () => {
     cloudBanner.t = null;
-    if (!(Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error'))) return;
+    const n = waitingN();
+    if (!(Cloud.on() && (Cloud.state === 'offline' || Cloud.state === 'error' || n))) return;
     b = document.getElementById('cloudbanner');
     if (!b) { b = document.createElement('div'); b.id = 'cloudbanner'; b.setAttribute('role', 'status'); document.body.prepend(b); }
-    const off = Cloud.state === 'offline';
+    const off = Cloud.state === 'offline', wait = n ? ` <b class="cbn">${n} change${n === 1 ? '' : 's'} not sent yet</b>` : '';
     b.className = off ? 'off' : 'err';
     b.innerHTML = `<span class="cbi" aria-hidden="true">${off ? '⚡' : '!'}</span><span class="cbt"><b>${off ? 'Offline' : 'Not syncing with the shared ledger'}</b><span>${off
       ? 'You see this device’s copy. Changes are saved here and sent when the connection is back.'
-      : 'You may be seeing an old copy, and changes stay on this device. Don’t edit on both devices until this is fixed.'}${Cloud.msg && !off ? ' ' + esc(Cloud.msg) : ''}</span></span><button type="button" class="btn sm" data-act="cloud-sync">Try again</button>`;
+      : 'You may be seeing an old copy. Changes are kept on this device and sent again. Don’t edit on both devices until this is fixed.'}${Cloud.msg && !off ? ' ' + esc(Cloud.msg) : ''}${wait}</span></span><button type="button" class="btn sm" data-act="cloud-sync">${n ? 'Send now' : 'Try again'}</button>`;
     document.body.classList.add('hasbanner');
   };
   if (b) show(); else if (!cloudBanner.t) cloudBanner.t = setTimeout(show, 4000);
 }
 window.addEventListener('online', () => { if (Cloud.on() && Cloud.state !== 'ok') Cloud.sync(); });
 window.addEventListener('offline', () => { if (Cloud.on()) Cloud.set('offline', offlineMsg); });
+
+/* ---------- copies of the ledger kept on this device ----------
+   One a day (the last 7 days), plus one whenever entries are left out on reconnecting. In the browser's own
+   database (IndexedDB), so they don't take room from the ledger itself. Settings → Backup & sync lists them */
+const LocalCopies = {
+  open() {
+    return this.p || (this.p = new Promise((ok, no) => {
+      const r = indexedDB.open('shanta-copies', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('copies', { keyPath: 'key' });
+      r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+    }));
+  },
+  async tx(mode, fn) { const d = await this.open(); return new Promise((ok, no) => { const t = d.transaction('copies', mode), s = t.objectStore('copies'), r = fn(s); t.oncomplete = () => ok(r && r.result); t.onerror = () => no(t.error); }); },
+  async list() { try { const all = await this.tx('readonly', s => s.getAll()); return (all || []).sort((a, b) => String(b.at).localeCompare(String(a.at))); } catch (e) { return []; } },
+  async get(key) { try { return await this.tx('readonly', s => s.get(key)); } catch (e) { return null; } },
+  count: d => COLLS.reduce((t, c) => t + (d[c] || []).length, 0),
+  async save(reason, data, key) {
+    try {
+      const at = new Date().toISOString();
+      await this.tx('readwrite', s => s.put({ key: key || 'x-' + at, at, reason, n: this.count(data), data: JSON.stringify(data) }));
+      /* keep the last 7 daily copies and the last 10 others */
+      const all = await this.list(), daily = all.filter(c => c.key.startsWith('d-')), other = all.filter(c => !c.key.startsWith('d-'));
+      const drop = daily.slice(7).concat(other.slice(10));
+      if (drop.length) await this.tx('readwrite', s => { drop.forEach(c => s.delete(c.key)); });
+    } catch (e) { console.warn('local copy', e); }
+  },
+  /* once a day, the first time the ledger is in a good state (synced, or not using the cloud) */
+  async daily() {
+    const key = 'd-' + today();
+    if (this.count(db) === 0 || await this.get(key)) return;
+    await this.save('Daily copy', db, key);
+  }
+};
+setTimeout(() => LocalCopies.daily(), 20000); setInterval(() => LocalCopies.daily(), 36e5);
+
+/* "not sent yet" mark for entries the cloud hasn't confirmed (a sale counts if any of its lines is waiting) */
+function unsentTag(coll, id) {
+  if (!waitingN()) return '';
+  const l = Cloud.ledger(), it = Outbox.items(l);
+  const hit = coll === 'sales' ? db.sales.some(s => (s.orderId || s.id) === id && ('sales/' + s.id) in it) || ('sales/' + id) in it : (coll + '/' + id) in it;
+  return hit ? ' <span class="pill bad unsent" title="Saved on this device, not in the shared ledger yet">not sent</span>' : '';
+}
+/* the list under Settings → Backup & sync, filled when opened */
+document.addEventListener('toggle', async e => {
+  if (e.target.id !== 'lcopies' || !e.target.open) return;
+  const box = e.target.querySelector('.lclist'), all = await LocalCopies.list();
+  box.innerHTML = all.length ? `<ul class="mini">${all.map(c => `<li><span>${esc(fDateTime(c.at))} · ${esc(c.reason)} · <span class="notr">${c.n}</span> entries</span><button type="button" class="btn sm ghost" data-lcopy="${esc(c.key)}">Download</button></li>`).join('')}</ul>`
+    : '<p class="note">No copies yet. The first one is made a minute after opening Shanta.</p>';
+}, true);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-lcopy]'); if (!b) return;
+  const c = await LocalCopies.get(b.dataset.lcopy); if (!c) return toast('⚠ That copy is gone.');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c.data], { type: 'application/json' }));
+  a.download = `shanta-copy-${c.at.slice(0, 16).replace(/[:T]/g, '-')}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+
+/* ---------- save status: a card that stays until it's dismissed ----------
+   Each change sent to the shared ledger shows what was saved and how it went: sending → saved, failed (with the
+   reason, and it's sent again), or offline (kept on this device). Settings-only changes don't show it.
+   It sits above open dialogs (popover) so it's seen after any save */
+const SAVE_NAMES = { shipments: ['box', 'boxes'], purchases: ['purchase', 'purchases'], sales: ['sale', 'sales'], payments: ['payment', 'payments'], expenses: ['expense', 'expenses'], transfers: ['transfer', 'transfers'] };
+function describePatch(patch) {
+  const by = {}, del = {}, orders = new Set();
+  Object.entries(patch).forEach(([k, v]) => { const [c, id, f] = k.split('/'); if (c === 'settings' || !SAVE_NAMES[c]) return;
+    const key = c + '/' + id;
+    if (v === null && f === undefined) { (del[c] = del[c] || new Set()).add(id); return; }
+    (by[c] = by[c] || new Set()).add(id);
+    if (c === 'sales') { const r = db.sales.find(s => s.id === id); orders.add(r ? (r.orderId || r.id) : id); } });
+  const parts = [];
+  Object.entries(by).forEach(([c, s]) => {
+    if (c === 'sales') { const n = orders.size, who = [...orders].map(o => { const r = db.sales.find(s => (s.orderId || s.id) === o); return r && r.customer; }).filter(Boolean);
+      parts.push(`${n} ${SAVE_NAMES.sales[n === 1 ? 0 : 1]}${who.length === 1 ? ' for ' + who[0] : ''} (${s.size} line${s.size === 1 ? '' : 's'})`); }
+    else parts.push(`${s.size} ${SAVE_NAMES[c][s.size === 1 ? 0 : 1]}`); });
+  const nd = Object.values(del).reduce((t, s) => t + s.size, 0);
+  if (nd) parts.push(`${nd} entr${nd === 1 ? 'y' : 'ies'} deleted`);
+  return parts.join(' · ');
+}
+const SaveStatus = {
+  seq: 0, jobs: {},
+  el() {
+    let b = document.getElementById('savestat');
+    if (!b) { b = document.createElement('div'); b.id = 'savestat'; b.setAttribute('role', 'status'); b.setAttribute('aria-live', 'polite');
+      if ('popover' in b) b.setAttribute('popover', 'manual'); document.body.appendChild(b); }
+    return b;
+  },
+  start(what) { const id = ++this.seq; this.jobs[id] = { what, st: 'sending', at: Date.now() }; this.draw(id);
+    this.jobs[id].t = setTimeout(() => { const j = this.jobs[id]; if (j && j.st === 'sending') { j.st = navigator.onLine ? 'slow' : 'offline'; this.draw(id); } }, 6000);
+    return id; },
+  ok(id) { const j = this.jobs[id]; if (!j) return; clearTimeout(j.t); const late = j.st !== 'sending'; j.st = 'ok'; this.draw(id, late); },
+  fail(id, msg) { const j = this.jobs[id]; if (!j) return; clearTimeout(j.t); j.st = 'fail'; j.msg = msg; this.draw(id, true); },
+  draw(id, force) {
+    const j = this.jobs[id], b = this.el();
+    /* a newer save takes the card; an older one only comes back to report something that went wrong or arrived late */
+    if (id !== this.cur && !force && this.cur && this.jobs[this.cur] && b.classList.contains('on') && id < this.cur) return;
+    this.cur = id;
+    const T = { sending: ['…', 'Saving…', 'Sending to the shared ledger.'], ok: ['✓', 'Saved', 'In the shared ledger, so it’s on both of your devices.'],
+      slow: ['…', 'Still sending…', 'The connection is slow. It’s kept on this device until it arrives.'],
+      offline: ['⚡', 'Saved on this device only', 'You’re offline. It’s sent automatically when the connection is back.'],
+      fail: ['!', 'Not saved in the shared ledger', 'It’s kept on this device and sent again automatically.'] }[j.st];
+    b.className = 'on ' + j.st;
+    b.innerHTML = `<span class="ssi" aria-hidden="true">${T[0]}</span><span class="sst"><b>${T[1]}</b><span class="sswhat notr">${esc(j.what)}</span><span>${T[2]}${j.msg ? ' ' + esc(j.msg) : ''}</span></span>
+      <span class="ssact">${j.st === 'fail' || j.st === 'offline' || j.st === 'slow' ? '<button type="button" class="btn sm ghost" data-act="cloud-sync">Try again</button>' : ''}<button type="button" class="btn sm" data-ssclose="">OK</button></span>`;
+    try { if (b.matches && b.hasAttribute('popover')) { if (b.matches(':popover-open')) b.hidePopover(); b.showPopover(); } } catch (e) { }
+  },
+  close() { const b = document.getElementById('savestat'); if (!b) return; b.classList.remove('on'); try { if (b.matches(':popover-open')) b.hidePopover(); } catch (e) { } this.cur = 0; }
+};
+document.addEventListener('click', e => { if (e.target.closest('[data-ssclose]')) SaveStatus.close(); });

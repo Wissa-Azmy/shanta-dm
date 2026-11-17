@@ -836,3 +836,16 @@ rx(/^Weights · (.+)$/, (m, n) => `الأوزان · ${n}`); rx(/^Weight · (.+)
 rx(/^Content per unit from the label, in g or ml \(1 ml counts as 1 g\); (\d+)% packaging is added\. Leave a field empty to keep the estimate\.$/, (m, p) => `المحتوى لكل وحدة من الملصق بالجرام أو المل (1 مل = 1 جم)؛ تُضاف ${p}% للتغليف. اترك الحقل فارغًا للإبقاء على التقدير.`);
 rx(/^Weight saved for (\d+) purchases?\. Shipping is split again\.$/, (m, n) => `حُفظ الوزن لـ ${n} من المشتريات. أُعيد توزيع الشحن.`);
 rx(/^(.+): tap to enter the weights$/, (m, t) => `${tr(t)}: اضغط لإدخال الأوزان`);
+Object.assign(AR, { 'Send now': 'أرسل الآن', 'not sent': 'لم يُرسل', 'Saved on this device, not in the shared ledger yet': 'محفوظ على هذا الجهاز، وليس في الدفتر المشترك بعد',
+  'Copies on this device': 'نسخ على هذا الجهاز', 'Download': 'تنزيل', 'Daily copy': 'نسخة يومية', 'Loading…': 'جارٍ التحميل…', 'That copy is gone.': 'هذه النسخة لم تعد موجودة.',
+  'One a day for the last 7 days, plus one whenever entries are left out of the shared ledger. Download one to keep it, or open it with “Restore from file”.': 'نسخة يوميًا لآخر 7 أيام، ونسخة كلما تُركت إدخالات خارج الدفتر المشترك. نزّلها للاحتفاظ بها، أو افتحها بـ «استعادة من ملف».',
+  'No copies yet. The first one is made a minute after opening Shanta.': 'لا توجد نسخ بعد. تُعمل الأولى بعد دقيقة من فتح Shanta.' });
+rx(/^(\d+) changes? not sent yet$/, (m, n) => `${n} تغيير لم يُرسل بعد`);
+rx(/^(\d+) entr(?:y|ies) left out of the shared ledger$/, (m, n) => `${n} إدخال تُرك خارج الدفتر المشترك`);
+rx(/^You may be seeing an old copy\. Changes are kept on this device and sent again\. Don’t edit on both devices until this is fixed\.(.*)$/, (m, rest) => `قد تكون هذه نسخة قديمة. التعديلات محفوظة على هذا الجهاز وتُرسل مجددًا. لا تعدّلوا على الجهازين حتى يُحل هذا.${rest ? ' ' + tr(rest.trim()) : ''}`);
+Object.assign(AR, { 'Saving…': 'جارٍ الحفظ…', 'Saved': 'تم الحفظ', 'Still sending…': 'ما زال الإرسال جاريًا…', 'Saved on this device only': 'محفوظ على هذا الجهاز فقط',
+  'Not saved in the shared ledger': 'لم يُحفظ في الدفتر المشترك', 'OK': 'حسنًا',
+  'Sending to the shared ledger.': 'جارٍ الإرسال إلى الدفتر المشترك.', 'In the shared ledger, so it’s on both of your devices.': 'في الدفتر المشترك، فهو على جهازيكما.',
+  'The connection is slow. It’s kept on this device until it arrives.': 'الاتصال بطيء. يبقى على هذا الجهاز حتى يصل.',
+  'You’re offline. It’s sent automatically when the connection is back.': 'أنت غير متصل. يُرسل تلقائيًا عند عودة الاتصال.' });
+rx(/^It’s kept on this device and sent again automatically\.(.*)$/, (m, rest) => `محفوظ على هذا الجهاز ويُرسل مجددًا تلقائيًا.${rest ? ' ' + tr(rest.trim()) : ''}`);

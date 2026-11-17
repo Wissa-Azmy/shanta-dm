@@ -229,7 +229,7 @@ V.sales = R => {
       && match(o.lines.map(pn).join(' '), o.extras.map(s => s.product).join(' '), h.customer, h.place, h.method, h.notes); }).sort(byDate);
   let bill = 0, prof = 0, costT = 0;
   const body = rows.map(o => { const h = o.h, m = orderMoney(o, R); bill += m.bill; prof += m.profit; costT += num(m.landed) + num(m.cost);
-    return `<tr><td>${fDate(h.date)}</td><td><b>${esc(h.customer || (h.kind === 'sale' ? 'Customer' : kinds[h.kind]))}</b><span class="sub">${esc(h.place || '')}${h.method && h.kind === 'sale' ? ' · ' + esc(h.method) : ''}</span></td>
+    return `<tr><td>${fDate(h.date)}</td><td><b>${esc(h.customer || (h.kind === 'sale' ? 'Customer' : kinds[h.kind]))}</b>${unsentTag('sales', o.id)}<span class="sub">${esc(h.place || '')}${h.method && h.kind === 'sale' ? ' · ' + esc(h.method) : ''}</span></td>
       <td>${saleSummary(o, pn)}</td>
       <td class="num">${h.kind === 'sale' ? fEGP(m.bill) : '—'}${m.charged ? `<span class="sub">incl. ${fEGP(m.charged)} extras</span>` : ''}${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</td>
       <td class="num">${m.cost ? fEGP(m.cost) : '—'}</td>
@@ -458,7 +458,7 @@ function saleCard(o, R, pn, kinds) {
       <span class="sub">${fAmt(b.collected, b.cur)} of ${fAmt(b.bill, b.cur)} paid${h.dueDate ? ` · <span class="${b.overdue ? 'out-amt' : ''}">${b.overdue ? 'Overdue since' : 'Due'} ${fDate(h.dueDate)}</span>` : ''}</span></div>` : '';
   return `<div class="gcard${sale ? '' : ' muted'}${open && b.overdue ? ' late' : ''}">
     <div class="gtop"><span class="gdate">${fDate(h.date)}</span>${cap}</div>
-    <b class="gname">${esc(h.customer || (sale ? 'Customer' : kinds[h.kind]))}</b>
+    <b class="gname">${esc(h.customer || (sale ? 'Customer' : kinds[h.kind]))}</b>${unsentTag('sales', o.id)}
     <span class="sub">${esc(h.place || '')}${h.method && sale ? (h.place ? ' · ' : '') + esc(h.method) : ''}</span>
     ${o.lines.length ? `<button type="button" class="gprod" data-salelines="${o.id}">${prods === 1 ? `<span class="notr">${esc(pn(o.lines[0]))}</span>` : `${prods} products`} · ${units} unit${units === 1 ? '' : 's'}</button>` : ''}
     <div class="gnums">${sale ? `<div><small>Customer pays</small><b>${fEGP(m.bill)}</b>${m.discount ? `<span class="sub">after ${fEGP(m.discount)} discount</span>` : ''}</div>` : ''}
