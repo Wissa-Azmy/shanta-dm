@@ -511,7 +511,7 @@ function pickerHTML(R) {
   const stores = [...new Set(all.filter(l => l.left > 0).map(l => storeOf(l.p)))].sort();
   const cats = [...new Set(all.filter(l => l.left > 0).map(l => l.p.category || 'Other'))].sort();
   return `<div class="picker" id="o_picker">
-    <div class="pkbar"><span class="srch"><input type="search" id="pk_q" placeholder="${OPK.line >= 0 ? 'Search the product for this line…' : 'Search name, brand or barcode…'}" value="${esc(OPK.q)}" autocomplete="off" enterkeyhint="done"><button type="button" class="srchx" data-o="pk-clear" aria-label="Clear search" title="Clear search"${OPK.q ? '' : ' hidden'}>×</button></span>
+    <div class="spbar"><span class="srch"><input type="search" id="pk_q" placeholder="${OPK.line >= 0 ? 'Search the product for this line…' : 'Search name, brand or barcode…'}" value="${esc(OPK.q)}" autocomplete="off" enterkeyhint="done"><button type="button" class="srchx" data-o="pk-clear" aria-label="Clear search" title="Clear search"${OPK.q ? '' : ' hidden'}>×</button></span>
       <button type="button" class="btn sm" data-o="pk-close">Done</button></div>
     <div class="pkf">
       <select data-pk="box">${opt('', 'All boxes', OPK.box)}${boxes.map(s => opt(s.id, s.name, OPK.box)).join('')}</select>
@@ -525,9 +525,9 @@ function pickerHTML(R) {
 function pickerList(R) {
   const rows = pickerLots(R), show = rows.slice(0, 60);
   if (!rows.length) return `<p class="note pkempty">No product in stock matches${OPK.q ? ` “${esc(OPK.q)}”` : ''}.</p>`;
-  return `<ul class="pklist">${show.map(({ l, left, inSale }, i) => `<li><button type="button" class="pkrow${i === 0 && OPK.q ? ' first' : ''}" data-o="pk-add:${esc(l.p.id)}"${left <= 0 && OPK.line < 0 ? ' disabled' : ''}>
-      <span class="pkn"><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')}${l.p.brand ? ' · ' : ''}${esc(shipName(l.p.shipmentId) || 'not in a box')}</span></span>
-      <span class="pkm"><span class="pkleft">${left} left</span><span class="sub">${fEGP(suggestEGP(l))}</span></span>
+  return `<ul class="splist">${show.map(({ l, left, inSale }, i) => `<li><button type="button" class="pkrow${i === 0 && OPK.q ? ' first' : ''}" data-o="pk-add:${esc(l.p.id)}"${left <= 0 && OPK.line < 0 ? ' disabled' : ''}>
+      <span class="spname"><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')}${l.p.brand ? ' · ' : ''}${esc(shipName(l.p.shipmentId) || 'not in a box')}</span></span>
+      <span class="spmeta"><span class="pkleft">${left} left</span><span class="sub">${fEGP(suggestEGP(l))}</span></span>
       ${inSale ? `<span class="pill ok pkin">×${inSale}</span>` : '<span class="pkplus" aria-hidden="true">+</span>'}</button></li>`).join('')}</ul>
     ${rows.length > show.length ? `<p class="note">${rows.length - show.length} more: type more of the name to narrow it down.</p>` : ''}`;
 }
