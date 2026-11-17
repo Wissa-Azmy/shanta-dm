@@ -850,3 +850,10 @@ Object.assign(AR, { 'Saving…': 'جارٍ الحفظ…', 'Saved': 'تم الح
   'You’re offline. It’s sent automatically when the connection is back.': 'أنت غير متصل. يُرسل تلقائيًا عند عودة الاتصال.' });
 rx(/^It’s kept on this device and sent again automatically\.(.*)$/, (m, rest) => `محفوظ على هذا الجهاز ويُرسل مجددًا تلقائيًا.${rest ? ' ' + tr(rest.trim()) : ''}`);
 rx(/^Sales are now stored one document per sale \((\d+) sales\)\. A backup was made first\.$/, (m, n) => `صارت المبيعات تُحفظ مستندًا واحدًا لكل عملية بيع (${n} عملية). أُخذت نسخة احتياطية أولًا.`);
+Object.assign(AR, { '+ Add products': '+ أضف منتجات', 'Done': 'تم', 'Choose a product…': 'اختر منتجًا…', 'Change the product': 'غيّر المنتج',
+  'Search name, brand or barcode… (Enter adds the first)': 'ابحث بالاسم أو الماركة أو الباركود… (Enter يضيف الأول)', 'Search the product for this line…': 'ابحث عن منتج هذا السطر…',
+  'All stores': 'كل المتاجر', 'All categories': 'كل الفئات', 'Sort: name': 'ترتيب: الاسم', 'Sort: brand': 'ترتيب: الماركة', 'Sort: most in stock': 'ترتيب: الأكثر في المخزون',
+  'Sort: newest': 'ترتيب: الأحدث', 'Sort: price': 'ترتيب: السعر', 'not in a box': 'ليس في صندوق' });
+rx(/^(\d+) left$/, (m, n) => `${n} متبقٍ`);
+rx(/^No product in stock matches(?: “(.+)”)?\.$/, (m, q) => q ? `لا يوجد منتج في المخزون يطابق «${q}».` : 'لا يوجد منتج في المخزون يطابق.');
+rx(/^(\d+) more: type more of the name to narrow it down\.$/, (m, n) => `${n} أخرى: اكتب المزيد من الاسم لتضييق البحث.`);

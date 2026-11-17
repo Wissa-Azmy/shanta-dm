@@ -65,7 +65,10 @@ function openOrder(id, preset) {
     if (preset && preset.extras) OR.extras = preset.extras.map(x => Object.assign({}, x));
     if (preset && preset.onSave) OR.after = preset.onSave;
   }
+  /* a new sale without products starts with the product search open */
+  Object.assign(OPK, { open: !OR.lines.some(x => x.purchaseId), q: '', line: -1 });
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
+  if (OPK.open) setTimeout(() => { const q = $('#pk_q'); if (q) q.focus(); }, 60);
 }
 function suggestEGP(l) { return Math.ceil(eur2egp(l.landed) * (1 + num(db.settings.targetMargin) / 100) / 5) * 5; }
 function orderTotals() {
@@ -127,14 +130,15 @@ function drawOrder(err) {
     <h3 class="osec">Products</h3>
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th>Product</th><th class="num">Qty</th>${sale ? `<th class="num">Price per unit (${cur})</th><th class="num">Line total</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.lines.map((x, i) => { const l = R.lots[x.purchaseId];
-      return `<tr><td>${sel(`class="cell wide" data-ol="${i}" data-k="purchaseId"`, [['', 'Choose a product…']].concat(lots.map(l => [l.p.id, `${l.p.product}${l.p.brand ? ' (' + l.p.brand + ')' : ''} · ${avail(l.p.id)} available`])), x.purchaseId)}
+      return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b>${l.p.brand ? ` <span class="sub">${esc(l.p.brand)} · ${avail(l.p.id)} available</span>` : ` <span class="sub">${avail(l.p.id)} available</span>`}</button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
         ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${db.settings.targetMargin}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
         <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
         ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
         <td class="num" id="ol_t_${i}">${fAmt(num(x.qty) * num(x.unitPrice), cur)}</td>` : ''}
         <td class="acts">${OR.lines.length > 1 ? `<button type="button" class="ib del" data-o="del-line:${i}" title="Remove">${TRASH}</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
-    <div class="topact" style="margin-top:8px"><button type="button" class="btn sm" data-o="scan">${SCANICON} Scan products</button><button type="button" class="btn sm ghost" data-o="add-line">+ Add product</button></div>
+    <div class="topact" style="margin-top:8px"><button type="button" class="btn sm" data-o="add-line">+ Add products</button><button type="button" class="btn sm ghost" data-o="scan">${SCANICON} Scan products</button></div>
+    ${pickerHTML(R)}
 
     <h3 class="osec">Extra costs</h3>${sale ? '<p class="note">Choose “From sale” for costs taken out of what the customer paid (e.g. free delivery the courier keeps): it lowers the sale’s profit and the money collected, and isn’t charged to either of you.</p>' : ''}
     ${OR.extras.length ? `<div class="tablewrap rx-table"><table class="t"><thead><tr><th>What</th><th>Description</th><th class="num">We pay (${cur})</th><th>Paid by</th>${sale ? `<th class="num">Customer pays (${cur})</th>` : ''}<th></th></tr></thead><tbody>
@@ -304,7 +308,10 @@ document.addEventListener('click', e => {
   if (a === 'save') return saveOrder();
   if (a === 'scan') return scanIntoOrder();
   if (a === 'delete') { if (deleteOrder(OR.id)) odlg().close(); return; }
-  if (a === 'add-line') OR.lines.push({ purchaseId: '', qty: 1, unitPrice: '' });
+  if (a === 'add-line') { OPK.open = true; OPK.line = -1; }
+  if (a === 'pk-line') { OPK.open = true; OPK.line = +arg; OPK.q = ''; }
+  if (a === 'pk-close') { OPK.open = false; OPK.line = -1; OPK.q = ''; OR.lines = OR.lines.filter((x, i) => x.purchaseId || OR.lines.length === 1); }
+  if (a === 'pk-add') { pickerAdd(b.dataset.o.slice(7)); drawOrder(); if (OPK.open) { const q = $('#pk_q'); if (q) q.focus(); } return; }
   if (a === 'del-line') OR.lines.splice(+arg, 1);
   if (a === 'add-extra') OR.extras.push({ category: arg, description: '', cost: '', paidBy: OR.h.receivedBy || 'friend', charge: '' });
   if (a === 'del-extra') OR.extras.splice(+arg, 1);
@@ -474,3 +481,75 @@ function custCard(c, t) {
     ${open.length ? `<ul class="gopen">${open.map(o => `<li><span>${fDate(o.h.date)} · ${fAmt(o.balance, o.cur)}</span><button class="ib" data-edit="sales:${o.id}" title="Open sale">${PENCIL}</button></li>`).join('')}</ul>` : `<span class="sub">${c.orders.length} sale${c.orders.length === 1 ? '' : 's'} · nothing open</span>`}
     ${owes ? `<div class="gfoot"><span></span><button class="btn sm" data-new="payments" ${pre({ customer: c.name, amount: Math.round(c.balanceEGP), currency: 'EGP' })}>+ Payment</button></div>` : ''}</div>`;
 }
+
+/* ---------- product picker in the sale form ----------
+   Instead of a dropdown with every product: type a few letters of the name, brand or barcode, narrow by box,
+   store or category, sort, and tap to add (tap again for one more). It stays open, so a 22-product sale is
+   typed and tapped without leaving the keyboard; Enter adds the first match */
+const OPK = { open: false, q: '', box: '', store: '', cat: '', sort: 'name', line: -1 };
+const pkNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
+function pickerLots(R) {
+  const avail = id => { const l = R.lots[id]; return l ? l.left + (OR.orig[id] || 0) : 0; };
+  const inSale = id => OR.lines.reduce((a, x) => a + (x.purchaseId === id ? num(x.qty) : 0), 0);
+  const words = pkNorm(OPK.q).split(/\s+/).filter(Boolean);
+  let list = Object.values(R.lots).filter(l => avail(l.p.id) - inSale(l.p.id) > 0 || inSale(l.p.id) > 0);
+  if (OPK.box) list = list.filter(l => (l.p.shipmentId || 'none') === OPK.box);
+  if (OPK.store) list = list.filter(l => storeOf(l.p) === OPK.store);
+  if (OPK.cat) list = list.filter(l => (l.p.category || 'Other') === OPK.cat);
+  if (words.length) list = list.filter(l => { const h = pkNorm([l.p.product, l.p.brand, l.p.ean, l.p.category].join(' ')); return words.every(w => h.includes(w)); });
+  const by = { name: (a, b) => a.p.product.localeCompare(b.p.product), brand: (a, b) => String(a.p.brand || '').localeCompare(String(b.p.brand || '')) || a.p.product.localeCompare(b.p.product),
+    stock: (a, b) => avail(b.p.id) - avail(a.p.id), newest: (a, b) => String(b.p.date || '').localeCompare(String(a.p.date || '')), price: (a, b) => suggestEGP(a) - suggestEGP(b) };
+  /* name matches first when searching */
+  const starts = l => words.length && pkNorm(l.p.product).startsWith(words[0]) ? 0 : 1;
+  return list.sort((a, b) => starts(a) - starts(b) || (by[OPK.sort] || by.name)(a, b)).map(l => ({ l, left: avail(l.p.id) - inSale(l.p.id), inSale: inSale(l.p.id) }));
+}
+function pickerHTML(R) {
+  if (!OPK.open) return '';
+  const all = Object.values(R.lots), opt = (v, t, s) => `<option value="${esc(v)}"${v === s ? ' selected' : ''}>${esc(t)}</option>`;
+  const boxes = db.shipments.slice().sort(byDate).filter(s => all.some(l => l.p.shipmentId === s.id && l.left > 0));
+  const stores = [...new Set(all.filter(l => l.left > 0).map(l => storeOf(l.p)))].sort();
+  const cats = [...new Set(all.filter(l => l.left > 0).map(l => l.p.category || 'Other'))].sort();
+  return `<div class="picker" id="o_picker">
+    <div class="pkbar"><input type="search" id="pk_q" placeholder="${OPK.line >= 0 ? 'Search the product for this line…' : 'Search name, brand or barcode… (Enter adds the first)'}" value="${esc(OPK.q)}" autocomplete="off" enterkeyhint="done">
+      <button type="button" class="btn sm" data-o="pk-close">Done</button></div>
+    <div class="pkf">
+      <select data-pk="box">${opt('', 'All boxes', OPK.box)}${boxes.map(s => opt(s.id, s.name, OPK.box)).join('')}</select>
+      <select data-pk="store">${opt('', 'All stores', OPK.store)}${stores.map(s => opt(s, s, OPK.store)).join('')}</select>
+      <select data-pk="cat">${opt('', 'All categories', OPK.cat)}${cats.map(c => opt(c, c, OPK.cat)).join('')}</select>
+      <select data-pk="sort">${[['name', 'Sort: name'], ['brand', 'Sort: brand'], ['stock', 'Sort: most in stock'], ['newest', 'Sort: newest'], ['price', 'Sort: price']].map(([v, t]) => opt(v, t, OPK.sort)).join('')}</select>
+    </div>
+    <div id="pk_list">${pickerList(R)}</div></div>`;
+}
+function pickerList(R) {
+  const rows = pickerLots(R), show = rows.slice(0, 60);
+  if (!rows.length) return `<p class="note pkempty">No product in stock matches${OPK.q ? ` “${esc(OPK.q)}”` : ''}.</p>`;
+  return `<ul class="pklist">${show.map(({ l, left, inSale }, i) => `<li><button type="button" class="pkrow${i === 0 && OPK.q ? ' first' : ''}" data-o="pk-add:${esc(l.p.id)}"${left <= 0 && OPK.line < 0 ? ' disabled' : ''}>
+      <span class="pkn"><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')}${l.p.brand ? ' · ' : ''}${esc(shipName(l.p.shipmentId) || 'not in a box')}</span></span>
+      <span class="pkm"><span class="pkleft">${left} left</span><span class="sub">${fEGP(suggestEGP(l))}</span></span>
+      ${inSale ? `<span class="pill ok pkin">×${inSale}</span>` : '<span class="pkplus" aria-hidden="true">+</span>'}</button></li>`).join('')}</ul>
+    ${rows.length > show.length ? `<p class="note">${rows.length - show.length} more: type more of the name to narrow it down.</p>` : ''}`;
+}
+/* tap a product: one more unit of it (a new line the first time, at the suggested price) */
+function pickerAdd(id) {
+  const R = calc(), l = R.lots[id]; if (!l) return;
+  const price = OR.h.kind === 'sale' && OR.h.currency === 'EGP' ? suggestEGP(l) : '';
+  if (OPK.line >= 0 && OR.lines[OPK.line]) {
+    const x = OR.lines[OPK.line]; x.purchaseId = id; if (x.unitPrice === '' || x.unitPrice == null) x.unitPrice = price;
+    OPK.line = -1; OPK.open = false; OPK.q = ''; return;
+  }
+  const ex = OR.lines.find(x => x.purchaseId === id);
+  if (ex) ex.qty = num(ex.qty) + 1;
+  else { const empty = OR.lines.find(x => !x.purchaseId); if (empty) Object.assign(empty, { purchaseId: id, qty: 1, unitPrice: empty.unitPrice === '' ? price : empty.unitPrice }); else OR.lines.push({ purchaseId: id, qty: 1, unitPrice: price }); }
+  OPK.q = '';
+}
+function redrawPicker(keepFocus) {
+  const R = calc(), box = $('#pk_list'); if (box) box.innerHTML = pickerList(R);
+  if (keepFocus) { const q = $('#pk_q'); if (q) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) { } } }
+}
+document.addEventListener('input', e => { if (e.target.id !== 'pk_q') return; OPK.q = e.target.value; redrawPicker(false); });
+document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.pk; if (!k) return; e.stopPropagation(); OPK[k] = e.target.value; redrawPicker(true); }, true);
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'pk_q') return;
+  if (e.key === 'Enter') { e.preventDefault(); const f = $('#pk_list .pkrow:not([disabled])'); if (f) f.click(); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); OPK.open = false; OPK.line = -1; drawOrder(); }
+});

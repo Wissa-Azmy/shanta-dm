@@ -999,3 +999,25 @@ dialog[open]{max-height:min(92vh,92dvh);overflow:auto;overscroll-behavior:contai
 #savestat .ssact{display:flex;flex-direction:column;gap:6px;align-self:center}
 [dir=rtl] #savestat{inset:auto auto calc(16px + env(safe-area-inset-bottom)) 16px}
 @media (max-width:600px){#savestat{inset:auto 10px calc(10px + env(safe-area-inset-bottom)) 10px;width:auto}}
+/* sale form: product search */
+.picker{margin-top:10px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}
+.picker .pkbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px;background:var(--card);border-bottom:1px solid var(--line)}
+.picker .pkbar input{flex:1;min-width:0;font-size:16px}
+.picker .pkf{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--paper)}
+.picker .pkf select{flex:1 1 140px;min-width:0;font-size:13px;padding-block:6px}
+.picker #pk_list{max-height:min(46vh,420px);overflow-y:auto;overscroll-behavior:contain}
+.pklist{list-style:none;margin:0;padding:0}
+.pklist li+li{border-top:1px solid var(--line)}
+.pkrow{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 12px}
+.pkrow:hover,.pkrow.first{background:var(--nile-soft)}
+.pkrow[disabled]{opacity:.45;cursor:default}
+.pkrow .pkn{flex:1;min-width:0;display:flex;flex-direction:column}
+.pkrow .pkn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkrow .pkm{flex:none;display:flex;flex-direction:column;align-items:flex-end;font-size:13px}
+.pkrow .pkleft{font-weight:600}
+.pkrow .pkplus{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper);font-weight:700}
+.pkrow .pkin{flex:none;min-width:28px;text-align:center}
+.pkempty{padding:14px}
+.pkpick{all:unset;cursor:pointer;display:block;max-width:100%}
+.pkpick b{border-bottom:1px dashed var(--muted)}
+.pkpick:hover b{color:var(--nile)}
