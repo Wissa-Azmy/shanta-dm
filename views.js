@@ -72,7 +72,7 @@ V.overview = R => {
   ${lossCard(R)}
   <div class="grid3" style="margin-top:18px">
     <div class="card"><h3>On the way</h3>${moving.length ? `<ul class="mini">${moving.map(s => `<li><span>${esc(s.name)}<span class="sub note">${esc(s.carrier || '')} ${fDate(s.date)}</span></span><span class="pill warn">${esc(s.status)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing in transit.</div>'}</div>
-    <div class="card"><h3>Running low</h3>${lows.length ? `<ul class="mini">${lows.map(l => `<li><span>${esc(l.p.product)}</span><span class="r">${l.left} left</span></li>`).join('')}</ul>` : '<div class="empty">Stock levels look fine.</div>'}</div>
+    <div class="card"><h3>Running low${lows.length ? ` <span class="note notr">· ${lows.length}</span>` : ''}</h3>${lows.length ? `<ul class="mini scrolly">${lows.map(l => `<li><span>${esc(l.p.product)}</span><span class="r">${l.left} left</span></li>`).join('')}</ul>` : '<div class="empty">Stock levels look fine.</div>'}</div>
     <div class="card"><h3>Waiting for payment</h3>${unpaid.length ? `<ul class="mini">${unpaid.slice(0, 8).map(o => { const l = R.lots[(o.lines[0] || {}).purchaseId], more = o.lines.length - 1, b = R.book.byId[o.id]; return `<li><span>${esc(o.h.customer || 'Customer')}<span class="sub note">${esc(l ? l.p.product : '')}${more > 0 ? ` +${more} more` : ''} · ${b.h.dueDate ? `<span class="${b.overdue ? 'out-amt' : ''}">due ${fDate(b.h.dueDate)}</span>` : fDate(o.date)}</span></span><span class="r"><button class="ib" data-act="paid:${o.id}" title="Record payment">+</button> ${fEGP(b.balanceEGP)}</span></li>`; }).join('')}</ul>` : '<div class="empty">Everyone has paid.</div>'}</div>
   </div>`;
 };

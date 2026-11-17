@@ -704,14 +704,14 @@ service cloud.firestore {
       <div class="f"><label for="${p}_pw">Password</label><input id="${p}_pw" type="password" autocomplete="current-password"></div>`;
   },
   settingsHTML() {
-    if (this.on()) return `<div class="card span2" id="cloudcard" data-mode="on"><h3>Shared online ledger</h3>
+    if (this.on()) return `<div class="card" id="cloudcard" data-mode="on"><h3>Shared online ledger</h3>
       <p class="note">Signed in as <b>${esc(whoAmI() ? pname(whoAmI()) + ' (' + userName(this.cfg.email) + ')' : userName(this.cfg.email))}</b>. Changes appear on ${esc(partnerName())}’s phone within seconds. Without internet everything keeps working: changes are saved on this device and sent when the connection is back. The file on disk still works as an extra backup.</p>
       ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
       <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
       ${this.usageHTML()}
       <div id="cl_backups"></div>
       ${this.adminHTML()}</div>`;
-    return `<div class="card span2" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
+    return `<div class="card" id="cloudcard" data-mode="off"><h3>Sign in to the shared ledger</h3>
       <p class="note">Sign in so you and ${esc(partnerName())} work on the same numbers from any phone or laptop.</p>
       <form class="fgrid" data-login="cl">${this.loginFields('cl')}<div class="f span"><button class="btn" style="align-self:flex-start">Sign in</button></div></form>
       <div class="gor"><span>or</span></div><div class="agsi" data-agsi="cl"></div>
