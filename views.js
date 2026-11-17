@@ -106,7 +106,7 @@ V.shipments = R => {
         const total = x.measuredG || x.grams;
         return `<dt>Shipping weight</dt><dd>${fG(total)} ${x.measuredG ? tag("weighed", "ok", "Packed box on the scale") : tag("calculated", "", "Sum of the products below")}</dd>` +
           row(kn, fG(x.wG), tag("label", "", "Content weight from the receipt or label + " + num(db.settings.packagingPct) + "% packaging")) +
-          row(un, x.useRest ? fG(x.rest) : fG(x.grams - x.wG), x.useRest ? tag("from box", "", "What is left of the weighed box after the products with a label weight") : tag("est.", "warn", "No weight known: estimated from the price")) +
+          row(un, x.useRest ? fG(x.rest) : fG(x.grams - x.wG), (x.useRest ? tag("from box", "", "What is left of the weighed box after the products with a label weight") : tag("est.", "warn", "No weight known: estimated from the price")) + (un.length ? ` <button type="button" class="btn sm ghost wbtn" data-weights="${s.id}">Enter weights</button>` : "")) +
           `<dt>Shipping per kg</dt><dd>${fEUR(x.costs / total * 1000)}</dd>`; })() : `<dt>Shipping split</dt><dd>by price <span class="pill" title="No product weights and the box was not weighed">no weights</span></dd>`}
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
       ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
@@ -204,7 +204,7 @@ V.stock = R => {
   ${rows.map(l => { const [where, c] = loc(l), cEGP = eur2egp(l.landed), avg = l.sold ? l.revEGP / l.sold : 0, mk = avg && cEGP ? (avg / cEGP - 1) * 100 : null;
     return `<tr${l.left > 0 ? ` data-pickrow="${l.p.id}"` : ''}${SEL.has(l.p.id) ? ' class="picked"' : ''}><td class="ck">${l.left > 0 ? `<input type="checkbox" class="selck" data-sel="${l.p.id}" aria-label="Select"${SEL.has(l.p.id) ? ' checked' : ''}>` : ''}</td><td><b>${esc(l.p.product)}</b><span class="sub">${storeLinkTag(l.p)}${esc(l.p.brand || '')} · ${esc(shipName(l.p.shipmentId) || 'no shipment')}</span></td><td><span class="pill ${c}">${esc(where)}</span></td>
     <td class="num">${l.qty}</td><td class="num">${l.sold}${l.unpaid > 0.05 ? `<span class="sub">${Math.round(l.unpaid * 10) / 10} not paid yet</span>` : ""}</td><td class="num">${l.lost || ''}</td><td class="num"><b>${l.left}</b></td>
-    <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ' <span class="pill warn" title="Estimated from price">est.</span>' : l.boxG ? ' <span class="pill" title="Share of the weighed box after the products with a known weight">from box</span>' : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
+    <td class="num">${l.shipG ? fG(l.shipG) + (l.estG ? ` <button type="button" class="pill warn pillbtn" title="Estimated from price: tap to enter the weight" data-weightp="${l.p.id}">est. ✎</button>` : l.boxG ? ` <button type="button" class="pill pillbtn" title="Share of the weighed box: tap to enter the weight" data-weightp="${l.p.id}">from box ✎</button>` : '') : '—'}${num(l.p.netG) ? `<span class="sub">${fG(num(l.p.netG))} + packaging</span>` : ''}</td>
     <td class="num">${fEGP(cEGP)}<span class="sub">${fEUR(l.unit)} + ${fEUR(l.shipShare || 0)} shipping</span><span class="sub">${fEGP(l.landedEGP)} at purchase rates</span></td><td class="num">${avg ? fEGP(avg) : '—'}</td>
     <td class="num">${mk === null ? '—' : `<span class="pill ${mk >= num(db.settings.targetMargin) ? 'ok' : mk >= 0 ? 'warn' : 'bad'}">${Math.round(mk)}%</span>`}</td>
     <td class="num">${fEGP(Math.ceil(cEGP * (1 + tm) / 5) * 5)}<span class="sub">today ${rt(rate())} · bought at ${rt(l.rateP)}${num(l.p.rate) ? "" : "*"}</span></td>
@@ -480,3 +480,43 @@ function linkPartnerEmails() {
   if (b.length === 1 && b[0] !== pemail('me')) { s.friendEmail = b[0]; changed = true; }
   return changed;
 }
+
+/* type the content weight of products that have none (estimated from price or shared from the weighed box).
+   One field per product in the box; the same product without a weight in other boxes gets it too */
+const wKey = p => [String(p.brand || '').trim().toLowerCase(), String(p.product || '').trim().toLowerCase(), normEan(p.ean || '')].join('|');
+let WLIST = new Set();
+function openWeights(list, title) {
+  WLIST = new Set(list.map(p => p.id));
+  const groups = new Map();
+  list.filter(p => !(num(p.netG) > 0)).forEach(p => { const k = wKey(p); (groups.get(k) || groups.set(k, []).get(k)).push(p); });
+  if (!groups.size) return toast('Every product here already has a weight.');
+  let d = $('#wdlg'); if (!d) { d = document.createElement('dialog'); d.id = 'wdlg'; d.className = 'sdialog'; document.body.appendChild(d); }
+  const rows = [...groups.entries()].map(([k, ps], i) => { const p = ps[0], u = ps.reduce((t, x) => t + num(x.qty), 0);
+    return `<tr><td><b>${esc(p.product)}</b><span class="sub">${esc(p.brand || '')} · ${u} unit${u === 1 ? '' : 's'}</span></td>
+      <td class="num"><input type="number" inputmode="decimal" min="0" step="1" placeholder="g" data-wk="${esc(k)}" aria-label="Content per unit in g or ml"${i === 0 ? ' autofocus' : ''}></td></tr>`; }).join('');
+  d.innerHTML = `<form method="dialog" class="sdbody" id="wform"><h2>${esc(title)}</h2>
+    <p class="note">Content per unit from the label, in g or ml (1 ml counts as 1 g); ${num(db.settings.packagingPct)}% packaging is added. Leave a field empty to keep the estimate.</p>
+    <div class="tablewrap"><table class="t"><tbody>${rows}</tbody></table></div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="w_all" checked> Also for the same product in other boxes</label>
+    <div class="mact"><button type="button" class="btn ghost" data-wclose="">Cancel</button><button type="submit" class="btn">Save weights</button></div></form>`;
+  d.showModal();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-weights]');
+  if (b) { const s = db.shipments.find(x => x.id === b.dataset.weights); return openWeights(db.purchases.filter(p => p.shipmentId === b.dataset.weights), 'Weights · ' + (s ? s.name : '')); }
+  const one = e.target.closest('[data-weightp]');
+  if (one) { e.stopPropagation(); const p = db.purchases.find(x => x.id === one.dataset.weightp); return p && openWeights([p], 'Weight · ' + p.product); }
+  if (e.target.closest('[data-wclose]')) $('#wdlg').close();
+}, true);
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'wform') return;
+  e.preventDefault();
+  const all = $('#w_all').checked, set = {};
+  e.target.querySelectorAll('[data-wk]').forEach(i => { const g = Math.round(num(i.value)); if (g > 0) set[i.dataset.wk] = g; });
+  if (!Object.keys(set).length) { $('#wdlg').close(); return; }
+
+  let n = 0;
+  db.purchases.forEach(p => { const k = wKey(p); if (set[k] && !(num(p.netG) > 0) && (all || WLIST.has(p.id))) { p.netG = set[k]; n++; } });
+  $('#wdlg').close(); commit();
+  toast(`Weight saved for ${n} purchase${n === 1 ? '' : 's'}. Shipping is split again.`);
+});
