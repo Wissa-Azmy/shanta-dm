@@ -5,9 +5,9 @@
    the customer uploads a screenshot. Their profile and credit are in customers/<uid>; only the two admins
    can change credit or the down payment a customer is asked for. */
 const FB_VER = '13.1.0', FB = s => `https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${s}.js`;
-const CFG = { apiKey: 'AIzaSyAa9fTvt1RxGFDGf1rWFLBB_gvVlaOkphM', authDomain: 'shanta-dm.firebaseapp.com', projectId: 'shanta-dm' };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const CFG = Object.assign({ authDomain: 'shanta-dm.firebaseapp.com', projectId: 'shanta-dm' }, window.SHANTA_FIREBASE || {});   // key in ../firebase-config.js
 const ls = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (e) { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
 const num = v => +v || 0;

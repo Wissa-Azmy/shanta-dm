@@ -8,7 +8,7 @@ const FB_VER = '13.1.0', FB = s => `https://www.gstatic.com/firebasejs/${FB_VER}
 const CLOUD = {
   projectId: 'shanta-dm',
   authDomain: 'shanta-dm.firebaseapp.com',
-  apiKey: 'AIzaSyAa9fTvt1RxGFDGf1rWFLBB_gvVlaOkphM',
+  apiKey: (window.SHANTA_FIREBASE || {}).apiKey || '',   // in firebase-config.js
   dbUrl: 'https://shanta-dm-default-rtdb.europe-west1.firebasedatabase.app', // old database, read once to move the data
   ledger: 'shared',
   domain: 'shanta-dm.firebaseapp.com' // plain usernames become <username>@this-domain
