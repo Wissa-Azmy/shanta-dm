@@ -857,3 +857,4 @@ Object.assign(AR, { '+ Add products': '+ أضف منتجات', 'Done': 'تم', '
 rx(/^(\d+) left$/, (m, n) => `${n} متبقٍ`);
 rx(/^No product in stock matches(?: “(.+)”)?\.$/, (m, q) => q ? `لا يوجد منتج في المخزون يطابق «${q}».` : 'لا يوجد منتج في المخزون يطابق.');
 rx(/^(\d+) more: type more of the name to narrow it down\.$/, (m, n) => `${n} أخرى: اكتب المزيد من الاسم لتضييق البحث.`);
+Object.assign(AR, { 'Search name, brand or barcode…': 'ابحث بالاسم أو الماركة أو الباركود…', 'Tap a product to add one; tap again for one more. Enter adds the first match.': 'اضغط على منتج لإضافة واحد، واضغط مجددًا لإضافة آخر. Enter يضيف أول نتيجة.' });

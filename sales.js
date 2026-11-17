@@ -130,7 +130,7 @@ function drawOrder(err) {
     <h3 class="osec">Products</h3>
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th>Product</th><th class="num">Qty</th>${sale ? `<th class="num">Price per unit (${cur})</th><th class="num">Line total</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.lines.map((x, i) => { const l = R.lots[x.purchaseId];
-      return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b>${l.p.brand ? ` <span class="sub">${esc(l.p.brand)} · ${avail(l.p.id)} available</span>` : ` <span class="sub">${avail(l.p.id)} available</span>`}</button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
+      return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b><span class="sub">${l.p.brand ? esc(l.p.brand) + ' · ' : ''}${avail(l.p.id)} available</span></button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
         ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${db.settings.targetMargin}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
         <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
         ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
@@ -310,6 +310,7 @@ document.addEventListener('click', e => {
   if (a === 'delete') { if (deleteOrder(OR.id)) odlg().close(); return; }
   if (a === 'add-line') { OPK.open = true; OPK.line = -1; }
   if (a === 'pk-line') { OPK.open = true; OPK.line = +arg; OPK.q = ''; }
+  if (a === 'pk-clear') { OPK.q = ''; const q = $('#pk_q'); if (q) { q.value = ''; q.focus(); } b.hidden = true; redrawPicker(false); return; }
   if (a === 'pk-close') { OPK.open = false; OPK.line = -1; OPK.q = ''; OR.lines = OR.lines.filter((x, i) => x.purchaseId || OR.lines.length === 1); }
   if (a === 'pk-add') { pickerAdd(b.dataset.o.slice(7)); drawOrder(); if (OPK.open) { const q = $('#pk_q'); if (q) q.focus(); } return; }
   if (a === 'del-line') OR.lines.splice(+arg, 1);
@@ -510,7 +511,7 @@ function pickerHTML(R) {
   const stores = [...new Set(all.filter(l => l.left > 0).map(l => storeOf(l.p)))].sort();
   const cats = [...new Set(all.filter(l => l.left > 0).map(l => l.p.category || 'Other'))].sort();
   return `<div class="picker" id="o_picker">
-    <div class="pkbar"><input type="search" id="pk_q" placeholder="${OPK.line >= 0 ? 'Search the product for this line…' : 'Search name, brand or barcode… (Enter adds the first)'}" value="${esc(OPK.q)}" autocomplete="off" enterkeyhint="done">
+    <div class="pkbar"><span class="srch"><input type="search" id="pk_q" placeholder="${OPK.line >= 0 ? 'Search the product for this line…' : 'Search name, brand or barcode…'}" value="${esc(OPK.q)}" autocomplete="off" enterkeyhint="done"><button type="button" class="srchx" data-o="pk-clear" aria-label="Clear search" title="Clear search"${OPK.q ? '' : ' hidden'}>×</button></span>
       <button type="button" class="btn sm" data-o="pk-close">Done</button></div>
     <div class="pkf">
       <select data-pk="box">${opt('', 'All boxes', OPK.box)}${boxes.map(s => opt(s.id, s.name, OPK.box)).join('')}</select>
@@ -518,7 +519,8 @@ function pickerHTML(R) {
       <select data-pk="cat">${opt('', 'All categories', OPK.cat)}${cats.map(c => opt(c, c, OPK.cat)).join('')}</select>
       <select data-pk="sort">${[['name', 'Sort: name'], ['brand', 'Sort: brand'], ['stock', 'Sort: most in stock'], ['newest', 'Sort: newest'], ['price', 'Sort: price']].map(([v, t]) => opt(v, t, OPK.sort)).join('')}</select>
     </div>
-    <div id="pk_list">${pickerList(R)}</div></div>`;
+    <div id="pk_list">${pickerList(R)}</div>
+    <p class="pkhint">Tap a product to add one; tap again for one more. Enter adds the first match.</p></div>`;
 }
 function pickerList(R) {
   const rows = pickerLots(R), show = rows.slice(0, 60);
@@ -546,7 +548,7 @@ function redrawPicker(keepFocus) {
   const R = calc(), box = $('#pk_list'); if (box) box.innerHTML = pickerList(R);
   if (keepFocus) { const q = $('#pk_q'); if (q) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) { } } }
 }
-document.addEventListener('input', e => { if (e.target.id !== 'pk_q') return; OPK.q = e.target.value; redrawPicker(false); });
+document.addEventListener('input', e => { if (e.target.id !== 'pk_q') return; OPK.q = e.target.value; const x = e.target.parentNode.querySelector('.srchx'); if (x) x.hidden = !OPK.q; redrawPicker(false); });
 document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.pk; if (!k) return; e.stopPropagation(); OPK[k] = e.target.value; redrawPicker(true); }, true);
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'pk_q') return;
