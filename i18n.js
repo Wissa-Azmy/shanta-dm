@@ -829,9 +829,10 @@ rx(/^, which isn’t linked to either partner yet\. Type it as the sign-in email
 Object.assign(AR, { 'Reads by this device today:': 'القراءات من هذا الجهاز اليوم:', '(free: 50,000 a day for both of you together).': '(المجاني: 50,000 يوميًا لكما معًا).',
   'Only changes are downloaded.': 'تُنزَّل التغييرات فقط.', 'Last full download:': 'آخر تنزيل كامل:', 'next one around': 'التالي حوالي',
   'This device downloaded the whole ledger. From the next sync on, only changes are downloaded.': 'نزّل هذا الجهاز الدفتر كاملًا. من المزامنة التالية تُنزَّل التغييرات فقط.' });
-Object.assign(AR, { 'Enter weights': 'أدخل الأوزان', 'est. ✎': 'تقدير ✎', 'from box ✎': 'من الصندوق ✎', 'Save weights': 'حفظ الأوزان', 'Cancel': 'إلغاء',
+Object.assign(AR, { 'est. ✎': 'تقدير ✎', 'from box ✎': 'من الصندوق ✎', 'Save weights': 'حفظ الأوزان', 'Cancel': 'إلغاء',
   'Also for the same product in other boxes': 'وأيضًا لنفس المنتج في الصناديق الأخرى', 'Every product here already has a weight.': 'كل المنتجات هنا لها وزن بالفعل.',
   'Estimated from price: tap to enter the weight': 'تقدير من السعر: اضغط لإدخال الوزن', 'Share of the weighed box: tap to enter the weight': 'نصيب من الصندوق الموزون: اضغط لإدخال الوزن' });
 rx(/^Weights · (.+)$/, (m, n) => `الأوزان · ${n}`); rx(/^Weight · (.+)$/, (m, n) => `الوزن · ${n}`);
 rx(/^Content per unit from the label, in g or ml \(1 ml counts as 1 g\); (\d+)% packaging is added\. Leave a field empty to keep the estimate\.$/, (m, p) => `المحتوى لكل وحدة من الملصق بالجرام أو المل (1 مل = 1 جم)؛ تُضاف ${p}% للتغليف. اترك الحقل فارغًا للإبقاء على التقدير.`);
 rx(/^Weight saved for (\d+) purchases?\. Shipping is split again\.$/, (m, n) => `حُفظ الوزن لـ ${n} من المشتريات. أُعيد توزيع الشحن.`);
+rx(/^(.+): tap to enter the weights$/, (m, t) => `${tr(t)}: اضغط لإدخال الأوزان`);

@@ -102,11 +102,13 @@ V.shipments = R => {
       <dt>Shipping &amp; other costs</dt><dd>${fEUR(x.costs)}${x.goods ? `<span class="kvnote"> · ${Math.round(x.costs / x.goods * 100)}% of goods</span>` : ""}</dd>
       ${x.byWeight ? (() => { const kn = items.filter(p => num(p.netG) > 0), un = items.filter(p => !(num(p.netG) > 0)), u = a => a.reduce((t, p) => t + num(p.qty), 0);
         const tag = (t, cls, tip) => `<span class="pill ${cls}" title="${tip}">${t}</span>`;
+        /* tap the tag to type the missing weights, as on the Stock page */
+        const wtag = (t, cls, tip) => `<button type="button" class="pill pillbtn ${cls}" title="${tip}: tap to enter the weights" data-weights="${s.id}">${t} ✎</button>`;
         const row = (list, g, t) => list.length ? `<dt class="kvsub">${list.length} product${list.length === 1 ? "" : "s"} <span>· ${u(list)} unit${u(list) === 1 ? "" : "s"}</span></dt><dd class="kvsub">${g} ${t}</dd>` : "";
         const total = x.measuredG || x.grams;
         return `<dt>Shipping weight</dt><dd>${fG(total)} ${x.measuredG ? tag("weighed", "ok", "Packed box on the scale") : tag("calculated", "", "Sum of the products below")}</dd>` +
           row(kn, fG(x.wG), tag("label", "", "Content weight from the receipt or label + " + num(db.settings.packagingPct) + "% packaging")) +
-          row(un, x.useRest ? fG(x.rest) : fG(x.grams - x.wG), (x.useRest ? tag("from box", "", "What is left of the weighed box after the products with a label weight") : tag("est.", "warn", "No weight known: estimated from the price")) + (un.length ? ` <button type="button" class="btn sm ghost wbtn" data-weights="${s.id}">Enter weights</button>` : "")) +
+          row(un, x.useRest ? fG(x.rest) : fG(x.grams - x.wG), x.useRest ? wtag("from box", "", "What is left of the weighed box after the products with a label weight") : wtag("est.", "warn", "No weight known: estimated from the price")) +
           `<dt>Shipping per kg</dt><dd>${fEUR(x.costs / total * 1000)}</dd>`; })() : `<dt>Shipping split</dt><dd>by price <span class="pill" title="No product weights and the box was not weighed">no weights</span></dd>`}
       <dt>Sold / given away</dt><dd>${x.goods ? Math.round(x.consumed / x.goods * 100) : 0}% of value</dd></dl>
       ${x.tooLight ? `<div class="wnote bad">The weighed box (${fG(x.measuredG)}) is lighter than its products’ calculated weight (${fG(x.wG)}). Check the box weight, the product weights or the packaging %.</div>` : ""}
