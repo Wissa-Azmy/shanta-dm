@@ -83,7 +83,10 @@ const SCHEMAS = {
       if (old) { const used = db.sales.filter(s => s.purchaseId === old.id).reduce((a, s) => a + num(s.qty), 0); if (num(v.qty) < used) return `${used} of these are already sold or given away, so quantity can’t be lower than that.`; }
       if (v.ean && !eanOK(normEan(v.ean))) return 'That barcode doesn’t look right. Check the digits (8 or 13 numbers).';
     },
-    beforeSave(v) { if (!num(v.netG)) v.netG = parseWeightG(v.product) || ''; v.ean = v.ean ? normEan(v.ean) : ''; },
+    beforeSave(v) { v.ean = v.ean ? normEan(v.ean) : '';
+      /* no weight typed: the same product's weight from an earlier purchase, else the one in its name */
+      if (!num(v.netG)) { const k = s => String(s || '').trim().toLowerCase(), p = db.purchases.filter(p => p.id !== v.id && num(p.netG) > 0 && ((v.ean && p.ean === v.ean) || (k(p.product) === k(v.product) && k(p.brand) === k(v.brand)))).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+        v.netG = p ? num(p.netG) : parseWeightG(v.product) || ''; } },
     afterSave(rec) { if (rec.ean) linkEan([rec.id], rec.ean, true); },
     canDelete: rec => db.sales.some(s => s.purchaseId === rec.id) ? 'This product has sales recorded. Delete those sales first.' : null
   },

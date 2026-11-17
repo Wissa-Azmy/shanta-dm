@@ -232,7 +232,13 @@ function drawReceipt() {
 function loadText(text, fileName) {
   const r = parseReceipt(text, fileName);
   /* a barcode from the receipt that is already in the ledger: use that product's name, so stock and scanning see one product */
-  r.items.forEach(x => { const k = x.ean && db.purchases.find(p => p.ean === x.ean); if (k) Object.assign(x, { brand: k.brand || '', product: k.product, category: k.category || x.category, netG: num(k.netG) || x.netG, known: true }); });
+  r.items.forEach(x => { const k = x.ean && db.purchases.find(p => p.ean === x.ean); if (k) Object.assign(x, { brand: k.brand || '', product: k.product, category: k.category || x.category, known: true }); });
+  /* a weight typed before for the same product (same barcode, or same brand and name) is used again,
+     the latest one first; it wins over a weight guessed from the receipt text only when that found none */
+  const nk = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const weightOf = x => { const ps = db.purchases.filter(p => num(p.netG) > 0 && ((x.ean && p.ean === x.ean) || (nk(p.product) === nk(x.product) && nk(p.brand) === nk(x.brand))));
+    ps.sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))); return ps.length ? num(ps[0].netG) : 0; };
+  r.items.forEach(x => { const g = weightOf(x); if (g && (x.known || !num(x.netG))) x.netG = g; });
   if (!r.items.length) { RX.err = 'No product lines were found. Try pasting the receipt text instead. Photos or scans of paper receipts can’t be read; use the eBon PDF from the dm or Rossmann app.'; RX.busy = false; drawReceipt(); return; }
   Object.assign(RX, r, { err: '', busy: false });
   Object.assign(RX.o, { date: r.meta.date || RX.o.date, receipt: r.meta.invoice || r.meta.order || '', method: r.meta.method || RX.o.method, store: r.meta.store || 'dm', place: r.meta.online ? 'dm.de (online)' : db.settings.cityDE });
