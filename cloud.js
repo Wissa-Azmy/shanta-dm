@@ -144,6 +144,35 @@ function fb() {
   })().catch(e => { fb.p = null; throw e; }));
 }
 const docRef = (l, c, id) => F.S.doc(F.fs, 'ledgers', l, c, id);
+
+/* ---- sales: one document per sale ----
+   Inside the app a sale is still one record per product line (orderId ties them together). In Firestore each
+   sale is one document, named after the sale (orderId, or the line's id for a one-line sale): what all its lines
+   share (date, customer, payment…) is stored once, and each product in `lines`. One write per sale instead of
+   one per product. Older one-document-per-line entries are still read, and moved to this form once */
+const saleKey = r => r.orderId || r.id;
+function packSale(lines) {
+  const keys = new Set(), head = {};
+  lines.forEach(r => Object.keys(r).forEach(k => keys.add(k)));
+  keys.forEach(k => { if (k === 'id' || k === 'lines') return; const v = stable(lines[0][k]); if (lines.every(r => k in r && stable(r[k]) === v)) head[k] = lines[0][k]; });
+  head.lines = lines.map(r => { const o = {}; Object.keys(r).forEach(k => { if (!(k in head) || k === 'id') o[k] = r[k]; }); return o; });
+  return head;
+}
+/* a Firestore document → [id, record] for each entry in it */
+function entriesOf(c, id, data) {
+  if (c === 'sales' && Array.isArray(data.lines)) {
+    const h = Object.assign({}, data); delete h.lines; delete h._t;
+    return data.lines.filter(x => x && x.id).map(x => { const r = Object.assign({}, h, x); return [r.id, r]; });
+  }
+  return [[id, cleanDoc(data, id)]];
+}
+/* entries ({id: stable}) → the documents that store them */
+function docsOf(c, coll) {
+  if (c !== 'sales') return Object.entries(coll).map(([id, s]) => [id, JSON.parse(s)]);
+  const by = {};
+  Object.values(coll).forEach(s => { const r = JSON.parse(s), k = saleKey(r); (by[k] = by[k] || []).push(r); });
+  return Object.entries(by).map(([k, ls]) => [k, packSale(ls)]);
+}
 const setRef = l => F.S.doc(F.fs, 'ledgers', l, 'meta', 'settings');
 const infoRef = l => F.S.doc(F.fs, 'ledgers', l, 'meta', 'info');
 const backupsCol = () => F.S.collection(F.fs, 'ledgers', CLOUD.ledger, 'backups');
@@ -162,7 +191,7 @@ const Cloud = {
   /* the last state this device saw confirmed by the server: anything in db that differs from it
      was changed here and is (re)sent when the app connects */
   base: JSON.parse(localStorage.getItem('shanta-cloud-base') || 'null'),
-  remote: null, ready: false, state: 'off', msg: '', last: null, busy: false, unsubs: [], backups: null, dellog: {}, unstamped: {}, since: {}, fullAt: 0,
+  remote: null, ready: false, state: 'off', msg: '', last: null, busy: false, unsubs: [], backups: null, dellog: {}, unstamped: {}, since: {}, fullAt: 0, src: null, docLines: null, legacy: new Set(),
   on() { return !!(this.cfg && this.cfg.fs); },
   /* signed in with the previous version of the app: needs to sign in once more */
   legacy() { return !!(this.cfg && !this.cfg.fs); },
@@ -171,7 +200,11 @@ const Cloud = {
   saveBase() { clearTimeout(this.bt); this.bt = setTimeout(() => { if (!this.ready || !this.on()) return;
     localStorage.setItem('shanta-cloud-base', JSON.stringify(this.base));
     /* where to continue next time: saved together with the copy it belongs to */
-    if (!this.isBackup() && this.fullAt) localStorage.setItem(SYNC_KEY, JSON.stringify({ ledger: this.ledger(), since: this.since, full: this.fullAt }));
+    if (!this.isBackup() && this.fullAt) {
+      /* which sale document each sale line is in (only those not stored under their own id) */
+      const src = {}; Object.entries((this.src && this.src.sales) || {}).forEach(([id, d]) => { if (d !== id && id in this.base.sales) src[id] = d; });
+      localStorage.setItem(SYNC_KEY, JSON.stringify({ v: 2, ledger: this.ledger(), since: this.since, full: this.fullAt, src, legacy: [...(this.legacy || [])] }));
+    }
     else localStorage.removeItem(SYNC_KEY); }, 800); },
   set(state, msg) { this.state = state; this.msg = msg || ''; renderFile(); cloudBanner(); const c = $('#cloudcard'); if (c) { if (this.on() !== (c.dataset.mode === 'on')) { c.outerHTML = this.settingsHTML(); this.fillBackups(); } else { const m = $('#cl_msg'); if (m) { m.textContent = this.msg; m.hidden = !this.msg; } } } const gm = $("#g_msg"); if (gm) { gm.textContent = this.msg; gm.hidden = !this.msg; } const lm = $("#ldmsg"); if (lm && this.msg) lm.textContent = this.msg; },
 
@@ -289,13 +322,17 @@ const Cloud = {
     else if (wasReady || !this.base0) this.base0 = this.base ? cloneSnap(this.base) : null;
     /* only what changed since the last sync, when this device has a complete, recent copy to start from */
     const sy = this.syncInfo(), base0 = this.base0;
-    const delta = !!(base0 && sy && sy.ledger === l && Date.now() - num(sy.full) < FULL_EVERY && !this.isBackup()
+    const delta = !!(base0 && sy && sy.v === 2 && sy.ledger === l && Date.now() - num(sy.full) < FULL_EVERY && !this.isBackup()
       && this.info && this.info.stampedAt && COLLS.every(c => typeof sy.since[c] === 'number'));
     this.mode = delta ? 'delta' : 'full';
     this.since = delta ? Object.assign({}, sy.since) : {}; COLLS.forEach(c => { if (typeof this.since[c] !== 'number') this.since[c] = 0; });
     this.fullAt = delta ? num(sy.full) : 0;
     this.unstamped = {}; this.dellog = {};
+    /* which Firestore document each entry lives in (a sale document holds several entries) */
+    this.src = {}; this.docLines = {}; COLLS.forEach(c => { this.src[c] = {}; this.docLines[c] = {}; });
+    this.legacy = new Set(delta ? sy.legacy || [] : []);
     this.remote = delta ? cloneSnap(base0) : emptySnap(); this.base = delta ? cloneSnap(base0) : emptySnap();
+    if (delta) { const ex = sy.src || {}; COLLS.forEach(c => Object.keys(this.remote[c]).forEach(id => this.link(c, id, (c === 'sales' && ex[id]) || id))); }
     const seen = {};
     const done = k => { got[k] = true; if (!this.ready && ['settings', 'deleted'].concat(COLLS).every(x => got[x])) this.becomeReady(); };
     /* a listener that fails stops for good: start them all again after a pause, instead of waiting for a
@@ -313,13 +350,13 @@ const Cloud = {
       this.unsubs.push(S.onSnapshot(q, { includeMetadataChanges: true }, snap => {
         Reads.snap(snap, seen, c, !delta);
         snap.docChanges({ includeMetadataChanges: true }).forEach(ch => {
-          const id = ch.doc.id;
+          const id = ch.doc.id, ok = !ch.doc.metadata.hasPendingWrites;
           /* with "changed since", leaving the answer isn't a deletion (meta/deleted says what was deleted) */
-          if (ch.type === 'removed') { if (!delta) { delete this.remote[c][id]; delete this.base[c][id]; } return; }
-          const data = ch.doc.data(), t = tMs(data._t), s = stable(cleanDoc(data, id));
-          this.remote[c][id] = s;
-          if (!ch.doc.metadata.hasPendingWrites) {
-            this.base[c][id] = s;
+          if (ch.type === 'removed') { if (!delta) { this.dropDoc(c, id, true); if (c === 'sales') this.legacy.delete(id); } return; }
+          const data = ch.doc.data(), t = tMs(data._t);
+          this.putDoc(c, id, entriesOf(c, id, data), ok);
+          if (c === 'sales') { if (Array.isArray(data.lines)) this.legacy.delete(id); else this.legacy.add(id); }
+          if (ok) {
             if (t > this.since[c]) this.since[c] = t;
             if (!t) this.unstamped[c + '/' + id] = 1; else delete this.unstamped[c + '/' + id];
           }
@@ -339,10 +376,23 @@ const Cloud = {
     this.unsubs.push(S.onSnapshot(delRef(l), { includeMetadataChanges: true }, d => {
       Reads.snap(d, seen, 'deleted', true);
       this.dellog = d.exists() ? d.data() : {};
-      COLLS.forEach(c => Object.keys(this.dellog[c] || {}).forEach(id => { delete this.remote[c][id]; if (!d.metadata.hasPendingWrites) delete this.base[c][id]; }));
+      COLLS.forEach(c => Object.keys(this.dellog[c] || {}).forEach(id => { this.dropDoc(c, id, !d.metadata.hasPendingWrites); if (c === 'sales') this.legacy.delete(id); }));
       if (!d.metadata.fromCache) done('deleted');
       this.changed('deleted');
     }, fail));
+  },
+  /* entry ↔ document bookkeeping */
+  link(c, id, d) { const o = this.src[c][id]; if (o === d) return; if (o && this.docLines[c][o]) this.docLines[c][o].delete(id); this.src[c][id] = d; (this.docLines[c][d] = this.docLines[c][d] || new Set()).add(id); },
+  unlink(c, id) { const o = this.src[c][id]; if (o && this.docLines[c][o]) this.docLines[c][o].delete(id); delete this.src[c][id]; },
+  /* a document arrived: its entries replace what came from it before. Entries it no longer holds are dropped
+     from the cloud's copy; from the confirmed copy (base) only once the server has confirmed it */
+  putDoc(c, d, entries, ok) {
+    const now = new Set(entries.map(e => e[0]));
+    [...(this.docLines[c][d] || [])].forEach(id => { if (!now.has(id) && this.src[c][id] === d) { delete this.remote[c][id]; if (ok) { delete this.base[c][id]; this.unlink(c, id); } } });
+    entries.forEach(([id, rec]) => { const s = stable(rec); this.remote[c][id] = s; if (ok) this.base[c][id] = s; this.link(c, id, d); });
+  },
+  dropDoc(c, d, ok) {
+    [...(this.docLines[c][d] || [])].forEach(id => { if (this.src[c][id] !== d) return; delete this.remote[c][id]; if (ok) { delete this.base[c][id]; this.unlink(c, id); } });
   },
   syncInfo() { try { const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); return s && s.since ? s : null; } catch (e) { return null; } },
   /* once per full download: give entries without a change time one (needed for "changed since"),
@@ -352,7 +402,9 @@ const Cloud = {
     this.tidying = true;
     try {
       const l = this.ledger(), S = F.S, ts = S.serverTimestamp(), ops = [];
-      Object.keys(this.unstamped).forEach(k => { const [c, id] = k.split('/'); if (id in this.base[c]) ops.push(b => b.update(docRef(l, c, id), { _t: ts })); });
+      /* once: sales stored one document per product line become one document per sale (a backup first) */
+      if (this.legacy.size && !this.moving) await this.moveSales();
+      Object.keys(this.unstamped).forEach(k => { const [c, id] = k.split('/'); if (c === 'sales' && this.legacy.has(id)) return; if (this.docLines[c][id] && this.docLines[c][id].size) ops.push(b => b.update(docRef(l, c, id), { _t: ts })); });
       const old = {}, cut = Date.now() - DEL_KEEP;
       COLLS.forEach(c => Object.entries(this.dellog[c] || {}).forEach(([id, t]) => { const m = tMs(t); if (m && m < cut) (old[c] = old[c] || {})[id] = S.deleteField(); }));
       if (Object.keys(old).length) ops.push(b => b.set(delRef(l), old, { merge: true }));
@@ -364,6 +416,19 @@ const Cloud = {
       }
     } catch (e) { console.warn('tidy', e); }
     this.tidying = false;
+  },
+  async moveSales() {
+    this.moving = true;
+    try {
+      const ids = new Set(); this.legacy.forEach(d => (this.docLines.sales[d] || []).forEach(id => { if (id in this.remote.sales) ids.add(id); }));
+      if (!ids.size) return;
+      const name = await this.snapshot('Automatic backup before storing each sale as one document');
+      const patch = {}; ids.forEach(id => patch['sales/' + id] = JSON.parse(this.remote.sales[id]));
+      this.quiet = true; this.write(patch, true); this.quiet = false;
+      await within(F.S.setDoc(infoRef(this.ledger()), { salesDocs: 2, salesMovedAt: new Date().toISOString(), salesBackup: name || '' }, { merge: true }), 30000, offlineMsg);
+      toast(`Sales are now stored one document per sale (${new Set([...ids].map(id => saleKey(JSON.parse(this.remote.sales[id])))).size} sales). A backup was made first.`);
+    } catch (e) { console.warn('moving sales', e); }
+    finally { this.moving = false; this.quiet = false; }
   },
   /* first complete picture from the server: merge in what this device changed while it wasn't connected */
   becomeReady() {
@@ -456,17 +521,38 @@ const Cloud = {
     Object.keys(patch).forEach(k => { const [c, id] = k.split('/'); const dk = c + '/' + id;
       keep[dk] = c === 'settings' ? (id in this.remote.settings ? JSON.parse(this.remote.settings[id]) : null) : (id in this.remote[c] ? JSON.parse(this.remote[c][id]) : null); });
     if (!this.isBackup()) Outbox.add(l, keep);
-    const what = describePatch(patch), job = what ? SaveStatus.start(what) : 0;
+    const what = this.quiet ? '' : describePatch(patch), job = what ? SaveStatus.start(what) : 0;
     let parts = 0, failed = false;
     Object.entries(patch).forEach(([k, v]) => {
       const [c, id, f] = k.split('/'), dk = c + '/' + id;
+      if (c === 'sales') return;   // whole sale documents, below
       if (c === 'settings') st[id] = v === null ? S.deleteField() : v;
       else if (f === undefined) {
-        if (v === null) { ops.push({ k: dk, f: b => b.delete(docRef(l, c, id)) }); mark(c, id, ts); }
-        else { ops.push({ k: dk, f: b => b.set(docRef(l, c, id), Object.assign({}, v, { _t: ts })) }); if (this.dellog[c] && id in this.dellog[c]) mark(c, id, S.deleteField()); }
+        if (v === null) { ops.push({ k: dk, f: b => b.delete(docRef(l, c, id)) }); mark(c, id, ts); this.unlink(c, id); }
+        else { ops.push({ k: dk, f: b => b.set(docRef(l, c, id), Object.assign({}, v, { _t: ts })) }); if (this.dellog[c] && id in this.dellog[c]) mark(c, id, S.deleteField()); this.link(c, id, id); }
       }
       else { const d = docs[dk] || (docs[dk] = { c, id, v: { _t: ts } }); d.v[f] = v === null ? S.deleteField() : v; }
     });
+    /* sales: every sale touched is written again as one whole document (with all its lines); a sale left with
+       no lines is deleted; an older one-line document whose line now sits in a sale document goes */
+    const saleDocs = new Map(), addTo = (d, dk) => { if (d) (saleDocs.get(d) || saleDocs.set(d, new Set()).get(d)).add(dk); };
+    Object.keys(patch).forEach(k => { const [c, id] = k.split('/'); if (c !== 'sales') return;
+      addTo(this.src.sales[id], 'sales/' + id); if (id in this.remote.sales) addTo(saleKey(JSON.parse(this.remote.sales[id])), 'sales/' + id); });
+    if (saleDocs.size) {
+      const byKey = {};
+      Object.values(this.remote.sales).forEach(s => { const r = JSON.parse(s), k = saleKey(r); (byKey[k] = byKey[k] || []).push(r); });
+      [...saleDocs.keys()].forEach(d => (byKey[d] || []).forEach(r => { const o = this.src.sales[r.id]; if (o && o !== d && !saleDocs.has(o)) saleDocs.set(o, new Set()); }));
+      saleDocs.forEach((keys, d) => {
+        const lines = byKey[d] || [];
+        if (lines.length) {
+          const data = Object.assign(packSale(lines), { _t: ts });
+          ops.push({ k: [...keys], f: b => b.set(docRef(l, 'sales', d), data) });
+          if (this.dellog.sales && d in this.dellog.sales) mark('sales', d, S.deleteField());
+        } else { ops.push({ k: [...keys], f: b => b.delete(docRef(l, 'sales', d)) }); mark('sales', d, ts); }
+      });
+      saleDocs.forEach((k, d) => (byKey[d] || []).forEach(r => this.link('sales', r.id, d)));
+      Object.keys(patch).forEach(k => { const [c, id] = k.split('/'); if (c === 'sales' && !(id in this.remote.sales)) this.unlink('sales', id); });
+    }
     Object.entries(docs).forEach(([dk, d]) => ops.push({ k: dk, f: b => b.set(docRef(l, d.c, d.id), d.v, { merge: true }) }));
     if (Object.keys(st).length) ops.push({ k: Object.keys(st).map(id => 'settings/' + id), f: b => b.set(setRef(l), st, { merge: true }) });
     if (Object.keys(gone).length) ops.push({ k: [], f: b => b.set(delRef(l), gone, { merge: true }) });
@@ -523,7 +609,9 @@ const Cloud = {
   /* a whole ledger from the server */
   async readLedger(l) {
     const o = emptySnap();
-    for (const c of COLLS) { const q = await within(F.S.getDocsFromServer(F.S.collection(F.fs, 'ledgers', l, c)), 30000, offlineMsg); Reads.add(Math.max(1, q.size)); q.forEach(d => o[c][d.id] = stable(cleanDoc(d.data(), d.id))); }
+    o.docIds = {};
+    for (const c of COLLS) { const q = await within(F.S.getDocsFromServer(F.S.collection(F.fs, 'ledgers', l, c)), 30000, offlineMsg); Reads.add(Math.max(1, q.size));
+      o.docIds[c] = q.docs.map(d => d.id); q.forEach(d => entriesOf(c, d.id, d.data()).forEach(([id, r]) => o[c][id] = stable(r))); }
     const s = await within(F.S.getDocFromServer(setRef(l)), 30000, offlineMsg);
     o.settings = snapSettings(s.exists() ? s.data() : {});
     return o;
@@ -532,12 +620,12 @@ const Cloud = {
   /* ---- backups: a backup is a full copy stored as its own ledger, listed in ledgers/shared/backups ---- */
   async snapshot(reason, src, from = this.ledger()) {
     src = src || (this.ready && from === this.ledger() ? cloneSnap(this.remote) : await this.readLedger(from));
-    const counts = {}; COLLS.forEach(c => counts[c] = Object.keys(src[c]).length);
+    const docs = {}, counts = {}; COLLS.forEach(c => { docs[c] = docsOf(c, src[c]); counts[c] = docs[c].length; });
     if (!COLLS.some(c => counts[c])) return null;
     const d = new Date(), p = n => String(n).padStart(2, '0');
     const name = `backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
     const ops = [];
-    COLLS.forEach(c => Object.entries(src[c]).forEach(([id, s]) => ops.push(b => b.set(docRef(name, c, id), JSON.parse(s)))));
+    COLLS.forEach(c => docs[c].forEach(([id, data]) => ops.push(b => b.set(docRef(name, c, id), data))));
     const st = {}; Object.entries(src.settings).forEach(([k, v]) => st[k] = JSON.parse(v));
     ops.push(b => b.set(setRef(name), st));
     ops.push(b => b.set(infoRef(name), { backupOf: from, createdAt: d.toISOString(), by: this.cfg.email, reason }));
@@ -555,7 +643,7 @@ const Cloud = {
       const name = await this.snapshot(reason);
       const l = this.ledger(), ops = [];
       const gone = {}, ts = F.S.serverTimestamp();
-      COLLS.forEach(c => Object.keys(this.remote[c]).forEach(id => { ops.push(b => b.delete(docRef(l, c, id))); (gone[c] = gone[c] || {})[id] = ts; }));
+      COLLS.forEach(c => Object.keys(this.docLines[c]).filter(d => this.docLines[c][d].size).forEach(id => { ops.push(b => b.delete(docRef(l, c, id))); (gone[c] = gone[c] || {})[id] = ts; }));
       if (Object.keys(gone).length) ops.push(b => b.set(delRef(l), gone, { merge: true }));
       await this.writeAll(ops);
       COLLS.forEach(c => { db[c] = []; this.remote[c] = {}; }); persistLocal();
@@ -582,8 +670,9 @@ const Cloud = {
       await this.snapshot(`Automatic backup before restoring the backup from ${when ? fDateTime(when.createdAt) : name}`, live, CLOUD.ledger);
       const ops = [], gone = {}, ts = F.S.serverTimestamp();
       COLLS.forEach(c => {
-        Object.keys(live[c]).forEach(id => { if (!(id in src[c])) { ops.push(b => b.delete(docRef(CLOUD.ledger, c, id))); (gone[c] = gone[c] || {})[id] = ts; } });
-        Object.entries(src[c]).forEach(([id, s]) => ops.push(b => b.set(docRef(CLOUD.ledger, c, id), Object.assign(JSON.parse(s), { _t: ts }))));
+        const put = docsOf(c, src[c]), keepIds = new Set(put.map(d => d[0]));
+        (live.docIds[c] || []).forEach(id => { if (!keepIds.has(id)) { ops.push(b => b.delete(docRef(CLOUD.ledger, c, id))); (gone[c] = gone[c] || {})[id] = ts; } });
+        put.forEach(([id, data]) => ops.push(b => b.set(docRef(CLOUD.ledger, c, id), Object.assign(data, { _t: ts }))));
       });
       const st = {}; Object.entries(src.settings).forEach(([k, v]) => st[k] = JSON.parse(v));
       if (Object.keys(st).length) ops.push(b => b.set(setRef(CLOUD.ledger), st));

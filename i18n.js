@@ -849,3 +849,4 @@ Object.assign(AR, { 'Saving…': 'جارٍ الحفظ…', 'Saved': 'تم الح
   'The connection is slow. It’s kept on this device until it arrives.': 'الاتصال بطيء. يبقى على هذا الجهاز حتى يصل.',
   'You’re offline. It’s sent automatically when the connection is back.': 'أنت غير متصل. يُرسل تلقائيًا عند عودة الاتصال.' });
 rx(/^It’s kept on this device and sent again automatically\.(.*)$/, (m, rest) => `محفوظ على هذا الجهاز ويُرسل مجددًا تلقائيًا.${rest ? ' ' + tr(rest.trim()) : ''}`);
+rx(/^Sales are now stored one document per sale \((\d+) sales\)\. A backup was made first\.$/, (m, n) => `صارت المبيعات تُحفظ مستندًا واحدًا لكل عملية بيع (${n} عملية). أُخذت نسخة احتياطية أولًا.`);
