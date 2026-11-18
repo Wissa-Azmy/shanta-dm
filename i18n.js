@@ -858,3 +858,14 @@ rx(/^(\d+) left$/, (m, n) => `${n} متبقٍ`);
 rx(/^No product in stock matches(?: “(.+)”)?\.$/, (m, q) => q ? `لا يوجد منتج في المخزون يطابق «${q}».` : 'لا يوجد منتج في المخزون يطابق.');
 rx(/^(\d+) more: type more of the name to narrow it down\.$/, (m, n) => `${n} أخرى: اكتب المزيد من الاسم لتضييق البحث.`);
 Object.assign(AR, { 'Search name, brand or barcode…': 'ابحث بالاسم أو الماركة أو الباركود…', 'Tap a product to add one; tap again for one more. Enter adds the first match.': 'اضغط على منتج لإضافة واحد، واضغط مجددًا لإضافة آخر. Enter يضيف أول نتيجة.' });
+Object.assign(AR, { 'Sign-in methods: Google and password': 'طرق تسجيل الدخول: جوجل وكلمة المرور', 'Google': 'جوجل', 'Email and password': 'البريد الإلكتروني وكلمة المرور',
+  'Email address verified': 'تم التحقق من البريد الإلكتروني', 'Add Google sign-in': 'أضف تسجيل الدخول بجوجل', 'Send verification email': 'أرسل رسالة التحقق',
+  'New password': 'كلمة مرور جديدة', 'Password to add': 'كلمة المرور المراد إضافتها', 'Repeat the password': 'كرّر كلمة المرور', 'Change password': 'غيّر كلمة المرور', 'Add a password': 'أضف كلمة مرور',
+  'on': 'مفعّل', 'off': 'غير مفعّل', 'yes': 'نعم', 'no': 'لا',
+  'Add Google here, not on the sign-in screen.': 'أضف جوجل من هنا، وليس من شاشة تسجيل الدخول.',
+  'Until the email is verified, signing in with Google there replaces the password.': 'إلى أن يتم التحقق من البريد، تسجيل الدخول بجوجل هناك يلغي كلمة المرور.',
+  'The password needs at least 6 characters.': 'كلمة المرور تحتاج 6 أحرف على الأقل.', 'The two passwords are different.': 'كلمتا المرور مختلفتان.',
+  'Password changed.': 'تم تغيير كلمة المرور.', 'Password added. You can now also sign in with this email and password.': 'تمت إضافة كلمة المرور. يمكنك الآن أيضًا الدخول بهذا البريد وكلمة المرور.',
+  'Google sign-in added. Google and the password now both open this account.': 'تمت إضافة الدخول بجوجل. جوجل وكلمة المرور يفتحان الآن هذا الحساب.',
+  'The browser blocked the Google window. Allow pop-ups for this site and try again.': 'المتصفح منع نافذة جوجل. اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مجددًا.',
+  'The Google window closed before finishing.': 'أُغلقت نافذة جوجل قبل الانتهاء.', 'This sign-in method is already on.': 'طريقة الدخول هذه مفعّلة بالفعل.' });

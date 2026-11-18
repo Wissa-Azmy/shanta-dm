@@ -862,6 +862,7 @@ service cloud.firestore {
       <p class="note">Signed in as <b>${esc(whoAmI() ? pname(whoAmI()) + ' (' + userName(this.cfg.email) + ')' : userName(this.cfg.email))}</b>. Changes appear on ${esc(partnerName())}’s phone within seconds. Without internet everything keeps working: changes are saved on this device and sent when the connection is back. The file on disk still works as an extra backup.</p>
       ${this.msg ? `<p class="note"><b>${esc(this.msg)}</b></p>` : ''}
       <div class="topact"><button class="btn" data-act="cloud-sync">Sync now</button><button class="btn ghost" data-act="cloud-off">Sign out on this device</button></div>
+      <details class="admin" id="signins"><summary>Sign-in methods: Google and password</summary><div class="silist"></div></details>
       ${this.usageHTML()}
       <div id="cl_backups"></div>
       ${this.adminHTML()}</div>`;
@@ -1190,3 +1191,91 @@ const SaveStatus = {
   close() { const b = document.getElementById('savestat'); if (!b) return; b.classList.remove('on'); try { if (b.matches(':popover-open')) b.hidePopover(); } catch (e) { } this.cur = 0; }
 };
 document.addEventListener('click', e => { if (e.target.closest('[data-ssclose]')) SaveStatus.close(); });
+
+/* ---------- sign-in methods: Google and a password on the same account ----------
+   Both sit on one Firebase account (same email), so the access rules treat them the same. Adding Google here,
+   while signed in, is the safe way: the first Google sign-in on the sign-in screen for an unverified password
+   account lets Google take the account over, and the password stops working */
+const SignIns = {
+  user() { return F && F.auth && F.auth.currentUser; },
+  has(u, p) { return !!(u && u.providerData.some(x => x.providerId === p)); },
+  async draw(msg, bad) {
+    const box = document.querySelector('#signins .silist'); if (!box) return;
+    const u = this.user();
+    if (!u) { box.innerHTML = '<p class="note">Connecting to the cloud… Open this again in a moment.</p>'; return; }
+    try { await u.reload(); } catch (e) { }
+    const g = this.has(u, 'google.com'), pw = this.has(u, 'password'), ok = u.emailVerified;
+    const row = (on, name, end) => `<li><span>${on ? '✓' : '–'} <span>${name}</span></span>${end}</li>`;
+    box.innerHTML = `<p class="note">Both open the same account (<b class="notr">${esc(u.email || '')}</b>) and the same ledger.</p>
+      <ul class="mini sirows">
+        ${row(g, 'Google', g ? '<span class="pill ok">on</span>' : '<button type="button" class="btn sm" data-si="google">Add Google sign-in</button>')}
+        ${row(pw, 'Email and password', pw ? '<span class="pill ok">on</span>' : '<span class="pill">off</span>')}
+        ${row(ok, 'Email address verified', ok ? '<span class="pill ok">yes</span>' : pw ? '<button type="button" class="btn sm ghost" data-si="verify">Send verification email</button>' : '<span class="pill warn">no</span>')}
+      </ul>
+      ${pw && !g && !ok ? '<p class="note"><b>Add Google here, not on the sign-in screen.</b> Until the email is verified, signing in with Google there replaces the password.</p>' : ''}
+      <form class="fgrid" data-siform="1">
+        <div class="f"><label for="si_pw">${pw ? 'New password' : 'Password to add'}</label><input id="si_pw" type="password" autocomplete="new-password"></div>
+        <div class="f"><label for="si_pw2">Repeat the password</label><input id="si_pw2" type="password" autocomplete="new-password"></div>
+        <div class="f span"><button class="btn sm" style="align-self:flex-start">${pw ? 'Change password' : 'Add a password'}</button></div>
+      </form>
+      <div class="${bad ? 'err' : 'note'}" id="si_msg"${msg ? '' : ' hidden'}>${esc(msg || '')}</div>`;
+  },
+  err(e) {
+    if (e && e.si) return e.si;
+    const c = String(e && (e.code || e.message) || e);
+    if (/weak-password/.test(c)) return 'The password needs at least 6 characters.';
+    if (/requires-recent-login/.test(c)) return 'For safety, Firebase wants a fresh sign-in first: sign out on this device, sign in again, then try once more.';
+    if (/credential-already-in-use|email-already-in-use|account-exists/.test(c)) return 'That Google account is already a separate user in Firebase. In Authentication → Users, delete that extra user (not the one with your password), then try again.';
+    if (/provider-already-linked/.test(c)) return 'This sign-in method is already on.';
+    if (/popup-blocked/.test(c)) return 'The browser blocked the Google window. Allow pop-ups for this site and try again.';
+    if (/popup-closed|cancelled-popup/.test(c)) return 'The Google window closed before finishing.';
+    if (/too-many-requests/.test(c)) return 'Too many attempts. Wait a few minutes and try again.';
+    if (/network/.test(c)) return netMsg;
+    return 'That didn’t work: ' + c;
+  },
+  /* changing sign-in methods needs a recent sign-in; with Google on the account, that is one more Google window */
+  async run(fn) {
+    const u = this.user(); if (!u) throw { si: 'Not connected to the cloud yet. Try again in a moment.' };
+    try { return await fn(u); }
+    catch (e) {
+      if (!/requires-recent-login/.test(e.code || '') || !this.has(u, 'google.com')) throw e;
+      const pr = new F.U.GoogleAuthProvider(); pr.setCustomParameters({ login_hint: u.email || '' });
+      await F.U.reauthenticateWithPopup(u, pr);
+      return fn(u);
+    }
+  },
+  async addGoogle() {
+    await this.run(async u => {
+      const pr = new F.U.GoogleAuthProvider(); pr.setCustomParameters({ prompt: 'select_account', login_hint: u.email || '' });
+      const r = await F.U.linkWithPopup(u, pr), gi = r.user.providerData.find(x => x.providerId === 'google.com');
+      /* another Google account would open this ledger under a different email: take it off again */
+      if (gi && gi.email && gi.email.toLowerCase() !== String(u.email || '').toLowerCase()) {
+        await F.U.unlink(u, 'google.com');
+        throw { si: `That was ${gi.email}. Choose the Google account ${u.email} instead.` };
+      }
+    });
+  },
+  async setPassword(pw) {
+    await this.run(u => this.has(u, 'password') ? F.U.updatePassword(u, pw) : F.U.linkWithCredential(u, F.U.EmailAuthProvider.credential(u.email, pw)));
+  }
+};
+document.addEventListener('toggle', e => { if (e.target.id === 'signins' && e.target.open) SignIns.draw(); }, true);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-si]'); if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.si === 'verify') { const u = SignIns.user(); await F.U.sendEmailVerification(u); SignIns.draw(`Sent to ${u.email}. Open the link in it (check spam too), then open this section again.`); }
+    if (b.dataset.si === 'google') { await SignIns.addGoogle(); SignIns.draw('Google sign-in added. Google and the password now both open this account.'); }
+  } catch (x) { console.warn(x); SignIns.draw(SignIns.err(x), true); }
+  finally { b.disabled = false; }
+});
+document.addEventListener('submit', async e => {
+  if (!e.target.closest('[data-siform]')) return;
+  e.preventDefault();
+  const a = $('#si_pw').value, b = $('#si_pw2').value;
+  if (a.length < 6) return SignIns.draw('The password needs at least 6 characters.', true);
+  if (a !== b) return SignIns.draw('The two passwords are different.', true);
+  const had = SignIns.has(SignIns.user(), 'password');
+  try { await SignIns.setPassword(a); SignIns.draw(had ? 'Password changed.' : 'Password added. You can now also sign in with this email and password.'); }
+  catch (x) { console.warn(x); SignIns.draw(SignIns.err(x), true); }
+});

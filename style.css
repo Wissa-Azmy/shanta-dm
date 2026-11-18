@@ -1040,3 +1040,8 @@ dialog[open]{max-height:min(92vh,92dvh);overflow:auto;overscroll-behavior:contai
 .pkpick .sub{display:block;font-size:12px;color:var(--muted)}
 .pkpick+.sub{display:block;margin-top:2px}
 .pkpick:hover b{color:var(--nile)}
+/* settings: sign-in methods */
+#signins .silist{margin-top:10px}
+#signins .sirows li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;min-height:34px}
+#signins .fgrid{margin-top:10px}
+#signins #si_msg{margin-top:8px}
