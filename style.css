@@ -977,7 +977,8 @@ button.pillbtn.warn{background:var(--gold-soft);color:#7a5a12}
 button.pillbtn:hover{filter:brightness(.95)}
 #wdlg .t input{width:90px;text-align:right}
 /* entries the cloud hasn't confirmed yet */
-.pill.unsent{font-size:10.5px;padding:1px 7px;margin-inline-start:6px;vertical-align:1px}
+.pill.unsent{font-size:10.5px;padding:1px 7px;width:max-content;max-width:100%;align-self:flex-start;justify-self:start;box-sizing:border-box;margin-inline-start:6px;vertical-align:1px}
+.gcard .pill.unsent{margin-inline-start:0;margin-top:-2px}
 #cloudbanner .cbn{display:inline-block;margin-inline-start:4px;color:var(--ink)}
 .lclist .mini li{align-items:center;gap:8px}
 /* an open dialog scrolls inside itself; the page behind stays put */

@@ -455,6 +455,8 @@ const Cloud = {
       const waiting = Outbox.items(this.ledger());
       Object.entries(waiting).forEach(([k, v]) => { Object.keys(pending).forEach(p => { if (p.startsWith(k + '/')) delete pending[p]; }); pending[k] = v; });
     }
+    /* deleting something the cloud no longer has changes nothing: leave it out (and out of the question below) */
+    Object.keys(pending).forEach(k => { const [c, id, f] = k.split('/'); if (pending[k] === null && f === undefined && c !== 'settings' && remote[c] && !(id in remote[c])) delete pending[k]; });
     /* many deletions on connecting means this device's copy is behind, not that someone deleted them: ask */
     const dels = Object.keys(pending).filter(k => pending[k] === null && k.split('/').length === 2 && !k.startsWith('settings/') && !Outbox.has(this.ledger(), k));
     if (dels.length >= 10 && !confirm(`This device's copy is missing ${dels.length} entries that are in the shared ledger.\n\nOK = delete them from the shared ledger too\nCancel = keep them (recommended unless you deleted them on purpose while offline)`))
@@ -560,11 +562,21 @@ const Cloud = {
       const part = ops.slice(i, i + 400), b = F.S.writeBatch(F.fs), sent = {};
       part.forEach(o => { o.f(b); [].concat(o.k).forEach(k => { sent[k] = stable(keep[k]); }); });
       parts++;
-      b.commit().then(() => { Outbox.done(l, sent); this.outFail = 0; if (!Outbox.count(l)) cloudBanner(); if (job && !--parts && !failed) SaveStatus.ok(job); })
+      b.commit().then(() => { Outbox.done(l, sent); this.confirmed(sent); this.outFail = 0; if (!Outbox.count(l)) cloudBanner(); if (document.querySelector('.pill.unsent')) render(); if (job && !--parts && !failed) SaveStatus.ok(job); })
         .catch(e => { console.warn(e); this.set('error', fsMsg(e)); this.retryOut(); if (job && !failed) { failed = true; SaveStatus.fail(job, fsMsg(e)); } });
     }
     this.set('syncing');
     clearTimeout(this.wt); this.wt = setTimeout(() => this.settle(), 50);
+  },
+  /* the server accepted a save: it's now the confirmed state too. Without this, a phone put away right after
+     saving kept the old copy as "confirmed", and on reopening the replaced entries looked deleted on this device */
+  confirmed(sent) {
+    if (this.isBackup() || !this.base) return;
+    Object.entries(sent).forEach(([k, s]) => { const [c, id] = k.split('/'), into = c === 'settings' ? this.base.settings : this.base[c], now = c === 'settings' ? this.remote.settings : this.remote[c];
+      if (!into || !now) return;
+      if (s === 'null' || s === undefined) { if (!(id in now)) delete into[id]; }
+      else if (now[id] === s) into[id] = s; });
+    this.saveBase();
   },
   /* the cloud refused or lost a save: send what's still waiting again, after a growing pause */
   retryOut() {
@@ -1141,7 +1153,10 @@ function describePatch(patch) {
     if (c === 'sales') { const n = orders.size, who = [...orders].map(o => { const r = db.sales.find(s => (s.orderId || s.id) === o); return r && r.customer; }).filter(Boolean);
       parts.push(`${n} ${SAVE_NAMES.sales[n === 1 ? 0 : 1]}${who.length === 1 ? ' for ' + who[0] : ''} (${s.size} line${s.size === 1 ? '' : 's'})`); }
     else parts.push(`${s.size} ${SAVE_NAMES[c][s.size === 1 ? 0 : 1]}`); });
-  const nd = Object.values(del).reduce((t, s) => t + s.size, 0);
+  const nd = Object.entries(del).reduce((t, [c, s]) => t + [...s].filter(id => {
+    /* a line taken out of a sale that is saved now is part of that sale's update, not a deleted entry */
+    if (c !== 'sales' || !Cloud.base || !Cloud.base.sales[id]) return true;
+    const r = JSON.parse(Cloud.base.sales[id]); return !orders.has(r.orderId || r.id); }).length, 0);
   if (nd) parts.push(`${nd} entr${nd === 1 ? 'y' : 'ies'} deleted`);
   return parts.join(' · ');
 }

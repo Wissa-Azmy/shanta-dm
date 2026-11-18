@@ -37,14 +37,14 @@ function openOrder(id, preset) {
   const o = id ? salesOrders().find(x => x.id === id) : null;
   if (o) {
     const h = o.h, ex = {};
-    o.costs.forEach(e => { const k = e.extraKey || e.id; ex[k] = Object.assign(ex[k] || { category: e.category, description: e.description || '', charge: '' }, { cost: num(e.amount), paidBy: e.paidBy }); });
-    o.extras.filter(s => !s.discount).forEach(s => { const k = s.extraKey || s.id; ex[k] = Object.assign(ex[k] || { category: s.category || 'Other', description: s.product || '', cost: '', paidBy: 'friend' }, { charge: num(s.unitPrice) }); });
+    o.costs.forEach(e => { const k = e.extraKey || e.id; ex[k] = Object.assign(ex[k] || { key: k, category: e.category, description: e.description || '', charge: '' }, { cost: num(e.amount), paidBy: e.paidBy }); });
+    o.extras.filter(s => !s.discount).forEach(s => { const k = s.extraKey || s.id; ex[k] = Object.assign(ex[k] || { key: k, category: s.category || 'Other', description: s.product || '', cost: '', paidBy: 'friend' }, { charge: num(s.unitPrice) }); });
     const disc = -o.extras.filter(s => s.discount).reduce((a, s) => a + num(s.qty) * num(s.unitPrice), 0)
       + o.lines.reduce((a, s) => a + (num(s.listPrice) ? num(s.qty) * (num(s.listPrice) - num(s.unitPrice)) : 0), 0);
     OR = { id: o.id, isNew: false,
       h: { date: h.date, customer: h.customer || '', place: h.place || '', receivedBy: h.receivedBy || 'friend', method: h.method || 'Cash', paid: !!h.paid, payMode: h.payMode || (h.paid ? 'full' : 'credit'), downPayment: h.downPayment || '', dueDate: h.dueDate || '', currency: h.currency || 'EGP', rate: h.rate || db.settings.rate, kind: h.kind || 'sale', notes: h.notes || '', discount: disc > 0 ? Math.round(disc * 100) / 100 : '' },
-      lines: o.lines.map(s => ({ purchaseId: s.purchaseId, qty: num(s.qty), unitPrice: h.kind === 'sale' ? r2(num(s.listPrice) || num(s.unitPrice)) : '' })),
-      extras: Object.values(ex),
+      lines: o.lines.map(s => ({ id: s.id, purchaseId: s.purchaseId, qty: num(s.qty), unitPrice: h.kind === 'sale' ? r2(num(s.listPrice) || num(s.unitPrice)) : '' })),
+      extras: Object.values(ex), oldExtras: o.extras.map(s => s.id),
       old: { sales: o.lines.concat(o.extras).map(s => s.id), exps: o.costs.map(e => e.id) }, orig: {} };
     o.lines.forEach(s => OR.orig[s.purchaseId] = (OR.orig[s.purchaseId] || 0) + num(s.qty));
   } else {
@@ -185,16 +185,19 @@ function saveOrder() {
     receivedBy: h.receivedBy, method: h.method, paid: sale && h.payMode === 'full', payMode: sale ? h.payMode : '', downPayment: sale && h.payMode === 'down' ? num(h.downPayment) : '', dueDate: sale && h.payMode !== 'full' ? h.dueDate : '', notes: h.notes };
   db.sales = db.sales.filter(s => !OR.old.sales.includes(s.id));
   db.expenses = db.expenses.filter(e => !OR.old.exps.includes(e.id));
+  /* an edited sale keeps the ids of its lines and extras, so the cloud sees an update, not 8 deletions + 8 new entries */
+  const used = new Set(), poolS = (OR.oldExtras || []).slice(), poolE = OR.old.exps.slice();
+  const keepId = id => id && OR.old.sales.includes(id) && !used.has(id) ? (used.add(id), id) : '', nextId = pool => { while (pool.length) { const id = pool.shift(); if (!used.has(id)) { used.add(id); return id; } } return uid(); };
   /* the discount is spread over the products by their share of the products' total, like receipt coupons;
      each line keeps the price before the discount as listPrice */
   const f = disc > 0 && listTot > 0 ? (listTot - disc) / listTot : 1;
-  lines.forEach(x => db.sales.push(Object.assign({ id: uid() }, base, { purchaseId: x.purchaseId, qty: num(x.qty),
+  lines.forEach(x => db.sales.push(Object.assign({ id: keepId(x.id) || uid() }, base, { purchaseId: x.purchaseId, qty: num(x.qty),
     unitPrice: sale ? (f < 1 ? Math.round(num(x.unitPrice) * f * 10000) / 10000 : num(x.unitPrice)) : 0 }, sale && f < 1 ? { listPrice: num(x.unitPrice) } : {})));
   OR.extras.forEach(x => {
-    const key = uid(), what = x.description || x.category;
-    if (num(x.cost) > 0) db.expenses.push({ id: uid(), orderId: oid, extraKey: key, date: h.date, category: x.category, description: what, amount: num(x.cost), currency: base.currency, rate: h.rate,
+    const key = x.key || uid(), what = x.description || x.category;
+    if (num(x.cost) > 0) db.expenses.push({ id: nextId(poolE), orderId: oid, extraKey: key, date: h.date, category: x.category, description: what, amount: num(x.cost), currency: base.currency, rate: h.rate,
       paidBy: x.paidBy === 'sale' && !sale ? (h.receivedBy || 'friend') : x.paidBy, method: 'Cash', place: h.place, shipmentId: '', notes: h.customer ? 'Sale to ' + h.customer : 'Sale' });
-    if (sale && num(x.charge) > 0) db.sales.push(Object.assign({ id: uid() }, base, { extra: true, extraKey: key, purchaseId: '', product: what, category: x.category, qty: 1, unitPrice: num(x.charge) }));
+    if (sale && num(x.charge) > 0) db.sales.push(Object.assign({ id: nextId(poolS) }, base, { extra: true, extraKey: key, purchaseId: '', product: what, category: x.category, qty: 1, unitPrice: num(x.charge) }));
   });
   const after = OR.after;
   commit(); odlg().close(); toast('Sale saved');
