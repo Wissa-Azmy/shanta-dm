@@ -130,7 +130,7 @@ function drawOrder(err) {
     <h3 class="osec">Products</h3>
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th>Product</th><th class="num">Qty</th>${sale ? `<th class="num">Price per unit (${cur})</th><th class="num">Line total</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.lines.map((x, i) => { const l = R.lots[x.purchaseId];
-      return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b><span class="sub">${l.p.brand ? esc(l.p.brand) + ' · ' : ''}${avail(l.p.id)} available</span></button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
+      return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b><span class="sub">${l.p.brand ? esc(l.p.brand) + ' · ' : ''}${avail(l.p.id)} available · ${esc(shipName(l.p.shipmentId) || 'not in a box')}${whereTag(l)}</span></button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
         ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${lotMarkup(l)}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
         <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
         ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
@@ -255,13 +255,21 @@ V.sales = R => {
    One unit per scan, taken from the oldest purchase of that product that still has stock;
    when that one runs out the next scan starts a line from the next box.
    Returns the message to show, or null when the barcode isn't linked to a product. */
+/* which units a sale takes first: from boxes already in Egypt, then boxes on the way, then what is still in Germany;
+   the other way round when the sale's place is Germany */
+const saleInDE = () => { const p = String((OR && OR.h && OR.h.place) || '').toLowerCase().trim(), de = String(db.settings.cityDE || '').toLowerCase().trim(); return !!p && (p === de || /germany|deutschland|dm,/.test(p)); };
+const saleRank = l => { const w = lotWhere(l); return saleInDE() ? { de: 0, way: 1, eg: 2 }[w] : { eg: 0, way: 1, de: 2 }[w]; };
+/* a tag on units that aren't where the sale is */
+const whereTag = l => { const w = lotWhere(l), s = l.p.shipmentId && db.shipments.find(x => x.id === l.p.shipmentId);
+  if (saleInDE() ? w === 'de' : w === 'eg') return '';
+  return w === 'de' ? ' <span class="pill warn pkwhere">In Germany</span>' : w === 'way' ? ` <span class="pill pkwhere">${esc(s.status)}</span>` : ' <span class="pill pkwhere">In Egypt</span>'; };
 function addScanned(code) {
   const R = calc(), lots = eanLines(code).map(p => R.lots[p.id]).filter(Boolean);
   if (!lots.length) return null;
   const ids = lots.map(l => l.p.id), name = lots[0].p.product, brand = lots[0].p.brand || '';
   const used = id => OR.lines.filter(x => x.purchaseId === id).reduce((a, x) => a + num(x.qty), 0);
   const free = l => l.left + (OR.orig[l.p.id] || 0) - used(l.p.id);
-  lots.sort((a, b) => (a.p.date || '').localeCompare(b.p.date || ''));
+  lots.sort((a, b) => saleRank(a) - saleRank(b) || (a.p.date || '').localeCompare(b.p.date || ''));
   const l = lots.find(x => free(x) > 0);
   if (!l) return { kind: 'warn', name, brand, note: 'None left in stock' };
   const line = OR.lines.find(x => x.purchaseId === l.p.id);
@@ -505,7 +513,7 @@ function pickerLots(R) {
     stock: (a, b) => avail(b.p.id) - avail(a.p.id), newest: (a, b) => String(b.p.date || '').localeCompare(String(a.p.date || '')), price: (a, b) => suggestEGP(a) - suggestEGP(b) };
   /* name matches first when searching */
   const starts = l => words.length && pkNorm(l.p.product).startsWith(words[0]) ? 0 : 1;
-  return list.sort((a, b) => starts(a) - starts(b) || (by[OPK.sort] || by.name)(a, b)).map(l => ({ l, left: avail(l.p.id) - inSale(l.p.id), inSale: inSale(l.p.id) }));
+  return list.sort((a, b) => starts(a) - starts(b) || (by[OPK.sort] || by.name)(a, b) || saleRank(a) - saleRank(b) || String(a.p.date || '').localeCompare(String(b.p.date || ''))).map(l => ({ l, left: avail(l.p.id) - inSale(l.p.id), inSale: inSale(l.p.id) }));
 }
 function pickerHTML(R) {
   if (!OPK.open) return '';
@@ -529,7 +537,7 @@ function pickerList(R) {
   const rows = pickerLots(R), show = rows.slice(0, 60);
   if (!rows.length) return `<p class="note pkempty">No product in stock matches${OPK.q ? ` “${esc(OPK.q)}”` : ''}.</p>`;
   return `<ul class="splist">${show.map(({ l, left, inSale }, i) => `<li><button type="button" class="pkrow${i === 0 && OPK.q ? ' first' : ''}" data-o="pk-add:${esc(l.p.id)}"${left <= 0 && OPK.line < 0 ? ' disabled' : ''}>
-      <span class="spname"><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')}${l.p.brand ? ' · ' : ''}${esc(shipName(l.p.shipmentId) || 'not in a box')}</span></span>
+      <span class="spname"><b>${esc(l.p.product)}</b><span class="sub">${esc(l.p.brand || '')}${l.p.brand ? ' · ' : ''}${esc(shipName(l.p.shipmentId) || 'not in a box')}${whereTag(l)}</span></span>
       <span class="spmeta"><span class="pkleft">${left} left</span><span class="sub">${fEGP(suggestEGP(l))}</span></span>
       ${inSale ? `<span class="pill ok pkin">×${inSale}</span>` : '<span class="pkplus" aria-hidden="true">+</span>'}</button></li>`).join('')}</ul>
     ${rows.length > show.length ? `<p class="note">${rows.length - show.length} more: type more of the name to narrow it down.</p>` : ''}`;

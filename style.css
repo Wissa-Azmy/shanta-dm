@@ -1045,3 +1045,4 @@ dialog[open]{max-height:min(92vh,92dvh);overflow:auto;overscroll-behavior:contai
 #signins .sirows li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;min-height:34px}
 #signins .fgrid{margin-top:10px}
 #signins #si_msg{margin-top:8px}
+.pill.pkwhere{font-size:10.5px;padding:1px 7px;margin-inline-start:4px;vertical-align:1px}

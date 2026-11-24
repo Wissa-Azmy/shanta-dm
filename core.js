@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.24-01";
+const APP_VERSION = "2026.11.24-02";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -452,3 +452,6 @@ const ScrollLock = {
 { const sm = HTMLDialogElement.prototype.showModal;
   HTMLDialogElement.prototype.showModal = function () { const r = sm.apply(this, arguments); ScrollLock.sync(); return r; }; }
 document.addEventListener('close', () => setTimeout(() => ScrollLock.sync(), 0), true);
+
+/* where a purchase's units are: 'eg' in a delivered box, 'way' in a box on its way, 'de' not in a box yet or a box still packing */
+const lotWhere = l => { const s = l && l.p && l.p.shipmentId && db.shipments.find(x => x.id === l.p.shipmentId); return !s || s.status === 'Packing' ? 'de' : s.status === 'Delivered' ? 'eg' : 'way'; };

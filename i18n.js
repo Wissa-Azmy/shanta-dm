@@ -873,3 +873,4 @@ Object.assign(AR, { 'Target markup for this box (%)': 'هامش الربح ال�
   'Change the target markup for this box': 'غيّر هامش الربح المستهدف لهذا الصندوق' });
 rx(/^Optional: leave empty to use the default \((.+)%, Settings\)\. Sets the suggested prices of the products in this box\.$/, (m, p) => `اختياري: اتركه فارغًا لاستخدام الافتراضي (${p}%، الإعدادات). يحدد الأسعار المقترحة لمنتجات هذا الصندوق.`);
 rx(/^(.+)% \(box\) · today (.+)$/, (m, p, r) => `${p}% (الصندوق) · اليوم ${r}`);
+rx(/^(\d+) available · (.+)$/, (m, n, b) => `${n} متاح · ${b}`);
