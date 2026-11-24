@@ -1,5 +1,5 @@
 /* App version: change this with every push (date + number of the day), e.g. 2026.11.01-2 */
-const APP_VERSION = "2026.11.18-02";
+const APP_VERSION = "2026.11.24-01";
 /* ---------- helpers ---------- */
 /* a script error shows as a notice with the file and line, so a button that "does nothing" says why */
 window.addEventListener('error', e => {
@@ -422,6 +422,10 @@ function downloadCSV(name, rows) {
 const markupPct = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? Math.round(m.profit / c * 1000) / 10 : null; };
 const pct1 = p => (p > 0 ? "+" : "") + p.toFixed(1) + "%";
 const markupTag = m => { const p = markupPct(m); return p === null ? '' : `<span class="mkup ${p >= 0 ? 'up' : 'down'}" title="Markup on cost: profit ÷ (products’ cost incl. shipping + extra costs)">${pct1(p)}</span>`; };
+/* target markup: a box can have its own (shipment field "markup"); empty = the default in Settings */
+const ownMarkup = s => s && s.markup !== undefined && s.markup !== null && String(s.markup).trim() !== "" && isFinite(+s.markup) ? +s.markup : null;
+const boxMarkup = shipId => { const o = ownMarkup(shipId && db.shipments.find(x => x.id === shipId)); return o === null ? num(db.settings.targetMargin) : o; };
+const lotMarkup = l => boxMarkup(l && l.p && l.p.shipmentId);
 /* the cost the markup is measured on, shown under the profit like the discount note under the total */
 const costNote = m => { const c = num(m.landed) + num(m.cost); return c > 0.005 ? `<span class="sub">on ${fEGP(c)} cost</span>` : ''; };
 

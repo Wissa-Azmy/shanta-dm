@@ -31,6 +31,7 @@ const SCHEMAS = {
       { k: '_carrierOther', l: 'Other carrier', t: 'text', show: v => v.carrier === '__other' },
       { k: 'tracking', l: 'Tracking number', t: 'text' },
       { k: 'weight', l: 'Weighed box (kg)', t: 'number', step: '0.01', hint: 'Optional: the packed box on the scale. Products without a known weight share what is left after the known ones; also used to check the packaging %.' },
+      { k: 'markup', l: 'Target markup for this box (%)', t: 'number', step: '1', hint: () => 'Optional: leave empty to use the default (' + num(db.settings.targetMargin) + '%, Settings). Sets the suggested prices of the products in this box.' },
       { k: 'deliveredOn', l: 'Delivered on', t: 'date', show: v => v.status === 'Delivered' },
       { k: 'notes', l: 'Notes', t: 'textarea', span: true },
       { t: 'section', l: 'Shipping cost (optional, saved as an expense on this shipment)', createOnly: true },
@@ -159,9 +160,9 @@ function uniq(a) { return [...new Set(a.filter(Boolean))].sort(); }
 function saleInfo(v) {
   const R = calc(), l = R.lots[v.purchaseId];
   if (!l) return '';
-  const landedEGP = eur2egp(l.landed), sugg = landedEGP * (1 + num(db.settings.targetMargin) / 100);
+  const landedEGP = eur2egp(l.landed), mk = lotMarkup(l), sugg = landedEGP * (1 + mk / 100);
   const avg = l.sold ? l.revEGP / l.sold : 0;
-  return `Cost incl. shipping: <b>${fEGP(landedEGP)}</b> (${fEUR(l.landed)}) per unit · Price for ${db.settings.targetMargin}% markup: <b>${fEGP(Math.ceil(sugg / 5) * 5)}</b>${avg ? ` · Sold so far at avg <b>${fEGP(avg)}</b>` : ''} · In stock: <b>${l.left}</b>`;
+  return `Cost incl. shipping: <b>${fEGP(landedEGP)}</b> (${fEUR(l.landed)}) per unit · Price for ${mk}% markup: <b>${fEGP(Math.ceil(sugg / 5) * 5)}</b>${avg ? ` · Sold so far at avg <b>${fEGP(avg)}</b>` : ''} · In stock: <b>${l.left}</b>`;
 }
 
 /* ---------- modal engine ---------- */
@@ -185,7 +186,7 @@ function fieldHTML(f, v, i) {
       (list ? `<datalist id="dl_${f.k}">${list.map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : '');
     if (f.scan) input = `<div class="scanin">${input.replace('autocomplete="off"', 'autocomplete="off" inputmode="numeric"')}<button type="button" class="btn ghost" data-scanfield="${f.k}" title="Scan with the camera">${SCANICON}</button></div>`;
   }
-  return `<div class="${cls}"><label for="${id}">${esc(f.l)}${f.req ? ' *' : ''}</label>${input}${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ''}</div>`;
+  return `<div class="${cls}"><label for="${id}">${esc(f.l)}${f.req ? ' *' : ''}</label>${input}${f.hint ? `<span class="hint">${esc(typeof f.hint === "function" ? f.hint() : f.hint)}</span>` : ''}</div>`;
 }
 function visibleFields() { const S = SCHEMAS[modal.coll]; return S.fields.filter(f => (!f.createOnly || modal.isNew) && (!f.show || f.show(modal.v))); }
 function drawForm(err) {

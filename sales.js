@@ -70,7 +70,7 @@ function openOrder(id, preset) {
   const d = odlg(); drawOrder(); if (!d.open) d.showModal();
   if (OPK.open) setTimeout(() => { const q = $('#pk_q'); if (q) q.focus(); }, 60);
 }
-function suggestEGP(l) { return Math.ceil(eur2egp(l.landed) * (1 + num(db.settings.targetMargin) / 100) / 5) * 5; }
+function suggestEGP(l) { return Math.ceil(eur2egp(l.landed) * (1 + lotMarkup(l) / 100) / 5) * 5; }
 function orderTotals() {
   const R = calc(), h = OR.h, sale = h.kind === 'sale';
   const egp = a => toEGP(a, h.currency, h.rate);
@@ -131,7 +131,7 @@ function drawOrder(err) {
     <div class="tablewrap rx-table"><table class="t"><thead><tr><th>Product</th><th class="num">Qty</th>${sale ? `<th class="num">Price per unit (${cur})</th><th class="num">Line total</th>` : ''}<th></th></tr></thead><tbody>
     ${OR.lines.map((x, i) => { const l = R.lots[x.purchaseId];
       return `<tr><td>${l ? `<button type="button" class="pkpick" data-o="pk-line:${i}" title="Change the product"><b>${esc(l.p.product)}</b><span class="sub">${l.p.brand ? esc(l.p.brand) + ' · ' : ''}${avail(l.p.id)} available</span></button>` : `<button type="button" class="btn sm ghost" data-o="pk-line:${i}">Choose a product…</button>`}
-        ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${db.settings.targetMargin}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
+        ${l ? `<span class="sub">Cost incl. shipping ${fEGP(eur2egp(l.landed))} · ${lotMarkup(l)}% markup → ${fEGP(suggestEGP(l))}</span>` : ''}</td>
         <td class="num"><input class="cell n" type="text" inputmode="decimal" data-num="1" min="1" step="1" data-ol="${i}" data-k="qty" value="${esc(x.qty)}"></td>
         ${sale ? `<td class="num"><input class="cell n w" type="text" inputmode="decimal" data-num="1" min="0" step="0.01" data-ol="${i}" data-k="unitPrice" value="${esc(x.unitPrice)}" placeholder="${l ? suggestEGP(l) : ''}"></td>
         <td class="num" id="ol_t_${i}">${fAmt(num(x.qty) * num(x.unitPrice), cur)}</td>` : ''}

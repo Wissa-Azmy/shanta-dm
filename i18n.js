@@ -869,3 +869,7 @@ Object.assign(AR, { 'Sign-in methods: Google and password': 'طرق تسجيل �
   'Google sign-in added. Google and the password now both open this account.': 'تمت إضافة الدخول بجوجل. جوجل وكلمة المرور يفتحان الآن هذا الحساب.',
   'The browser blocked the Google window. Allow pop-ups for this site and try again.': 'المتصفح منع نافذة جوجل. اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مجددًا.',
   'The Google window closed before finishing.': 'أُغلقت نافذة جوجل قبل الانتهاء.', 'This sign-in method is already on.': 'طريقة الدخول هذه مفعّلة بالفعل.' });
+Object.assign(AR, { 'Target markup for this box (%)': 'هامش الربح المستهدف لهذا الصندوق (%)', 'Target markup': 'هامش الربح المستهدف', 'this box': 'لهذا الصندوق', 'default': 'الافتراضي', 'Suggested price': 'السعر المقترح',
+  'Change the target markup for this box': 'غيّر هامش الربح المستهدف لهذا الصندوق' });
+rx(/^Optional: leave empty to use the default \((.+)%, Settings\)\. Sets the suggested prices of the products in this box\.$/, (m, p) => `اختياري: اتركه فارغًا لاستخدام الافتراضي (${p}%، الإعدادات). يحدد الأسعار المقترحة لمنتجات هذا الصندوق.`);
+rx(/^(.+)% \(box\) · today (.+)$/, (m, p, r) => `${p}% (الصندوق) · اليوم ${r}`);
